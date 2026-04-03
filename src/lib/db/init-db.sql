@@ -1,8 +1,4 @@
--- 创建数据库
-CREATE DATABASE IF NOT EXISTS zisha_ecommerce;
-
--- 连接到数据库
-\c zisha_ecommerce;
+-- SQLite 初始化脚本
 
 -- 创建分类表
 CREATE TABLE IF NOT EXISTS categories (
@@ -193,6 +189,74 @@ CREATE TABLE IF NOT EXISTS recommendations (
     reward_points INTEGER DEFAULT 0,
     reward_amount DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建活动类别表
+CREATE TABLE IF NOT EXISTS activity_categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    name_en VARCHAR(255) NOT NULL,
+    name_ar VARCHAR(255) NOT NULL,
+    icon VARCHAR(255) NOT NULL,
+    color VARCHAR(50) NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建活动标识关联表
+CREATE TABLE IF NOT EXISTS product_activities (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    activity_category_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (activity_category_id) REFERENCES activity_categories(id) ON DELETE CASCADE
+);
+
+-- 创建唯一索引，确保一个产品在同一活动类别中只出现一次
+CREATE UNIQUE INDEX IF NOT EXISTS idx_product_activity_unique ON product_activities(product_id, activity_category_id);
+
+-- 插入初始活动类别
+INSERT INTO activity_categories (name, name_en, name_ar, icon, color, status) VALUES
+('限时特惠', 'Limited Time Offer', 'عرض لفترة محدودة', 'fire', '#FF5733', 'active'),
+('新品上市', 'New Arrival', 'وصل جديد', 'star', '#33FF57', 'active'),
+('畅销商品', 'Bestseller', 'الأكثر مبيعًا', 'trophy', '#3357FF', 'active'),
+('独家定制', 'Exclusive', 'حصري', 'crown', '#FF33F1', 'active'),
+('库存有限', 'Limited Stock', 'مخزون محدود', 'alert-circle', '#FFB733', 'active'),
+('包邮', 'Free Shipping', 'شحن مجاني', 'truck', '#33C1FF', 'active'),
+('一元购抽奖', 'Lucky Draw', 'سحب النعمة', 'gift', '#FF3366', 'active')
+ON CONFLICT DO NOTHING;
+
+-- 创建一元购活动表
+CREATE TABLE IF NOT EXISTS lucky_draws (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    total_equity INTEGER NOT NULL, -- 总等份
+    price_per_equity DECIMAL(10,2) DEFAULT 1.00, -- 每份价格
+    current_equity INTEGER DEFAULT 0, -- 当前已售等份
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    status VARCHAR(20) DEFAULT 'active', -- active, completed, cancelled
+    winner_id INTEGER, -- 中奖用户ID
+    winning_time TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+-- 创建一元购订单表
+CREATE TABLE IF NOT EXISTS lucky_draw_orders (
+    id SERIAL PRIMARY KEY,
+    lucky_draw_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    equity_count INTEGER NOT NULL, -- 购买等份数
+    total_amount DECIMAL(10,2) NOT NULL,
+    equity_numbers TEXT NOT NULL, -- 购买的等份号码，逗号分隔
+    status VARCHAR(20) DEFAULT 'completed', -- pending, completed, refunded
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lucky_draw_id) REFERENCES lucky_draws(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 创建索引

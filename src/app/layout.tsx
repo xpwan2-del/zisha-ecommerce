@@ -6,7 +6,7 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import { CartProvider } from "@/lib/contexts/CartContext";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { CurrencyProvider } from "@/lib/contexts/CurrencyContext";
-import { Navbar } from "@/components/Navbar";
+import { Header } from "@/components/Header";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,8 +28,8 @@ export default function RootLayout({
             <AuthProvider>
               <CartProvider>
                 <CurrencyProvider>
-                  <Navbar />
-                  <main className="pt-16">
+                  <Header />
+                  <main>
                     {children}
                   </main>
                 </CurrencyProvider>

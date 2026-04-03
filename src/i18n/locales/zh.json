@@ -1,4 +1,13 @@
 {
+  "nav": {
+    "deals": "今日特惠",
+    "allProducts": "所有商品",
+    "customize": "定制服务",
+    "luckyDraw": "一元购",
+    "account": "账户",
+    "cart": "购物车",
+    "admin": "后台管理"
+  },
   "hero": {
     "title": "正宗紫砂陶艺",
     "subtitle": "源自中国的顶级茶具",
@@ -47,7 +56,15 @@
     "add_to_cart": "加入购物车",
     "buy_now": "立即购买",
     "description": "描述",
-    "reviews": "评价"
+    "reviews": "评价",
+    "page_info": "共 {{total}} 个产品，当前第 {{currentPage}} 页，共 {{totalPages}} 页"
+  },
+  "pagination": {
+    "total": "共 {{total}} 个产品",
+    "current_page": "当前第 {{currentPage}} 页",
+    "total_pages": "共 {{totalPages}} 页",
+    "prev": "上一页",
+    "next": "下一页"
   },
   "about": {
     "title": "关于紫砂陶艺",

@@ -2,15 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
 const mockProducts = [
-  {
-    id: 1,
+  {    id: 1,
     name: "Classic Zisha Teapot",
     name_en: "Classic Zisha Teapot",
     name_ar: "إبوة زيشا الكلاسيكية",
     price: 120,
     original_price: 150,
     stock: 50,
-    category_id: "teapots",
+    category_id: "1",
     image: "https://placehold.co/400x400/e8d4c4/ffffff?text=Classic+Zisha+Teapot",
     images: [
       "https://placehold.co/400x400/e8d4c4/ffffff?text=Classic+Zisha+Teapot",
@@ -21,7 +20,11 @@ const mockProducts = [
     description: "Handcrafted from authentic Yixing clay, this classic zisha teapot is perfect for brewing all types of tea.",
     features: ["Authentic Yixing clay", "Handcrafted by skilled artisans", "150ml capacity"],
     is_limited: true,
-    discount: 20
+    discount: 20,
+    activities: [
+      { id: 1, name: "限时特惠", name_en: "Limited Time Offer", name_ar: "عرض لفترة محدودة", icon: "fire", color: "#FF5733" },
+      { id: 3, name: "畅销商品", name_en: "Bestseller", name_ar: "الأكثر مبيعًا", icon: "trophy", color: "#3357FF" }
+    ]
   },
   {
     id: 2,
@@ -31,7 +34,7 @@ const mockProducts = [
     price: 85,
     original_price: 100,
     stock: 30,
-    category_id: "cups",
+    category_id: "2",
     image: "https://placehold.co/400x400/a8d5ba/ffffff?text=Zisha+Tea+Cup+Set",
     images: [
       "https://placehold.co/400x400/a8d5ba/ffffff?text=Zisha+Tea+Cup+Set",
@@ -40,7 +43,10 @@ const mockProducts = [
     description: "Beautiful set of 4 zisha tea cups, perfect for tea ceremonies.",
     features: ["Set of 4 cups", "Handmade", "Elegant design"],
     is_limited: false,
-    discount: 0
+    discount: 0,
+    activities: [
+      { id: 2, name: "新品上市", name_en: "New Arrival", name_ar: "وصل جديد", icon: "star", color: "#33FF57" }
+    ]
   },
   {
     id: 3,
@@ -50,7 +56,7 @@ const mockProducts = [
     price: 200,
     original_price: 250,
     stock: 20,
-    category_id: "teapots",
+    category_id: "1",
     image: "https://placehold.co/400x400/f4d03f/ffffff?text=Premium+Zisha+Teapot",
     images: [
       "https://placehold.co/400x400/f4d03f/ffffff?text=Premium+Zisha+Teapot",
@@ -60,7 +66,11 @@ const mockProducts = [
     description: "Premium quality zisha teapot with gold trim, perfect for special occasions.",
     features: ["Premium quality", "Gold trim", "200ml capacity"],
     is_limited: true,
-    discount: 15
+    discount: 15,
+    activities: [
+      { id: 4, name: "独家定制", name_en: "Exclusive", name_ar: "حصري", icon: "crown", color: "#FF33F1" },
+      { id: 5, name: "库存有限", name_en: "Limited Stock", name_ar: "مخزون محدود", icon: "alert-circle", color: "#FFB733" }
+    ]
   },
   {
     id: 4,
@@ -70,7 +80,7 @@ const mockProducts = [
     price: 350,
     original_price: 400,
     stock: 15,
-    category_id: "sets",
+    category_id: "3",
     image: "https://placehold.co/400x400/27ae60/ffffff?text=Traditional+Tea+Set",
     images: [
       "https://placehold.co/400x400/27ae60/ffffff?text=Traditional+Tea+Set",
@@ -79,7 +89,12 @@ const mockProducts = [
     description: "Complete traditional tea set with teapot and 6 cups.",
     features: ["Complete set", "Teapot + 6 cups", "Traditional design"],
     is_limited: false,
-    discount: 10
+    discount: 10,
+    activities: [
+      { id: 1, name: "限时特惠", name_en: "Limited Time Offer", name_ar: "عرض لفترة محدودة", icon: "fire", color: "#FF5733" },
+      { id: 2, name: "新品上市", name_en: "New Arrival", name_ar: "وصل جديد", icon: "star", color: "#33FF57" },
+      { id: 3, name: "畅销商品", name_en: "Bestseller", name_ar: "الأكثر مبيعًا", icon: "trophy", color: "#3357FF" }
+    ]
   }
 ];
 
@@ -95,31 +110,33 @@ export async function GET(request: NextRequest) {
   
   try {
     
-    let whereClause = 'WHERE 1=1';
+    let whereClause = '';
     let params: any[] = [];
-    let paramIndex = 1;
     
-    if (category) {
-      whereClause += ` AND category_id = ?`;
+    if (category && category !== 'all') {
+      whereClause = `WHERE category_id = ?`;
       params.push(category);
     }
     
     if (search) {
-      whereClause += ` AND (name LIKE ? OR name_en LIKE ? OR description LIKE ?)`;
+      whereClause += whereClause ? ' AND ' : 'WHERE ';
+      whereClause += `(name LIKE ? OR name_en LIKE ? OR description LIKE ?)`;
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     
     if (minPrice) {
-      whereClause += ` AND price >= ?`;
+      whereClause += whereClause ? ' AND ' : 'WHERE ';
+      whereClause += `price >= ?`;
       params.push(parseFloat(minPrice));
     }
     
     if (maxPrice) {
-      whereClause += ` AND price <= ?`;
+      whereClause += whereClause ? ' AND ' : 'WHERE ';
+      whereClause += `price <= ?`;
       params.push(parseFloat(maxPrice));
     }
     
-    let orderBy = 'ORDER BY created_at DESC';
+    let orderBy = 'ORDER BY id DESC';
     switch (sort) {
       case 'price-asc':
         orderBy = 'ORDER BY price ASC';
@@ -136,7 +153,7 @@ export async function GET(request: NextRequest) {
     
     const countQuery = `SELECT COUNT(*) as count FROM products ${whereClause}`;
     const countResult = await query(countQuery, params);
-    const total = parseInt(countResult.rows[0].count);
+    const total = countResult.rows && countResult.rows[0] ? parseInt(countResult.rows[0].count) : 0;
     
     const productsQuery = `
       SELECT * FROM products
@@ -147,7 +164,31 @@ export async function GET(request: NextRequest) {
     params.push(limit, offset);
     
     const productsResult = await query(productsQuery, params);
-    const products = productsResult.rows;
+    const products = productsResult.rows.map((row: any) => {
+      // 处理images和features字段
+      if (row.images) {
+        try {
+          row.images = JSON.parse(row.images);
+        } catch (error) {
+          row.images = [];
+        }
+      } else {
+        row.images = [];
+      }
+      
+      if (row.features) {
+        try {
+          row.features = JSON.parse(row.features);
+        } catch (error) {
+          row.features = [];
+        }
+      } else {
+        row.features = [];
+      }
+      
+      row.activities = [];
+      return row;
+    });
     
     const totalPages = Math.ceil(total / limit);
     
@@ -160,55 +201,12 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching products:', error);
     
-    let filteredProducts = mockProducts;
-    
-    if (category) {
-      filteredProducts = filteredProducts.filter(p => p.category_id === category);
-    }
-    
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filteredProducts = filteredProducts.filter(p => 
-        p.name.toLowerCase().includes(searchLower) ||
-        p.name_en.toLowerCase().includes(searchLower) ||
-        p.name_ar.includes(search) ||
-        p.description.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    if (minPrice) {
-      filteredProducts = filteredProducts.filter(p => p.price >= parseFloat(minPrice));
-    }
-    
-    if (maxPrice) {
-      filteredProducts = filteredProducts.filter(p => p.price <= parseFloat(maxPrice));
-    }
-    
-    let sortedProducts = [...filteredProducts];
-    switch (sort) {
-      case 'price-asc':
-        sortedProducts.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        sortedProducts.sort((a, b) => b.price - a.price);
-        break;
-      case 'sales':
-        sortedProducts.sort((a, b) => b.stock - a.stock);
-        break;
-      default:
-        sortedProducts.sort((a, b) => a.id - b.id);
-    }
-    
-    const offset = (page - 1) * limit;
-    const paginatedProducts = sortedProducts.slice(offset, offset + limit);
-    const total = sortedProducts.length;
-    const totalPages = Math.ceil(total / limit);
-    
+    // 直接返回空数据，不使用mock数据
     return NextResponse.json({
-      products: paginatedProducts,
-      total,
-      page,
-      totalPages
+      products: [],
+      total: 0,
+      page: 1,
+      totalPages: 0
     });
   }
 }

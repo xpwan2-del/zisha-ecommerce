@@ -109,14 +109,14 @@ export default function CustomizePage() {
   return (
     <div className="py-12 px-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 min-h-screen">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-4xl font-bold mb-12 text-center text-amazon-dark dark:text-white tracking-tight">{t('customize.title')}</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-8 sm:mb-12 text-center text-amazon-dark dark:text-white tracking-tight">{t('customize.title')}</h1>
         
         {/* 进度条 */}
-        <div className="mb-12 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-100 dark:border-gray-700">
-          <div className="flex justify-between items-center mb-6">
+        <div className="mb-8 sm:mb-12 bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100 dark:border-gray-700">
+          <div className="flex justify-between items-center mb-4 sm:mb-6 overflow-x-auto pb-2">
             {[...Array(7)].map((_, index) => (
-              <div key={index} className="flex flex-col items-center">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold mb-3 transition-all duration-300 ease-in-out ${step > index + 1 ? 'bg-amazon-orange text-white shadow-lg shadow-amazon-orange/20' : step === index + 1 ? 'bg-amazon-orange text-white shadow-lg shadow-amazon-orange/20 scale-110' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+              <div key={index} className="flex flex-col items-center min-w-[80px]">
+                <div className={`w-10 sm:w-12 h-10 sm:h-12 rounded-full flex items-center justify-center font-bold mb-2 sm:mb-3 transition-all duration-300 ease-in-out ${step > index + 1 ? 'bg-amazon-orange text-white shadow-lg shadow-amazon-orange/20' : step === index + 1 ? 'bg-amazon-orange text-white shadow-lg shadow-amazon-orange/20 scale-110' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
                   {index + 1}
                 </div>
                 <span className={`text-xs font-medium transition-all duration-300 ${step > index + 1 ? 'text-amazon-orange' : step === index + 1 ? 'text-amazon-orange font-semibold' : 'text-gray-500'}`}>
@@ -125,17 +125,17 @@ export default function CustomizePage() {
               </div>
             ))}
           </div>
-          <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 sm:h-3 overflow-hidden">
             <div className="bg-amazon-orange h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${((step - 1) / 6) * 100}%` }}></div>
           </div>
         </div>
         
         {/* 步骤内容 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-8 mb-8 border border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 sm:p-8 mb-8 border border-gray-100 dark:border-gray-700">
           {/* 步骤1：选择壶型 */}
           {step === 1 && (
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step1')}</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step1')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {teapotTypes.map((type) => (
                   <div
@@ -536,11 +536,11 @@ export default function CustomizePage() {
           )}
           
           {/* 导航按钮 */}
-          <div className="mt-16 flex justify-between items-center">
+          <div className="mt-12 sm:mt-16 flex flex-col sm:flex-row justify-between items-center gap-4">
             <button
               onClick={handlePrev}
               disabled={step === 1}
-              className="px-8 py-4 border border-gray-200 dark:border-gray-700 rounded-xl font-medium disabled:opacity-50 transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-300"
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 border border-gray-200 dark:border-gray-700 rounded-xl font-medium disabled:opacity-50 transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-300"
             >
               {t('customize.prev')}
             </button>
@@ -549,14 +549,14 @@ export default function CustomizePage() {
               <button
                 onClick={handleNext}
                 disabled={step === 1 && !customData.teapotType}
-                className="px-8 py-4 bg-amazon-orange text-amazon-dark rounded-xl font-semibold disabled:opacity-50 transition-all duration-300 hover:bg-amazon-light-orange hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amazon-orange/50 transform hover:scale-105 active:scale-95"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-amazon-orange text-amazon-dark rounded-xl font-semibold disabled:opacity-50 transition-all duration-300 hover:bg-amazon-light-orange hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amazon-orange/50 transform hover:scale-105 active:scale-95"
               >
                 {t('customize.next')}
               </button>
             ) : (
               <button
                 onClick={handleComplete}
-                className="px-8 py-4 bg-amazon-orange text-amazon-dark rounded-xl font-semibold transition-all duration-300 hover:bg-amazon-light-orange hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amazon-orange/50 transform hover:scale-105 active:scale-95"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-amazon-orange text-amazon-dark rounded-xl font-semibold transition-all duration-300 hover:bg-amazon-light-orange hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amazon-orange/50 transform hover:scale-105 active:scale-95"
               >
                 {t('customize.complete')}
               </button>

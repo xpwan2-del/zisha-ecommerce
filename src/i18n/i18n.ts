@@ -13,6 +13,11 @@ const fallbackTranslations = {
 
 // Function to load translations from database
 async function loadTranslationsFromDatabase() {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
   try {
     const response = await fetch('/api/translations');
     if (response.ok) {
@@ -49,21 +54,23 @@ i18n
     },
   });
 
-// Load translations from database and update i18n
-loadTranslationsFromDatabase().then((dbTranslations) => {
-  if (dbTranslations) {
-    // Update i18n resources with database translations
-    Object.keys(dbTranslations).forEach((lng) => {
-      if (i18n.hasResourceBundle(lng, 'translation')) {
-        const existingTranslations = i18n.getResourceBundle(lng, 'translation');
-        const newTranslations = {
-          ...existingTranslations,
-          ...dbTranslations[lng],
-        };
-        i18n.addResourceBundle(lng, 'translation', newTranslations, true, true);
-      }
-    });
-  }
-});
+// Load translations from database and update i18n (only in browser)
+if (typeof window !== 'undefined') {
+  loadTranslationsFromDatabase().then((dbTranslations) => {
+    if (dbTranslations) {
+      // Update i18n resources with database translations
+      Object.keys(dbTranslations).forEach((lng) => {
+        if (i18n.hasResourceBundle(lng, 'translation')) {
+          const existingTranslations = i18n.getResourceBundle(lng, 'translation');
+          const newTranslations = {
+            ...existingTranslations,
+            ...dbTranslations[lng],
+          };
+          i18n.addResourceBundle(lng, 'translation', newTranslations, true, true);
+        }
+      });
+    }
+  });
+}
 
 export default i18n;

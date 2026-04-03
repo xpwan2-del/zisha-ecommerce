@@ -171,7 +171,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   
   try {
     const result = await query(
-      'SELECT * FROM products WHERE id = $1',
+      'SELECT * FROM products WHERE id = ?',
       [id]
     );
     
@@ -179,17 +179,52 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
     
-    return NextResponse.json(result.rows[0]);
-  } catch (error) {
-    console.error('Error fetching product:', error);
+    const product = result.rows[0];
     
-    const product = mockProducts.find(p => p.id === parseInt(id));
+    if (product.images && typeof product.images === 'string') {
+      try {
+        product.images = JSON.parse(product.images);
+      } catch (e) {
+        product.images = [];
+      }
+    }
     
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    if (product.features && typeof product.features === 'string') {
+      try {
+        product.features = JSON.parse(product.features);
+      } catch (e) {
+        product.features = [];
+      }
+    }
+    
+    if (product.specifications && typeof product.specifications === 'string') {
+      try {
+        product.specifications = JSON.parse(product.specifications);
+      } catch (e) {
+        product.specifications = {};
+      }
+    }
+    
+    if (product.shipping && typeof product.shipping === 'string') {
+      try {
+        product.shipping = JSON.parse(product.shipping);
+      } catch (e) {
+        product.shipping = {};
+      }
+    }
+    
+    if (product.after_sale && typeof product.after_sale === 'string') {
+      try {
+        product.after_sale = JSON.parse(product.after_sale);
+      } catch (e) {
+        product.after_sale = {};
+      }
     }
     
     return NextResponse.json(product);
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    return NextResponse.json({ error: 'Product not found' }, { status: 404 });
   }
 }
 
@@ -202,26 +237,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     
     const result = await query(
       `UPDATE products SET
-       name = $1,
-       name_en = $2,
-       name_ar = $3,
-       price = $4,
-       original_price = $5,
-       stock = $6,
-       category_id = $7,
-       image = $8,
-       images = $9,
-       video = $10,
-       description = $11,
-       features = $12,
-       specifications = $13,
-       shipping = $14,
-       after_sale = $15,
-       is_limited = $16,
-       discount = $17
-       WHERE id = $18
-       RETURNING *`,
-      [name, name_en, name_ar, price, original_price || 0, stock, category_id, image, images || [], video || '', description, features || [], specifications || {}, shipping || {}, after_sale || {}, is_limited || false, discount || 0, id]
+       name = ?,
+       name_en = ?,
+       name_ar = ?,
+       price = ?,
+       original_price = ?,
+       stock = ?,
+       category_id = ?,
+       image = ?,
+       images = ?,
+       video = ?,
+       description = ?,
+       features = ?,
+       specifications = ?,
+       shipping = ?,
+       after_sale = ?,
+       is_limited = ?,
+       discount = ?
+       WHERE id = ?`,
+      [name, name_en, name_ar, price, original_price || 0, stock, category_id, image, JSON.stringify(images || []), video || '', description, JSON.stringify(features || []), JSON.stringify(specifications || {}), JSON.stringify(shipping || {}), JSON.stringify(after_sale || {}), is_limited || false, discount || 0, id]
     );
     
     if (result.rows.length === 0) {
@@ -240,7 +274,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { id } = await params;
     
     const result = await query(
-      'DELETE FROM products WHERE id = $1 RETURNING *',
+      'DELETE FROM products WHERE id = ?',
       [id]
     );
     

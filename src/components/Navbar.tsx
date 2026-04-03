@@ -178,30 +178,30 @@ export function Navbar() {
       {/* Bottom navigation */}
       <div className="bg-gray-100 dark:bg-gray-700 border-t border-amazon-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-10">
+          <div className="flex flex-wrap items-center justify-between py-3">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded mb-2 sm:mb-0"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
               <span>All</span>
             </button>
-            <div className="hidden sm:flex sm:space-x-6 ml-4">
-              <a href="/products?category=teapots" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+              <a href="/products?category=teapots" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
                 {t('categories.items.0') || 'Teapots'}
               </a>
-              <a href="/products?category=cups" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue">
+              <a href="/products?category=cups" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
                 {t('categories.items.1') || 'Cups'}
               </a>
-              <a href="/products?category=accessories" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue">
+              <a href="/products?category=accessories" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
                 {t('categories.items.2') || 'Accessories'}
               </a>
-              <a href="/products?category=sets" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue">
+              <a href="/products?category=sets" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
                 {t('categories.items.3') || 'Sets'}
               </a>
-              <a href="/customize" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue">
+              <a href="/customize" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
                 Customize
               </a>
             </div>
