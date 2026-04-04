@@ -32,7 +32,7 @@ export function Header() {
   };
 
   return (
-    <header className="bg-amazon-blue text-white shadow-md">
+    <header className="bg-white text-gray-800 shadow-md">
       {/* 顶部导航栏 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
@@ -42,16 +42,16 @@ export function Header() {
               <img src={logoUrl} alt="Zisha" className="h-14 w-auto" />
             </a>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              <a href="/deals" className="border-amazon-orange text-white border-b-2 px-3 py-2 text-sm font-medium">
+              <a href="/deals" className="border-amazon-orange text-gray-800 border-b-2 px-3 py-2 text-sm font-medium hover:text-amazon-orange">
                 {t("nav.deals", "今日特惠")}
               </a>
-              <a href="/products" className="border-transparent hover:border-amazon-orange px-3 py-2 text-sm font-medium">
+              <a href="/products" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
                 {t("nav.allProducts", "所有商品")}
               </a>
-              <a href="/customize" className="border-transparent hover:border-amazon-orange px-3 py-2 text-sm font-medium">
+              <a href="/customize" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
                 {t("nav.customize", "定制服务")}
               </a>
-              <a href="/lucky-draws" className="border-transparent hover:border-amazon-orange px-3 py-2 text-sm font-medium">
+              <a href="/lucky-draws" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
                 {t("nav.luckyDraw", "一元购")}
               </a>
             </div>
