@@ -56,6 +56,7 @@ export default function DealsPage() {
   }, []);
 
   const filteredProducts = products.filter((product) => {
+    if (product.discount <= 0) return false;
     if (activeCategory === "all") return true;
     if (activeCategory === "teapots") return product.name_en?.toLowerCase().includes("teapot") || product.name?.includes("壶");
     if (activeCategory === "cups") return product.name_en?.toLowerCase().includes("cup") || product.name?.includes("杯");
