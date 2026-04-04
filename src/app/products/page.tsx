@@ -17,7 +17,7 @@ export default function ProductsPage() {
 function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { currency } = useCurrency();
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -157,7 +157,7 @@ function ProductsContent() {
                   ? 'bg-primary text-white' 
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               >
-                {t('locale') === 'zh' ? category.name : t('locale') === 'en' ? category.name_en : category.name_ar}
+                {i18n.language === 'zh' ? category.name : i18n.language === 'en' ? category.name_en : category.name_ar}
               </button>
             ))}
             <button
@@ -178,7 +178,7 @@ function ProductsContent() {
         
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Right content - products */}
-          <div className="lg:w-3/4">
+          <div className="w-full">
             {/* Products grid */}
             {isLoading ? (
               <div className="flex justify-center items-center h-96">
