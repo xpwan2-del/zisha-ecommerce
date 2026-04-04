@@ -177,8 +177,8 @@ function ProductsContent() {
         </div>
         
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left sidebar - filters */}
-          <div className="lg:w-1/4">
+          {/* Left sidebar - filters - hidden on mobile */}
+          <div className="hidden lg:block lg:w-1/4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <h3 className="text-lg font-semibold mb-4">{t('products.filters')}</h3>
               
