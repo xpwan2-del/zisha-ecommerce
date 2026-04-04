@@ -177,31 +177,31 @@ export function Navbar() {
 
       {/* Bottom navigation */}
       <div className="bg-gray-100 dark:bg-gray-700 border-t border-amazon-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between py-3">
+        <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-2 overflow-x-auto">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded mb-2 sm:mb-0"
+              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded flex-shrink-0"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
               <span>All</span>
             </button>
-            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-              <a href="/products?category=teapots" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
+            <div className="flex items-center gap-3 sm:gap-6 flex-nowrap overflow-x-auto">
+              <a href="/products?category=teapots" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.0') || 'Teapots'}
               </a>
-              <a href="/products?category=cups" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
+              <a href="/products?category=cups" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.1') || 'Cups'}
               </a>
-              <a href="/products?category=accessories" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
+              <a href="/products?category=accessories" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.2') || 'Accessories'}
               </a>
-              <a href="/products?category=sets" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
+              <a href="/products?category=sets" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.3') || 'Sets'}
               </a>
-              <a href="/customize" className="text-sm text-gray-700 dark:text-gray-300 hover:text-amazon-blue whitespace-nowrap">
+              <a href="/customize" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 Customize
               </a>
             </div>
@@ -213,22 +213,22 @@ export function Navbar() {
       {isMenuOpen && (
         <div className="sm:hidden bg-white dark:bg-gray-800 shadow-lg">
           <div className="pt-2 pb-3 space-y-1">
-            <a href="/products" className="block px-4 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <a href="/products" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               All Products
             </a>
-            <a href="/products?category=teapots" className="block px-4 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <a href="/products?category=teapots" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               {t('categories.items.0') || 'Teapots'}
             </a>
-            <a href="/products?category=cups" className="block px-4 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <a href="/products?category=cups" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               {t('categories.items.1') || 'Cups'}
             </a>
-            <a href="/products?category=accessories" className="block px-4 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <a href="/products?category=accessories" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               {t('categories.items.2') || 'Accessories'}
             </a>
-            <a href="/products?category=sets" className="block px-4 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <a href="/products?category=sets" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               {t('categories.items.3') || 'Sets'}
             </a>
-            <a href="/customize" className="block px-4 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <a href="/customize" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               Customize
             </a>
           </div>
