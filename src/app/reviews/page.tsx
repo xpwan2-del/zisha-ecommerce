@@ -131,7 +131,7 @@ export default function ReviewsPage() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="text-lg">{renderStars(review.rating)}</div>
-                    <span className="text-sm text-gray-600">{review.rating.toFixed(1)}</span>
+                    <span className="text-sm text-gray-600">{Number(review.rating).toFixed(1)}</span>
                   </div>
                   <span className="text-sm text-gray-500">{formatDate(review.created_at)}</span>
                 </div>
@@ -186,7 +186,7 @@ export default function ReviewsPage() {
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{review.product.name}</p>
-                        <p className="text-sm text-amazon-orange font-bold">¥{review.product.price.toFixed(2)}</p>
+                        <p className="text-sm text-amazon-orange font-bold">¥{Number(review.product.price).toFixed(2)}</p>
                       </div>
                       <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

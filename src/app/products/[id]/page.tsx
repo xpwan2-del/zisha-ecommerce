@@ -488,7 +488,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{review.product.name}</p>
-                        <p className="text-sm text-amazon-orange font-bold">¥{review.product.price.toFixed(2)}</p>
+                        <p className="text-sm text-amazon-orange font-bold">¥{Number(review.product.price).toFixed(2)}</p>
                       </div>
                       <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

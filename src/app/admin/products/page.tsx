@@ -83,7 +83,7 @@ export default function ProductsPage() {
                     </td>
                     <td className="py-3 px-4">{product.name}</td>
                     <td className="py-3 px-4">{product.category}</td>
-                    <td className="py-3 px-4">${product.price.toFixed(2)}</td>
+                    <td className="py-3 px-4">${Number(product.price).toFixed(2)}</td>
                     <td className="py-3 px-4">{product.stock}</td>
                     <td className="py-3 px-4">
                       <div className="flex space-x-2">

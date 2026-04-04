@@ -162,7 +162,7 @@ export default function CustomizePage() {
                       <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{type.name_en}</p>
                       <div className="flex justify-between items-center">
                         <p className="text-xs text-gray-500">{type.min_capacity}-{type.max_capacity}ml</p>
-                        <p className="text-sm font-bold text-amazon-orange">${type.base_price.toFixed(2)}</p>
+                        <p className="text-sm font-bold text-amazon-orange">${Number(type.base_price).toFixed(2)}</p>
                       </div>
                     </div>
                   </div>
@@ -199,7 +199,7 @@ export default function CustomizePage() {
                       <h3 className="font-semibold mb-1 text-amazon-dark dark:text-white">{material.name}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{material.description}</p>
                       {material.price_modifier > 0 && (
-                        <p className="text-sm font-bold text-amazon-orange">+${material.price_modifier.toFixed(2)}</p>
+                        <p className="text-sm font-bold text-amazon-orange">+${Number(material.price_modifier).toFixed(2)}</p>
                       )}
                     </div>
                   </div>
