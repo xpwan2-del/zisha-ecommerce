@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
 export function Header() {
+  const router = useRouter();
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
@@ -193,6 +195,42 @@ export function Header() {
               </svg>
             </button>
           </form>
+        </div>
+
+        {/* 手机端分类Tab */}
+        <div className="md:hidden bg-white border-t border-gray-200">
+          <div className="flex overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => router.push('/products')}
+              className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-amazon-orange text-amazon-orange"
+            >
+              All
+            </button>
+            <button
+              onClick={() => router.push('/products?category=1')}
+              className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
+            >
+              {t("categories.items.0", "茶壶")}
+            </button>
+            <button
+              onClick={() => router.push('/products?category=2')}
+              className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
+            >
+              {t("categories.items.1", "茶杯")}
+            </button>
+            <button
+              onClick={() => router.push('/products?category=3')}
+              className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
+            >
+              {t("categories.items.2", "配件")}
+            </button>
+            <button
+              onClick={() => router.push('/products?category=4')}
+              className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
+            >
+              {t("categories.items.3", "套组")}
+            </button>
+          </div>
         </div>
 
         {/* 移动端导航菜单 */}
