@@ -155,8 +155,8 @@ export default function Home() {
       {/* 主内容区域 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* 左侧分类筛选 */}
-          <div className="lg:w-1/4">
+          {/* 左侧分类筛选 - 只在桌面端显示 */}
+          <div className="hidden lg:block lg:w-1/4">
             <div className="bg-white rounded-md shadow-sm p-4 mb-6">
               <h3 className="text-lg font-semibold mb-4">{t("categories.title", "分类")}</h3>
               <ul className="space-y-2">
