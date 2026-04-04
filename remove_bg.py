@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-from PIL import Image
+from PIL import Image, ImageOps
 
-def process_logo(input_path, output_path, scale=0.7, threshold=240):
+def process_logo(input_path, output_path, scale=0.49, threshold=240):
     img = Image.open(input_path).convert("RGBA")
     datas = img.getdata()
 
@@ -17,14 +17,17 @@ def process_logo(input_path, output_path, scale=0.7, threshold=240):
 
     if bbox:
         cropped = img.crop(bbox)
+
+        border_size = max(2, int(min(cropped.width, cropped.height) * 0.02))
+        bordered = ImageOps.expand(cropped, border=border_size, fill='white')
+
         w = int((bbox[2] - bbox[0]) * scale)
         h = int((bbox[3] - bbox[1]) * scale)
-        resized = cropped.resize((w, h), Image.LANCZOS)
+        resized = bordered.resize((w, h), Image.LANCZOS)
         resized.save(output_path, "PNG")
-        print(f"Scaled {scale*100:.0f}%, cropped to {bbox}, final size {w}x{h}")
+        print(f"Scaled {scale*100:.0f}%, with white border {border_size}px, final size {w}x{h}")
     else:
         img.save(output_path, "PNG")
-        print("Saved without cropping")
 
 if __name__ == "__main__":
     process_logo(
