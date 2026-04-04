@@ -185,7 +185,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     product.price = parseFloat(String(product.price)) || 0;
     product.original_price = parseFloat(String(product.original_price)) || 0;
     product.stock = parseInt(String(product.stock)) || 0;
-    product.inStock = product.stock > 0;
+    (product as any).inStock = product.stock > 0;
 
     if (product.images && typeof product.images === 'string') {
       try {
