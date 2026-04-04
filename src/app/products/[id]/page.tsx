@@ -164,22 +164,6 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
           {/* 左侧图片区域 */}
           <div className="lg:w-1/2">
             <div className="bg-white rounded-md shadow-sm overflow-hidden mb-4 relative">
-              {/* 活动标签 */}
-              {activities.length > 0 && (
-                <div className="absolute top-4 left-4 z-10 flex gap-2">
-                  {activities.map((activity: any) => (
-                    <div
-                      key={activity.id}
-                      className="flex items-center bg-white/90 backdrop-blur-sm shadow-md px-3 py-1 rounded-full"
-                      style={{ borderLeft: `4px solid ${activity.color}` }}
-                    >
-                      <span className="mr-1">{activity.icon}</span>
-                      <span className="text-sm font-medium">{activity.name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
               {/* 主媒体展示 */}
               <div className="aspect-square relative bg-white">
                 {/* 视频播放 */}
@@ -252,12 +236,21 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
           <div className="lg:w-1/2">
             <div className="bg-white rounded-md shadow-sm p-6">
               <div className="flex flex-wrap items-center gap-2 mb-4">
+                {activities.length > 0 && activities.map((activity: any) => (
+                  <span
+                    key={activity.id}
+                    className="text-white text-xs font-bold px-2 py-1 rounded"
+                    style={{ backgroundColor: activity.id === 28 ? '#FF0000' : activity.color }}
+                  >
+                    {activity.icon} {activity.name}
+                  </span>
+                ))}
                 {product.bestSeller && (
                   <span className="bg-amazon-orange text-white text-xs font-bold px-2 py-1 rounded">
                     {t("products.limited_offer", "畅销")}
                   </span>
                 )}
-                {product.discount > 0 && (
+                {product.discount > 0 && !activities.find(a => a.id === 28) && (
                   <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
                     {t("products.limited_offer", "限时特惠")}
                   </span>
