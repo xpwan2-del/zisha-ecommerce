@@ -181,7 +181,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     const product = result.rows[0];
 
-    // 确保数值类型正确
+    // 确保数值类型正确并计算库存状态
     product.price = parseFloat(String(product.price)) || 0;
     product.original_price = parseFloat(String(product.original_price)) || 0;
     product.stock = parseInt(String(product.stock)) || 0;
