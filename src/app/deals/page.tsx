@@ -171,7 +171,7 @@ export default function DealsPage() {
                     <span className="text-lg font-bold text-red-500">
                       {formatCurrency(convertCurrency(product.price, "aed", currency), currency)}
                     </span>
-                    {product.original_price > product.price && (
+                    {product.original_price > 0 && product.original_price > product.price && (
                       <span className="text-sm text-gray-400 line-through">
                         {formatCurrency(convertCurrency(product.original_price, "aed", currency), currency)}
                       </span>

@@ -209,7 +209,7 @@ function ProductsContent() {
                         <h3 className="text-lg font-semibold mb-2 line-clamp-2">{product.name}</h3>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="text-xl font-bold text-primary">{formatCurrency(convertCurrency(product.price, 'aed', currency), currency)}</span>
-                          {product.original_price > product.price && (
+                          {product.original_price > 0 && product.original_price > product.price && (
                             <span className="text-sm text-gray-500 line-through">{formatCurrency(convertCurrency(product.original_price, 'aed', currency), currency)}</span>
                           )}
                         </div>
