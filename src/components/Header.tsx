@@ -26,7 +26,7 @@ export function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <a href="/" className="flex-shrink-0">
-              <span className="text-2xl font-bold">Zisha</span>
+              <img src="/logo.png" alt="Zisha" className="h-10 w-auto" />
             </a>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <a href="/deals" className="border-amazon-orange text-white border-b-2 px-3 py-2 text-sm font-medium">
