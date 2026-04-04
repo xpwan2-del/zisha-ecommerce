@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
         after_sale TEXT,
         is_limited INTEGER DEFAULT 0,
         discount INTEGER DEFAULT 0,
+        display_mode VARCHAR(20) DEFAULT 'double',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )

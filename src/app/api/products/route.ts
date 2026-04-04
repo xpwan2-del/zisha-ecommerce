@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
 const mockProducts = [
-  {    id: 1,
+  {
+    id: 1,
     name: "Classic Zisha Teapot",
     name_en: "Classic Zisha Teapot",
     name_ar: "إبوة زيشا الكلاسيكية",
@@ -21,6 +22,7 @@ const mockProducts = [
     features: ["Authentic Yixing clay", "Handcrafted by skilled artisans", "150ml capacity"],
     is_limited: true,
     discount: 20,
+    display_mode: "single",
     activities: [
       { id: 1, name: "限时特惠", name_en: "Limited Time Offer", name_ar: "عرض لفترة محدودة", icon: "fire", color: "#FF5733" },
       { id: 3, name: "畅销商品", name_en: "Bestseller", name_ar: "الأكثر مبيعًا", icon: "trophy", color: "#3357FF" }
@@ -168,6 +170,7 @@ export async function GET(request: NextRequest) {
       row.price = parseFloat(row.price) || 0;
       row.original_price = parseFloat(row.original_price) || 0;
       row.stock = parseInt(row.stock) || 0;
+      row.display_mode = row.display_mode || 'double';
 
       if (row.images) {
         try {
@@ -229,9 +232,9 @@ export async function POST(request: NextRequest) {
     const { name, name_en, name_ar, price, original_price, stock, category_id, image, images, video, description, features, specifications, shipping, after_sale, is_limited, discount } = body;
     
     const result = await query(
-      `INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, images, video, description, features, specifications, shipping, after_sale, is_limited, discount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, name_en, name_ar, price, original_price || 0, stock, category_id, image, JSON.stringify(images || []), video || '', description, JSON.stringify(features || []), JSON.stringify(specifications || {}), JSON.stringify(shipping || {}), JSON.stringify(after_sale || {}), is_limited ? 1 : 0, discount || 0]
+      `INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, images, video, description, features, specifications, shipping, after_sale, is_limited, discount, display_mode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, name_en, name_ar, price, original_price || 0, stock, category_id, image, JSON.stringify(images || []), video || '', description, JSON.stringify(features || []), JSON.stringify(specifications || {}), JSON.stringify(shipping || {}), JSON.stringify(after_sale || {}), is_limited ? 1 : 0, discount || 0, body.display_mode || 'double']
     );
     
     return NextResponse.json(result.rows[0], { status: 201 });
