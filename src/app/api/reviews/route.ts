@@ -46,9 +46,10 @@ export async function GET(request: NextRequest) {
       } else if (lang === 'ar' && review.comment_ar) {
         comment = review.comment_ar;
       }
-      
+
       return {
         ...review,
+        rating: parseFloat(review.rating) || 0,
         comment,
         images: typeof review.images === 'string' ? JSON.parse(review.images) : review.images || []
       };

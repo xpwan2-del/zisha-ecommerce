@@ -165,7 +165,10 @@ export async function GET(request: NextRequest) {
     
     const productsResult = await query(productsQuery, params);
     const products = productsResult.rows.map((row: any) => {
-      // 处理images和features字段
+      row.price = parseFloat(row.price) || 0;
+      row.original_price = parseFloat(row.original_price) || 0;
+      row.stock = parseInt(row.stock) || 0;
+
       if (row.images) {
         try {
           row.images = JSON.parse(row.images);
@@ -175,7 +178,7 @@ export async function GET(request: NextRequest) {
       } else {
         row.images = [];
       }
-      
+
       if (row.features) {
         try {
           row.features = JSON.parse(row.features);
@@ -185,7 +188,7 @@ export async function GET(request: NextRequest) {
       } else {
         row.features = [];
       }
-      
+
       row.activities = [];
       return row;
     });
