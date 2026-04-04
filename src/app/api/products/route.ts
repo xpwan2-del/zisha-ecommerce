@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
     params.push(limit, offset);
     
     const productsResult = await query(productsQuery, params);
-    const products = productsResult.rows.map((row: any) => {
+    const products = await Promise.all(productsResult.rows.map(async (row: any) => {
       row.price = parseFloat(row.price) || 0;
       row.original_price = parseFloat(row.original_price) || 0;
       row.stock = parseInt(row.stock) || 0;
@@ -190,8 +190,17 @@ export async function GET(request: NextRequest) {
       }
 
       row.activities = [];
+
+      const reviewStats = await query(
+        'SELECT COUNT(*) as count, AVG(rating) as avg_rating FROM reviews WHERE product_id = ?',
+        [row.id]
+      );
+      const stats = reviewStats.rows[0];
+      row.reviewCount = parseInt(String(stats?.count || 0));
+      row.rating = stats?.avg_rating ? parseFloat(String(stats.avg_rating)).toFixed(1) : '5.0';
+
       return row;
-    });
+    }));
     
     const totalPages = Math.ceil(total / limit);
     

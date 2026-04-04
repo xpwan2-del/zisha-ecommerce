@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ImageModal from '@/components/ImageModal';
+import Link from 'next/link';
+
+interface ReviewProduct {
+  id: number;
+  name: string;
+  image: string;
+  price: number;
+}
 
 interface Review {
   id: number;
@@ -14,6 +22,7 @@ interface Review {
   product_name: string;
   product_name_en: string;
   product_name_ar: string;
+  product: ReviewProduct | null;
 }
 
 export default function ReviewsPage() {
@@ -164,6 +173,26 @@ export default function ReviewsPage() {
                     <p className="text-xs text-gray-500 mt-2">{t.clickToEnlarge}</p>
                   </div>
                 )}
+
+                {review.product && (
+                    <Link
+                      href={`/products/${review.product.id}`}
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <img
+                        src={review.product.image}
+                        alt={review.product.name}
+                        className="w-16 h-16 object-cover rounded-md"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{review.product.name}</p>
+                        <p className="text-sm text-amazon-orange font-bold">¥{review.product.price.toFixed(2)}</p>
+                      </div>
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  )}
 
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                   <div className="text-sm font-medium text-gray-900">

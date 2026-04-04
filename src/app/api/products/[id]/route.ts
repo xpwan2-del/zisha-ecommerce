@@ -187,6 +187,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     product.stock = parseInt(String(product.stock)) || 0;
     (product as any).inStock = product.stock > 0;
 
+    // 计算基于评价的平均评分
+    const reviewStats = await query(
+      'SELECT COUNT(*) as count, AVG(rating) as avg_rating FROM reviews WHERE product_id = ?',
+      [id]
+    );
+    const stats = reviewStats.rows[0];
+    (product as any).reviewCount = parseInt(String(stats?.count || 0));
+    (product as any).rating = stats?.avg_rating ? parseFloat(String(stats.avg_rating)).toFixed(1) : 5.0;
+
     if (product.images && typeof product.images === 'string') {
       try {
         product.images = JSON.parse(String(product.images));

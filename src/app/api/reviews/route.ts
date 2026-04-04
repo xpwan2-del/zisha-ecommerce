@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     
     let sql = `
-      SELECT 
+      SELECT
         r.id,
         r.rating,
         r.comment,
@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
         u.name as user_name,
         p.name as product_name,
         p.name_en as product_name_en,
-        p.name_ar as product_name_ar
+        p.name_ar as product_name_ar,
+        p.image as product_image,
+        p.price as product_price
       FROM reviews r
       LEFT JOIN users u ON r.user_id = u.id
       LEFT JOIN products p ON r.product_id = p.id
@@ -51,7 +53,13 @@ export async function GET(request: NextRequest) {
         ...review,
         rating: parseFloat(review.rating) || 0,
         comment,
-        images: typeof review.images === 'string' ? JSON.parse(review.images) : review.images || []
+        images: typeof review.images === 'string' ? JSON.parse(review.images) : review.images || [],
+        product: review.product_name ? {
+          id: review.product_id,
+          name: lang === 'en' ? review.product_name_en : lang === 'ar' ? review.product_name_ar : review.product_name,
+          image: review.product_image,
+          price: parseFloat(review.product_price) || 0
+        } : null
       };
     });
     
