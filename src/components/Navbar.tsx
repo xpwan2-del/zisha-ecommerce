@@ -219,18 +219,6 @@ export function Navbar() {
             <a href="/products" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               All Products
             </a>
-            <a href="/products?category=teapots" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
-              {t('categories.items.0') || 'Teapots'}
-            </a>
-            <a href="/products?category=cups" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
-              {t('categories.items.1') || 'Cups'}
-            </a>
-            <a href="/products?category=accessories" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
-              {t('categories.items.2') || 'Accessories'}
-            </a>
-            <a href="/products?category=sets" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
-              {t('categories.items.3') || 'Sets'}
-            </a>
             <a href="/customize" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               Customize
             </a>
