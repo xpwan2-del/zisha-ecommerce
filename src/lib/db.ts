@@ -34,15 +34,9 @@ export async function query(sql: string, params?: any[]) {
   }
 
   try {
-    const isWrite = sql.trim().toUpperCase().startsWith('INSERT') ||
-                    sql.trim().toUpperCase().startsWith('UPDATE') ||
-                    sql.trim().toUpperCase().startsWith('DELETE') ||
-                    sql.trim().toUpperCase().startsWith('CREATE');
-
     const result = await db.execute({
       sql,
       args: params || [],
-      sync: true,
     });
 
     return {
