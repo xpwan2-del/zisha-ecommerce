@@ -183,9 +183,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     if (product.images && typeof product.images === 'string') {
       try {
-        product.images = JSON.parse(product.images);
+        product.images = JSON.parse(String(product.images));
       } catch (e) {
-        product.images = [];
+        product.images = [] as any;
       }
     }
     
@@ -193,7 +193,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       try {
         product.features = JSON.parse(product.features);
       } catch (e) {
-        product.features = [];
+        product.features = [] as any;
       }
     }
     
@@ -201,7 +201,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       try {
         product.specifications = JSON.parse(product.specifications);
       } catch (e) {
-        product.specifications = {};
+        product.specifications = {} as any;
       }
     }
     
@@ -209,7 +209,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       try {
         product.shipping = JSON.parse(product.shipping);
       } catch (e) {
-        product.shipping = {};
+        product.shipping = {} as any;
       }
     }
     
@@ -217,7 +217,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       try {
         product.after_sale = JSON.parse(product.after_sale);
       } catch (e) {
-        product.after_sale = {};
+        product.after_sale = {} as any;
       }
     }
     

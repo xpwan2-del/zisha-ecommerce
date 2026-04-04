@@ -11,7 +11,7 @@ export async function POST() {
     const updatedProducts = [];
     
     for (const product of products) {
-      const productName = product.name;
+      const productName = String(product.name || '');
       
       // 根据产品名称生成不同的prompt
       let prompt = '';

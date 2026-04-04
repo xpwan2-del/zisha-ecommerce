@@ -109,7 +109,8 @@ export async function POST(request: NextRequest) {
         throw new Error('Lucky draw not found');
       }
 
-      const { current_equity, total_equity } = drawResult.rows[0];
+      const current_equity = Number(drawResult.rows[0].current_equity) || 0;
+      const total_equity = Number(drawResult.rows[0].total_equity) || 0;
       const newCurrentEquity = current_equity + equityCount;
 
       if (newCurrentEquity > total_equity) {

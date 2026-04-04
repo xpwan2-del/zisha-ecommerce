@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
     
     const countQuery = `SELECT COUNT(*) as count FROM products ${whereClause}`;
     const countResult = await query(countQuery, params);
-    const total = countResult.rows && countResult.rows[0] ? parseInt(countResult.rows[0].count) : 0;
+    const total = countResult.rows && countResult.rows[0] ? parseInt(String(countResult.rows[0].count)) : 0;
     
     const productsQuery = `
       SELECT * FROM products

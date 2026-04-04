@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const countQuery = `SELECT COUNT(*) as count FROM lucky_draws ${whereClause}`;
     const countResult = await query(countQuery, params);
-    const total = parseInt(countResult.rows[0].count);
+    const total = parseInt(String(countResult.rows[0].count)) || 0;
 
     const luckyDrawsQuery = `
       SELECT 

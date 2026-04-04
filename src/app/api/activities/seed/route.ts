@@ -57,18 +57,18 @@ export async function POST() {
       }
     ];
 
-    const activityIds: number[] = [];
+    const activityIds: (number | string)[] = [];
     for (const activity of activities) {
       const result = await query(
         'INSERT INTO activity_categories (name, name_en, name_ar, icon, color, status) VALUES (?, ?, ?, ?, ?, ?)',
         [activity.name, activity.name_en, activity.name_ar, activity.icon, activity.color, activity.status]
       );
       if (result.rows && result.rows[0] && result.rows[0].id) {
-        activityIds.push(result.rows[0].id);
+        activityIds.push(String(result.rows[0].id));
       } else {
         const lastIdResult = await query('SELECT last_insert_rowid() as id');
         if (lastIdResult.rows && lastIdResult.rows[0]) {
-          activityIds.push(lastIdResult.rows[0].id);
+          activityIds.push(String(lastIdResult.rows[0].id));
         }
       }
     }

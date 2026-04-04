@@ -4,7 +4,7 @@ import { query } from '@/lib/db';
 export async function POST() {
   try {
     const existingReviews = await query('SELECT COUNT(*) as count FROM reviews');
-    if (existingReviews.rows[0].count > 0) {
+    if (existingReviews.rows && existingReviews.rows[0] && existingReviews.rows[0].count && Number(existingReviews.rows[0].count) > 0) {
       return NextResponse.json({ 
         message: 'Reviews already exist',
         count: existingReviews.rows[0].count
@@ -12,7 +12,7 @@ export async function POST() {
     }
 
     const products = await query('SELECT id FROM products LIMIT 4');
-    if (products.rows.length === 0) {
+    if (!products.rows || products.rows.length === 0) {
       return NextResponse.json({ 
         error: 'No products found. Please seed products first.' 
       }, { status: 400 });
