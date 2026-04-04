@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
 import { useCart } from '@/lib/contexts/CartContext';
@@ -8,6 +9,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { useCurrency } from '@/lib/contexts/CurrencyContext';
 
 export function Navbar() {
+  const router = useRouter();
   const { t, i18n: i18nInstance } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const { totalItems } = useCart();
@@ -181,24 +183,27 @@ export function Navbar() {
           <div className="flex items-center justify-between py-2 overflow-x-auto">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded flex-shrink-0"
+              className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded flex-shrink-0 sm:hidden"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
               <span>All</span>
             </button>
-            <div className="flex items-center gap-3 sm:gap-6 flex-nowrap overflow-x-auto">
-              <a href="/products?category=teapots" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+            <div className="hidden sm:flex items-center gap-4 lg:gap-6 flex-nowrap overflow-x-auto">
+              <a href="/products" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+                All
+              </a>
+              <a href="/products?category=1" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.0') || 'Teapots'}
               </a>
-              <a href="/products?category=cups" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              <a href="/products?category=2" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.1') || 'Cups'}
               </a>
-              <a href="/products?category=accessories" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              <a href="/products?category=3" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.2') || 'Accessories'}
               </a>
-              <a href="/products?category=sets" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              <a href="/products?category=4" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.3') || 'Sets'}
               </a>
               <a href="/customize" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
@@ -206,6 +211,42 @@ export function Navbar() {
               </a>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Mobile category tabs */}
+      <div className="sm:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => router.push('/products')}
+            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-amazon-orange text-amazon-orange"
+          >
+            All
+          </button>
+          <button
+            onClick={() => router.push('/products?category=1')}
+            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
+          >
+            {t('categories.items.0') || 'Teapots'}
+          </button>
+          <button
+            onClick={() => router.push('/products?category=2')}
+            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
+          >
+            {t('categories.items.1') || 'Cups'}
+          </button>
+          <button
+            onClick={() => router.push('/products?category=3')}
+            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
+          >
+            {t('categories.items.2') || 'Accessories'}
+          </button>
+          <button
+            onClick={() => router.push('/products?category=4')}
+            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
+          >
+            {t('categories.items.3') || 'Sets'}
+          </button>
         </div>
       </div>
 
