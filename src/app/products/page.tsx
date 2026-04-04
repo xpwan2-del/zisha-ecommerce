@@ -130,8 +130,8 @@ function ProductsContent() {
           </div>
         </div>
         
-        {/* Category filter */}
-        <div className="flex justify-center mb-8 overflow-x-auto">
+        {/* Category filter - hidden on mobile, use tabs in header */}
+        <div className="hidden md:flex justify-center mb-8 overflow-x-auto">
           <div className="inline-flex rounded-md shadow-sm whitespace-nowrap">
             <button
               key="all"
