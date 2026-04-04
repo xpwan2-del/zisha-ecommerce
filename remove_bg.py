@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 from PIL import Image
-import sys
 
-def remove_white_background_and_crop(input_path, output_path, threshold=240):
+def process_logo(input_path, output_path, scale=0.7, threshold=240):
     img = Image.open(input_path).convert("RGBA")
     datas = img.getdata()
 
@@ -14,17 +13,21 @@ def remove_white_background_and_crop(input_path, output_path, threshold=240):
             new_data.append(item)
 
     img.putdata(new_data)
-
     bbox = img.getbbox()
+
     if bbox:
         cropped = img.crop(bbox)
-        cropped.save(output_path, "PNG")
-        print(f"Cropped to {bbox} and saved to {output_path}")
+        w = int((bbox[2] - bbox[0]) * scale)
+        h = int((bbox[3] - bbox[1]) * scale)
+        resized = cropped.resize((w, h), Image.LANCZOS)
+        resized.save(output_path, "PNG")
+        print(f"Scaled {scale*100:.0f}%, cropped to {bbox}, final size {w}x{h}")
     else:
         img.save(output_path, "PNG")
-        print(f"Saved without cropping to {output_path}")
+        print("Saved without cropping")
 
 if __name__ == "__main__":
-    input_file = "/Users/davis/Desktop/IMAGE 2026-04-04 20:28:24.jpg"
-    output_file = "/Users/davis/zisha-ecommerce/public/logo.png"
-    remove_white_background_and_crop(input_file, output_file)
+    process_logo(
+        "/Users/davis/Desktop/IMAGE 2026-04-04 20:28:24.jpg",
+        "/Users/davis/zisha-ecommerce/public/logo.png"
+    )

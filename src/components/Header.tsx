@@ -39,7 +39,7 @@ export function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <a href="/" className="flex-shrink-0">
-              <img src={logoUrl} alt="Zisha" className="h-20 w-auto" />
+              <img src={logoUrl} alt="Zisha" className="h-14 w-auto" />
             </a>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <a href="/deals" className="border-amazon-orange text-white border-b-2 px-3 py-2 text-sm font-medium">
