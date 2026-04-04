@@ -54,6 +54,9 @@ export function Header() {
               <a href="/lucky-draws" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
                 {t("nav.luckyDraw", "一元购")}
               </a>
+              <a href="/about" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
+                {t("nav.about", "关于我们")}
+              </a>
             </div>
           </div>
 
