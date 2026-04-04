@@ -36,7 +36,7 @@ export function Header() {
       {/* 顶部信息栏 */}
       <div className="bg-gray-100 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-end items-center h-8 space-x-6">
+          <div className="flex justify-center sm:justify-end items-center h-8 space-x-4 sm:space-x-6">
             <a href="/reviews" className="text-xs text-gray-600 hover:text-amazon-orange">
               {t("nav.reviews", "用户评价")}
             </a>
