@@ -33,6 +33,22 @@ export function Header() {
 
   return (
     <header className="bg-white text-gray-800 shadow-md">
+      {/* 顶部信息栏 */}
+      <div className="bg-gray-100 border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-end items-center h-8 space-x-6">
+            <a href="/reviews" className="text-xs text-gray-600 hover:text-amazon-orange">
+              {t("nav.reviews", "用户评价")}
+            </a>
+            <a href="/about" className="text-xs text-gray-600 hover:text-amazon-orange">
+              {t("nav.about", "关于我们")}
+            </a>
+            <a href="/contact" className="text-xs text-gray-600 hover:text-amazon-orange">
+              {t("nav.contact", "联系我们")}
+            </a>
+          </div>
+        </div>
+      </div>
       {/* 顶部导航栏 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
@@ -53,15 +69,6 @@ export function Header() {
               </a>
               <a href="/lucky-draws" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
                 {t("nav.luckyDraw", "一元购")}
-              </a>
-              <a href="/reviews" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
-                {t("nav.reviews", "用户评价")}
-              </a>
-              <a href="/about" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
-                {t("nav.about", "关于我们")}
-              </a>
-              <a href="/contact" className="border-transparent hover:text-amazon-orange px-3 py-2 text-sm font-medium">
-                {t("nav.contact", "联系我们")}
               </a>
             </div>
           </div>
