@@ -476,6 +476,25 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       ))}
                     </div>
                   )}
+                  {review.product && (
+                    <Link
+                      href={`/products/${review.product.id}`}
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors mt-3"
+                    >
+                      <img
+                        src={review.product.image}
+                        alt={review.product.name}
+                        className="w-12 h-12 object-cover rounded-md"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{review.product.name}</p>
+                        <p className="text-sm text-amazon-orange font-bold">¥{review.product.price.toFixed(2)}</p>
+                      </div>
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  )}
                   <div className="text-xs text-gray-500 mt-2">
                     — {review.user_name || t("products.anonymous", "匿名用户")}
                   </div>
