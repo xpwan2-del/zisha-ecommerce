@@ -271,11 +271,11 @@ function ProductsContent() {
               </div>
             ) : products.length > 0 ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                   {products.map((product) => (
                     <div 
                       key={product.id} 
-                      className={`bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer ${product.display_mode === 'single' ? 'sm:col-span-2 lg:col-span-1' : ''}`}
+                      className={`bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer ${product.display_mode === 'single' ? 'col-span-2 sm:col-span-1' : ''}`}
                       onClick={() => handleProductClick(product.id)}
                     >
                       <div className="aspect-square overflow-hidden relative">
@@ -287,7 +287,7 @@ function ProductsContent() {
                         <img 
                           src={Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : 'https://via.placeholder.com/400'}
                           alt={product.name} 
-                          className={`w-full h-full object-cover transition-transform duration-500 hover:scale-105 ${product.display_mode === 'single' ? 'sm:h-80 sm:object-contain' : ''}`}
+                          className={`w-full aspect-square object-cover transition-transform duration-500 hover:scale-105 ${product.display_mode === 'single' ? 'lg:h-80 lg:object-contain' : ''}`}
                         />
                       </div>
                       <div className="p-4">
