@@ -13,6 +13,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Zisha Pottery | Premium Teaware",
   description: "Authentic Chinese Zisha pottery for tea enthusiasts in the Middle East",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({

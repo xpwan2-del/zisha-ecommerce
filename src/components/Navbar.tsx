@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
 import { useCart } from '@/lib/contexts/CartContext';
@@ -9,7 +8,6 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { useCurrency } from '@/lib/contexts/CurrencyContext';
 
 export function Navbar() {
-  const router = useRouter();
   const { t, i18n: i18nInstance } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const { totalItems } = useCart();
@@ -211,42 +209,6 @@ export function Navbar() {
               </a>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Mobile category tabs */}
-      <div className="sm:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex overflow-x-auto scrollbar-hide">
-          <button
-            onClick={() => router.push('/products')}
-            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-amazon-orange text-amazon-orange"
-          >
-            All
-          </button>
-          <button
-            onClick={() => router.push('/products?category=1')}
-            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
-          >
-            {t('categories.items.0') || 'Teapots'}
-          </button>
-          <button
-            onClick={() => router.push('/products?category=2')}
-            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
-          >
-            {t('categories.items.1') || 'Cups'}
-          </button>
-          <button
-            onClick={() => router.push('/products?category=3')}
-            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
-          >
-            {t('categories.items.2') || 'Accessories'}
-          </button>
-          <button
-            onClick={() => router.push('/products?category=4')}
-            className="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-amazon-orange"
-          >
-            {t('categories.items.3') || 'Sets'}
-          </button>
         </div>
       </div>
 
