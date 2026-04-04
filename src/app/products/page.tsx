@@ -32,7 +32,17 @@ function ProductsContent() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
   const searchTriggerRef = useRef(0);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // 加载分类
   useEffect(() => {
@@ -177,8 +187,9 @@ function ProductsContent() {
         </div>
         
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left sidebar - filters - hidden on mobile */}
-          <div className="hidden lg:block lg:w-1/4">
+          {/* Left sidebar - filters - desktop only */}
+          {!isMobile && (
+            <div className="hidden lg:block lg:w-1/4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <h3 className="text-lg font-semibold mb-4">{t('products.filters')}</h3>
               
@@ -261,6 +272,7 @@ function ProductsContent() {
               </button>
             </div>
           </div>
+          )}
           
           {/* Right content - products */}
           <div className="lg:w-3/4">
