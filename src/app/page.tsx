@@ -221,7 +221,7 @@ export default function Home() {
                           <span className="text-lg font-bold text-amazon-orange">
                             ¥{product.price}
                           </span>
-                          {product.original_price && (
+                          {product.original_price > 0 && (
                             <span className="text-sm text-gray-500 line-through ml-2">
                               ¥{product.original_price}
                             </span>

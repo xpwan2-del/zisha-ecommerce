@@ -190,7 +190,7 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
                 <span className="text-lg font-bold text-amazon-orange">
                   ¥{product.price}
                 </span>
-                {product.originalPrice && (
+                {product.originalPrice > 0 && (
                   <span className="text-sm text-gray-500 line-through ml-2">
                     ¥{product.originalPrice}
                   </span>

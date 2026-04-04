@@ -283,7 +283,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       ¥{product.originalPrice}
                     </span>
                   )}
-                  {product.discount > 0 && product.original_price && product.price && (
+                  {product.discount > 0 && product.original_price > 0 && product.original_price > product.price && (
                     <span className="text-red-500 font-bold ml-3">
                       {t("products.discount", "省")}¥{product.original_price - product.price}
                     </span>
