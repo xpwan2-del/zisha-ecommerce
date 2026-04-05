@@ -145,7 +145,7 @@ export default function CustomizePage() {
                   >
                     <div className="aspect-square overflow-hidden relative group">
                       <img 
-                        src={JSON.parse(type.images)[0] || `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20${type.name}&size=square`} 
+                        src={JSON.parse(type.images)[0] || `https://image.pollinations.ai/prompt/zisha%20teapot%20${encodeURIComponent(type.name)}?width=400&height=400`} 
                         alt={type.name} 
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
@@ -436,7 +436,7 @@ export default function CustomizePage() {
                   <div className="text-center">
                     <div className="mb-6">
                       <img 
-                        src={customData.teapotType?.images ? JSON.parse(customData.teapotType.images)[0] : `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20${customData.teapotType?.name}&size=square`} 
+                        src={customData.teapotType?.images ? JSON.parse(customData.teapotType.images)[0] : `https://image.pollinations.ai/prompt/zisha%20teapot%20${encodeURIComponent(customData.teapotType?.name || '')}?width=400&height=400`} 
                         alt={customData.teapotType?.name} 
                         className="w-72 h-72 object-contain mx-auto transition-all duration-500 hover:scale-105"
                       />

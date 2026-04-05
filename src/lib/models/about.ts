@@ -24,9 +24,9 @@ const aboutSchema = new Schema<AboutDocument>({
   images: {
     type: [String],
     default: [
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20pottery%20craftsman%20working%20on%20teapot&image_size=landscape_4_3',
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapots%20display%20in%20shop&image_size=landscape_4_3',
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=traditional%20chinese%20tea%20ceremony&image_size=landscape_4_3'
+      'https://image.pollinations.ai/prompt/zisha%20pottery%20craftsman%20working%20on%20teapot?width=400&height=300&seed=about1',
+      'https://image.pollinations.ai/prompt/zisha%20teapots%20display%20in%20shop?width=400&height=300&seed=about2',
+      'https://image.pollinations.ai/prompt/traditional%20chinese%20tea%20ceremony?width=400&height=300&seed=about3'
     ]
   },
   videoUrl: {

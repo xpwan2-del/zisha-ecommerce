@@ -235,7 +235,8 @@ export async function GET(request: NextRequest) {
     const mockTeapots = Array.from({ length: 100 }, (_, i) => {
       const nameIdx = i % teapotNames.length;
       const colorIdx = Math.floor(i / teapotNames.length) % colors.length;
-      const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20clay%20teapot%20${encodeURIComponent(teapotNames[nameIdx])}%20classic%20design%20handcrafted&image_size=square_hd&seed=${i + 1000}`;
+      const encodedName = encodeURIComponent(teapotNames[nameIdx]);
+      const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20clay%20teapot%20${encodedName}%20classic%20design%20handcrafted?width=400&height=400&seed=${i + 1000}`;
       return {
         id: 10000 + i,
         name: `${teapotNames[nameIdx]} ${Math.floor(i / teapotNames.length) + 1}号`,
@@ -307,7 +308,7 @@ export async function PUT(request: NextRequest) {
       const inserted = [];
       for (let i = 0; i < 100; i++) {
         const nameIdx = i % teapotNames.length;
-        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20clay%20teapot%20${encodeURIComponent(teapotNames[nameIdx])}%20classic%20design%20handcrafted&image_size=square_hd&seed=${i + 1000}`;
+        const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20clay%20teapot%20${encodeURIComponent(teapotNames[nameIdx])}%20classic%20design%20handcrafted?width=400&height=400&seed=${i + 1000}`;
         const name = `${teapotNames[nameIdx]} ${Math.floor(i / teapotNames.length) + 1}号`;
         const price = 299 + (i * 37) % 2000;
         const stock = 10 + (i * 13) % 90;
@@ -340,7 +341,7 @@ export async function PUT(request: NextRequest) {
       const inserted = [];
       for (let i = 0; i < 50; i++) {
         const nameIdx = i % cupNames.length;
-        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20clay%20tea%20cup%20${encodeURIComponent(cupNames[nameIdx])}%20elegant%20design%20handcrafted%20professional%20photography&image_size=square_hd&seed=${i + 2000}`;
+        const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20clay%20tea%20cup%20${encodeURIComponent(cupNames[nameIdx])}%20elegant%20design%20handcrafted%20professional%20photography?width=400&height=400&seed=${i + 2000}`;
         const name = `${cupNames[nameIdx]} ${Math.floor(i / cupNames.length) + 1}号`;
         const price = 99 + (i * 23) % 500;
         const stock = 20 + (i * 7) % 80;
@@ -370,7 +371,7 @@ export async function PUT(request: NextRequest) {
       const inserted = [];
       for (let i = 0; i < 50; i++) {
         const nameIdx = i % accessoryNames.length;
-        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20tea%20accessory%20${encodeURIComponent(accessoryNames[nameIdx])}%20traditional%20handcrafted%20professional%20photography&image_size=square_hd&seed=${i + 3000}`;
+        const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20tea%20accessory%20${encodeURIComponent(accessoryNames[nameIdx])}%20traditional%20handcrafted%20professional%20photography?width=400&height=400&seed=${i + 3000}`;
         const name = `${accessoryNames[nameIdx]} ${Math.floor(i / accessoryNames.length) + 1}号`;
         const price = 39 + (i * 17) % 300;
         const stock = 30 + (i * 11) % 70;
@@ -401,7 +402,7 @@ export async function PUT(request: NextRequest) {
       const inserted = [];
       for (let i = 0; i < 30; i++) {
         const nameIdx = i % setNames.length;
-        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20tea%20set%20${encodeURIComponent(setNames[nameIdx])}%20complete%20traditional%20elegant%20professional%20photography&image_size=square_hd&seed=${i + 4000}`;
+        const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20tea%20set%20${encodeURIComponent(setNames[nameIdx])}%20complete%20traditional%20elegant%20professional%20photography?width=400&height=400&seed=${i + 4000}`;
         const name = `${setNames[nameIdx]} ${Math.floor(i / setNames.length) + 1}号`;
         const price = 599 + (i * 47) % 2000;
         const stock = 5 + (i * 3) % 30;

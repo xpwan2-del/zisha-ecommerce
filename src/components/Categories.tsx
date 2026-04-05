@@ -7,10 +7,10 @@ export function Categories() {
   const categories = t('categories.items', { returnObjects: true }) as string[];
 
   const categoryImages = [
-    "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zisha%20teapot%20collection&image_size=square",
-    "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20set&image_size=square",
-    "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tea%20accessories%20zisha&image_size=square",
-    "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20set%20complete&image_size=square"
+    "https://image.pollinations.ai/prompt/chinese%20zisha%20teapot%20collection?width=400&height=400&seed=cat1",
+    "https://image.pollinations.ai/prompt/zisha%20tea%20cups%20set?width=400&height=400&seed=cat2",
+    "https://image.pollinations.ai/prompt/tea%20accessories%20zisha?width=400&height=400&seed=cat3",
+    "https://image.pollinations.ai/prompt/zisha%20tea%20set%20complete?width=400&height=400&seed=cat4"
   ];
 
   return (

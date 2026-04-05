@@ -9,9 +9,9 @@ export function Contact() {
     title: 'Contact Us',
     description: 'Get in touch with us for any inquiries',
     images: [
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tea%20shop%20interior%20design&image_size=landscape_4_3',
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20tea%20ceremony%20setup&image_size=landscape_4_3',
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20pottery%20workshop&image_size=landscape_4_3'
+      'https://image.pollinations.ai/prompt/tea%20shop%20interior%20design?width=400&height=300&seed=contact1',
+      'https://image.pollinations.ai/prompt/chinese%20tea%20ceremony%20setup?width=400&height=300&seed=contact2',
+      'https://image.pollinations.ai/prompt/zisha%20pottery%20workshop?width=400&height=300&seed=contact3'
     ],
     videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
     address: '123 Zisha Street, Yixing, Jiangsu, China',

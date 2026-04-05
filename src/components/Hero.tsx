@@ -62,9 +62,9 @@ export function Hero() {
           
           <div className="relative">
             <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden shadow-xl">
-              <img 
-                src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot%20collection%20on%20wooden%20table%20with%20traditional%20chinese%20tea%20set%20elegant%20professional%20photography&image_size=landscape_16_9" 
-                alt="Zisha Pottery Collection" 
+              <img
+                src="https://image.pollinations.ai/prompt/premium%20zisha%20teapot%20collection%20on%20wooden%20table%20with%20traditional%20chinese%20tea%20set%20elegant%20professional%20photography?width=800&height=450&seed=hero"
+                alt="Zisha Pottery Collection"
                 className="object-cover w-full h-full"
               />
             </div>
