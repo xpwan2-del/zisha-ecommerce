@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import Link from "next/link";
 import { useCurrency } from "@/lib/contexts/CurrencyContext";
 import { convertCurrency, formatCurrency } from "@/lib/utils/currency";
+import { useSearchParams } from "next/navigation";
 
 interface DealProduct {
   id: number;
@@ -25,9 +26,11 @@ interface DealProduct {
 export default function DealsPage() {
   const { t, i18n } = useTranslation();
   const { currency } = useCurrency();
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<DealProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
+  const [activeType, setActiveType] = useState(searchParams.get("type") || "all");
 
   const categories = [
     { id: "all", name: "全部", name_en: "All" },
@@ -37,6 +40,12 @@ export default function DealsPage() {
     { id: "4", name: "套组", name_en: "Sets" },
   ];
 
+  const dealTypes = [
+    { id: "all", name: "全部特惠", name_en: "All Deals" },
+    { id: "1yuan", name: "1元购", name_en: "1 Yuan Deals" },
+    { id: "daily", name: "今日特价", name_en: "Daily Specials" },
+  ];
+
   useEffect(() => {
     async function fetchDeals() {
       setIsLoading(true);
@@ -44,7 +53,17 @@ export default function DealsPage() {
         const response = await fetch("/api/products?limit=50&sort=deals");
         const data = await response.json();
         if (data.products) {
-          const dealsProducts = data.products.filter((p: any) => p.discount > 0 || p.is_limited);
+          let dealsProducts = data.products.filter((p: any) => p.discount > 0 || p.is_limited);
+          
+          // 根据活动类型筛选
+          if (activeType === "1yuan") {
+            // 1元购活动：价格特别低的产品
+            dealsProducts = dealsProducts.filter((p: any) => p.price <= 10);
+          } else if (activeType === "daily") {
+            // 今日特价：折扣较大的产品
+            dealsProducts = dealsProducts.filter((p: any) => p.discount >= 20);
+          }
+          
           setProducts(dealsProducts);
         }
       } catch (error) {
@@ -54,7 +73,7 @@ export default function DealsPage() {
       }
     }
     fetchDeals();
-  }, []);
+  }, [activeType]);
 
   const filteredProducts = products.filter((product) => {
     if (product.discount <= 0) return false;
@@ -63,9 +82,10 @@ export default function DealsPage() {
   });
 
   const getActivityName = (activity: any) => {
-    if (i18n.language === "zh") return activity.name;
-    if (i18n.language === "ar") return activity.name_ar || activity.name_en || activity.name;
-    return activity.name_en || activity.name;
+    if (!activity) return "";
+    if (i18n.language === "zh") return activity.name || "";
+    if (i18n.language === "ar") return activity.name_ar || activity.name_en || activity.name || "";
+    return activity.name_en || activity.name || "";
   };
 
   return (
@@ -78,6 +98,24 @@ export default function DealsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* 活动类型选项卡 */}
+        <div className="flex overflow-x-auto gap-2 mb-6 pb-2">
+          {dealTypes.map((type) => (
+            <button
+              key={type.id}
+              onClick={() => setActiveType(type.id)}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                activeType === type.id
+                  ? "bg-amazon-orange text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              }`}
+            >
+              {i18n.language === "zh" ? type.name : type.name_en}
+            </button>
+          ))}
+        </div>
+
+        {/* 分类选项卡 */}
         <div className="flex overflow-x-auto gap-2 mb-8 pb-2">
           {categories.map((cat) => (
             <button
@@ -147,7 +185,7 @@ export default function DealsPage() {
 
                 <div className="p-4">
                   <div className="flex flex-wrap gap-1 mb-2">
-                    {product.activities?.slice(0, 2).map((activity) => (
+                    {product.activities?.filter(activity => getActivityName(activity)).slice(0, 2).map((activity) => (
                       <span
                         key={activity.id}
                         className="text-xs px-2 py-0.5 rounded-full"

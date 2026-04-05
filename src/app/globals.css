@@ -1,35 +1,33 @@
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --amazon-blue: #007185;
-  --amazon-orange: #ff9900;
-  --amazon-light-orange: #ffd814;
-  --amazon-dark: #111111;
-  --amazon-light: #ffffff;
-  --amazon-gray: #f3f3f3;
-  --amazon-border: #d5d5d5;
-  --amazon-text: #333333;
-  --amazon-light-text: #666666;
+  /* Zisha Pottery Design System Colors */
+  --primary: #7C2D12;
+  --secondary: #B91C1C;
+  --cta: #CA8A04;
+  --background: #FEF2F2;
+  --text: #450A0A;
   
-  --foreground-rgb: 51, 51, 51;
-  --background-rgb: 255, 255, 255;
+  --foreground-rgb: 69, 10, 10;
+  --background-rgb: 254, 242, 242;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-rgb: 30, 30, 30;
+    --foreground-rgb: 254, 242, 242;
+    --background-rgb: 69, 10, 10;
   }
 }
 
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -46,35 +44,101 @@ body {
   text-align: left;
 }
 
-/* Amazon style components */
-.amazon-btn {
-  @apply bg-amazon-orange hover:bg-amazon-light-orange text-amazon-dark font-medium py-2 px-4 rounded transition-colors duration-200;
+/* Zisha Pottery style components */
+.zisha-btn {
+  @apply bg-[#CA8A04] hover:bg-[#B47C03] text-white font-medium py-3 px-6 rounded-md transition-colors duration-300;
 }
 
-.amazon-link {
-  @apply text-amazon-blue hover:text-amazon-orange transition-colors duration-200;
+.zisha-btn-outline {
+  @apply border-2 border-[#7C2D12] hover:bg-[#7C2D12] hover:text-white text-[#450A0A] py-3 px-6 rounded-md font-medium transition-all duration-300;
 }
 
-.amazon-card {
-  @apply bg-white dark:bg-gray-800 rounded-md border border-amazon-border p-4 hover:shadow-md transition-shadow duration-200;
+.zisha-card {
+  @apply bg-white dark:bg-gray-800 rounded-md border border-[#7C2D12]/20 p-6 hover:shadow-lg transition-all duration-300;
 }
 
-.amazon-input {
-  @apply border border-amazon-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amazon-blue focus:border-transparent;
+.zisha-input {
+  @apply border border-[#7C2D12]/30 rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#CA8A04] focus:border-transparent;
 }
 
-.amazon-price {
-  @apply text-xl font-bold text-amazon-dark dark:text-white;
+.zisha-price {
+  @apply text-xl font-bold text-[#450A0A] dark:text-white;
 }
 
-.amazon-discount {
-  @apply text-red-500 font-medium;
+.zisha-discount {
+  @apply text-[#B91C1C] font-medium;
 }
 
-.amazon-rating {
+.zisha-rating {
   @apply flex items-center gap-1;
 }
 
-.amazon-star {
-  @apply text-amazon-orange;
+.zisha-star {
+  @apply text-[#CA8A04];
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  color: var(--text);
+}
+
+p {
+  font-family: 'Noto Sans TC', sans-serif;
+  color: var(--text);
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.3s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2.5rem;
+  }
+  h2 {
+    font-size: 2rem;
+  }
+  h3 {
+    font-size: 1.5rem;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none;
+  }
+}
+
+/* Focus states */
+:focus {
+  outline: 2px solid var(--cta);
+  outline-offset: 2px;
+}
+
+/* Cursor for clickable elements */
+button, a, [role="button"] {
+  cursor: pointer;
+}
+
+/* Animation classes */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 30s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
 }

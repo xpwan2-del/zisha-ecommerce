@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
       const nameIdx = i % teapotNames.length;
       const colorIdx = Math.floor(i / teapotNames.length) % colors.length;
       const encodedName = encodeURIComponent(teapotNames[nameIdx]);
-      const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20clay%20teapot%20${encodedName}%20classic%20design%20handcrafted?width=400&height=400&seed=${i + 1000}`;
+      const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20clay%20teapot%20${encodedName}%20classic%20design%20handcrafted&image_size=square`;
       return {
         id: 10000 + i,
         name: `${teapotNames[nameIdx]} ${Math.floor(i / teapotNames.length) + 1}号`,
@@ -308,7 +308,7 @@ export async function PUT(request: NextRequest) {
       const inserted = [];
       for (let i = 0; i < 100; i++) {
         const nameIdx = i % teapotNames.length;
-        const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20clay%20teapot%20${encodeURIComponent(teapotNames[nameIdx])}%20classic%20design%20handcrafted?width=400&height=400&seed=${i + 1000}`;
+        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20clay%20teapot%20${encodeURIComponent(teapotNames[nameIdx])}%20classic%20design%20handcrafted&image_size=square`;
         const name = `${teapotNames[nameIdx]} ${Math.floor(i / teapotNames.length) + 1}号`;
         const price = 299 + (i * 37) % 2000;
         const stock = 10 + (i * 13) % 90;
@@ -341,7 +341,7 @@ export async function PUT(request: NextRequest) {
       const inserted = [];
       for (let i = 0; i < 50; i++) {
         const nameIdx = i % cupNames.length;
-        const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20clay%20tea%20cup%20${encodeURIComponent(cupNames[nameIdx])}%20elegant%20design%20handcrafted%20professional%20photography?width=400&height=400&seed=${i + 2000}`;
+        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20clay%20tea%20cup%20${encodeURIComponent(cupNames[nameIdx])}%20elegant%20design%20handcrafted%20professional%20photography&image_size=square`;
         const name = `${cupNames[nameIdx]} ${Math.floor(i / cupNames.length) + 1}号`;
         const price = 99 + (i * 23) % 500;
         const stock = 20 + (i * 7) % 80;
@@ -371,7 +371,7 @@ export async function PUT(request: NextRequest) {
       const inserted = [];
       for (let i = 0; i < 50; i++) {
         const nameIdx = i % accessoryNames.length;
-        const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20tea%20accessory%20${encodeURIComponent(accessoryNames[nameIdx])}%20traditional%20handcrafted%20professional%20photography?width=400&height=400&seed=${i + 3000}`;
+        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20tea%20accessory%20${encodeURIComponent(accessoryNames[nameIdx])}%20traditional%20handcrafted%20professional%20photography&image_size=square`;
         const name = `${accessoryNames[nameIdx]} ${Math.floor(i / accessoryNames.length) + 1}号`;
         const price = 39 + (i * 17) % 300;
         const stock = 30 + (i * 11) % 70;
@@ -402,7 +402,7 @@ export async function PUT(request: NextRequest) {
       const inserted = [];
       for (let i = 0; i < 30; i++) {
         const nameIdx = i % setNames.length;
-        const imageUrl = `https://image.pollinations.ai/prompt/chinese%20yixing%20zisha%20tea%20set%20${encodeURIComponent(setNames[nameIdx])}%20complete%20traditional%20elegant%20professional%20photography?width=400&height=400&seed=${i + 4000}`;
+        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20tea%20set%20${encodeURIComponent(setNames[nameIdx])}%20complete%20traditional%20elegant%20professional%20photography&image_size=square`;
         const name = `${setNames[nameIdx]} ${Math.floor(i / setNames.length) + 1}号`;
         const price = 599 + (i * 47) % 2000;
         const stock = 5 + (i * 3) % 30;
@@ -423,53 +423,93 @@ export async function PUT(request: NextRequest) {
 
     if (action === 'batch_update_images') {
       const products = await query('SELECT id, category_id, name FROM products');
-      const prompts: Record<string, string> = {
-        1: 'traditional%20chinese%20yixing%20zisha%20teapot%20purple%20clay%20handmade',
-        2: 'chinese%20zisha%20tea%20cup%20purple%20clay%20traditional%20handmade',
-        3: 'chinese%20zisha%20tea%20accessory%20traditional%20purple%20clay%20handicraft',
-        4: 'chinese%20zisha%20tea%20set%20complete%20teapot%20and%20cups%20purple%20clay'
-      };
 
       let updated = 0;
       for (const product of products.rows) {
         const productId = Number(product.id);
-        const catId = String(product.category_id);
-        const basePrompt = prompts[catId] || prompts['1'];
-        const nameEncoded = encodeURIComponent(String(product.name || 'Product'));
-        const imageUrl = `https://image.pollinations.ai/prompt/${basePrompt}%20${nameEncoded}?width=400&height=400&seed=${productId}`;
+        const images = [];
+        for (let i = 0; i < 6; i++) {
+          images.push(`https://picsum.photos/seed/${productId * 10 + i}/400/400`);
+        }
 
         await query(
           'UPDATE products SET image = ?, images = ? WHERE id = ?',
-          [imageUrl, JSON.stringify([imageUrl]), product.id]
+          [images[0], JSON.stringify(images), product.id]
         );
         updated++;
       }
       return NextResponse.json({ success: true, count: updated });
     }
 
-    const body = await request.json();
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
+    if (action === 'delete_all') {
+      await query('PRAGMA foreign_keys = OFF');
+      await query('DELETE FROM products');
+      await query('PRAGMA foreign_keys = ON');
+      return NextResponse.json({ success: true, message: 'All products deleted' });
     }
 
-    const { name, name_en, name_ar, price, original_price, stock, category_id, image, images, video, description, features, specifications, shipping, after_sale, is_limited, discount, display_mode } = body;
+    if (action === 'generate_products') {
+      const teapotNames = ['石瓢壶', '西施壶', '仿古壶', '井栏壶', '掇球壶', '提梁壶', '龙蛋壶', '水平壶', '容天壶', '福临壶', '思亭壶', '乳鼎壶', '汉扁壶', '柱楚壶', '平盖壶', '桶子壶', '汤婆壶', '铜鼓壶', '风卷葵', '菊花壶', '梅花壶', '竹节壶', '南瓜壶', '莲子壶', '佛手壶', '石榴壶', '桃子壶', '茄子壶', '黄瓜壶', '葫芦壶', '美人肩壶'];
+      const cupNames = ['品茗杯', '闻香杯', '功夫杯', '主人杯', '客杯', '公道杯', '普洱杯', '绿茶杯', '红茶杯', '乌龙茶杯', '斗笠杯', '圆融杯', '束口杯', '敞口杯', '敛口杯', '高足杯', '压手杯', '盏', '盅', '碗', '莲花杯', '菊花杯', '梅花杯', '竹叶杯', '南瓜杯', '桃子杯', '石榴杯', '柿子杯', '苹果杯', '梨子杯'];
+      const accessoryNames = ['茶叶罐', '公道杯', '茶海', '茶盘', '茶夹', '茶拨', '茶漏', '茶针', '茶宠', '茶巾', '茶洗', '水盂', '痰盂', '盖置', '杯托', '壶承', '壶垫', '养壶笔', '茶道六君子', '普洱刀', '茶滤', '茶巾盘', '香炉', '花插', '屏风', '柜子', '箱子', '盒子', '杯子', '茶具套装'];
+      const setNames = ['紫砂套组', '功夫茶具套装', '普洱茶具套装', '绿茶茶具套装', '红茶茶具套装', '乌龙茶具套装', '茶道套装', '礼品茶具套装', '精品茶具套装', '豪华茶具套装', '简约茶具套装', '传统茶具套装', '现代茶具套装', '大师茶具套装', '手工茶具套装', '定制茶具套装', '经典茶具套装', '流行茶具套装', '复古茶具套装', '时尚茶具套装', '商务茶具套装', '旅行茶具套装', '办公室茶具套装', '家用茶具套装', '收藏茶具套装', '把玩茶具套装', '展示茶具套装', '实用茶具套装', '装饰茶具套装', '多功能茶具套装'];
 
-    const result = await query(
-      `UPDATE products SET name = ?, name_en = ?, name_ar = ?, price = ?, original_price = ?, stock = ?, category_id = ?, image = ?, images = ?, video = ?, description = ?, features = ?, specifications = ?, shipping = ?, after_sale = ?, is_limited = ?, discount = ?, display_mode = ? WHERE id = ?`,
-      [name, name_en, name_ar, price, original_price, stock, category_id, image, JSON.stringify(images), video, description, JSON.stringify(features), JSON.stringify(specifications), JSON.stringify(shipping), JSON.stringify(after_sale), is_limited ? 1 : 0, discount, display_mode, id]
-    );
+      const categories = [
+        { id: 1, names: teapotNames, basePrice: 299, desc: '宜兴紫砂壶手工制作', prompt: 'Yixing Zisha purple clay teapot traditional Chinese pottery' },
+        { id: 2, names: cupNames, basePrice: 99, desc: '宜兴紫砂茶杯品茗杯', prompt: 'Yixing Zisha purple clay tea cup handcrafted' },
+        { id: 3, names: accessoryNames, basePrice: 59, desc: '茶道配件精品', prompt: 'Yixing Zisha teaware accessories tea set' },
+        { id: 4, names: setNames, basePrice: 599, desc: '紫砂茶具套装', prompt: 'Yixing Zisha purple clay tea set complete teaware collection' }
+      ];
 
-    if (result.rowCount === 0) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      let totalInserted = 0;
+
+      for (const cat of categories) {
+        for (let i = 0; i < 30; i++) {
+          const name = `${cat.names[i % cat.names.length]} ${Math.floor(i / cat.names.length) + 1}号`;
+          const price = cat.basePrice + (i * 17) % 500;
+          const originalPrice = Math.floor(price * (1.2 + (i % 5) * 0.1));
+          const stock = 10 + (i * 7) % 90;
+          const discount = ((i % 5) + 1) * 5;
+          const isLimited = i % 3 === 0 ? 1 : 0;
+
+          const productId = cat.id * 1000 + i;
+          const images = [];
+          for (let j = 0; j < 6; j++) {
+            const seed = productId * 10 + j;
+            const prompt = `${cat.prompt} variant ${j + 1}`;
+            images.push(`https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${encodeURIComponent(prompt)}&image_size=square`);
+          }
+
+          await query(
+            `INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount, display_mode)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              name,
+              `${name} English`,
+              `${name} Arabic`,
+              price,
+              originalPrice,
+              stock,
+              cat.id,
+              images[0],
+              JSON.stringify(images),
+              `优质${cat.desc}，${name}，手工制作，泥料正宗`,
+              JSON.stringify(['宜兴紫砂', '手工制作', '正品保证']),
+              isLimited,
+              discount,
+              i % 3 === 0 ? 'single' : 'double'
+            ]
+          );
+          totalInserted++;
+        }
+      }
+
+      return NextResponse.json({ success: true, count: totalInserted });
     }
 
-    return NextResponse.json(result.rows[0]);
-  } catch (error) {
-    console.error('Error updating product:', error);
-    return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ error: 'Failed to process request', details: error.message }, { status: 500 });
   }
 }
 

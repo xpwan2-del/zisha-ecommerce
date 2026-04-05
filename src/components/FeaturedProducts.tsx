@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 
 interface FeaturedProductsProps {
@@ -8,12 +7,8 @@ interface FeaturedProductsProps {
 }
 
 export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
-  const [products, setProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // 模拟产品数据
-  const defaultProducts = [
+  // 产品数据
+  const products = [
     {
       id: 1,
       name: "经典石瓢壶 - 宜兴紫砂壶手工制作",
@@ -21,7 +16,7 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
       price: 899,
       originalPrice: 1299,
       discount: 30,
-      image: "https://image.pollinations.ai/prompt/yixing%20zisha%20teapot%20stone%20gourd%20shape%20traditional%20chinese%20tea%20pot%20high%20quality%20professional%20photography%20white%20background?width=400&height=400&seed=1",
+      image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=yixing%20zisha%20teapot%20stone%20gourd%20shape%20traditional%20chinese%20tea%20pot%20high%20quality%20professional%20photography%20white%20background&image_size=landscape_16_9",
       category: "1",
       rating: 4.8,
       reviewCount: 128,
@@ -35,7 +30,7 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
       price: 699,
       originalPrice: 999,
       discount: 30,
-      image: "https://image.pollinations.ai/prompt/yixing%20zisha%20teapot%20xishi%20shape%20elegant%20design%20traditional%20chinese%20tea%20pot%20high%20quality%20professional%20photography%20white%20background?width=400&height=400&seed=2",
+      image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=yixing%20zisha%20teapot%20xishi%20shape%20elegant%20design%20traditional%20chinese%20tea%20pot%20high%20quality%20professional%20photography%20white%20background&image_size=landscape_16_9",
       category: "1",
       rating: 4.7,
       reviewCount: 89,
@@ -48,7 +43,7 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
       price: 299,
       originalPrice: 499,
       discount: 40,
-      image: "https://image.pollinations.ai/prompt/zisha%20tea%20cups%20set%20traditional%20chinese%20tea%20cups%20elegant%20design%20high%20quality%20professional%20photography%20white%20background?width=400&height=400&seed=3",
+      image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20set%20traditional%20chinese%20tea%20cups%20elegant%20design%20high%20quality%20professional%20photography%20white%20background&image_size=landscape_16_9",
       category: "2",
       rating: 4.9,
       reviewCount: 210,
@@ -61,7 +56,7 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
       price: 199,
       originalPrice: 299,
       discount: 33,
-      image: "https://image.pollinations.ai/prompt/zisha%20tea%20caddy%20traditional%20chinese%20tea%20storage%20jar%20sealed%20high%20quality%20professional%20photography%20white%20background?width=400&height=400&seed=4",
+      image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20caddy%20traditional%20chinese%20tea%20storage%20jar%20sealed%20high%20quality%20professional%20photography%20white%20background&image_size=landscape_16_9",
       category: "3",
       rating: 4.6,
       reviewCount: 76,
@@ -69,58 +64,17 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
     },
   ];
 
-  useEffect(() => {
-    fetchProducts();
-  }, [category]);
+  // 根据分类筛选产品
+  const filteredProducts = category === "all" 
+    ? products 
+    : products.filter(product => product.category === category);
 
-  const fetchProducts = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/products?category=${category}`);
-      const data = await response.json();
-      
-      // Check if data is an array or has products property
-      if (Array.isArray(data)) {
-        setProducts(data);
-      } else if (data.products && Array.isArray(data.products)) {
-        // Convert API data to match component expected format
-        const formattedProducts = data.products.map((product: any) => ({
-          ...product,
-          originalPrice: product.original_price,
-          rating: 4.5, // Default rating
-          reviewCount: 50, // Default review count
-          category: product.category_id,
-          inStock: product.stock > 0,
-          fastDelivery: true, // Default fast delivery
-          bestSeller: product.id <= 2 // Mark first 2 products as best sellers
-        }));
-        setProducts(formattedProducts);
-      } else {
-        // Use default products if API returns non-array
-        console.warn('API returned non-array data, using default products');
-        setProducts(filterProductsByCategory(defaultProducts, category));
-      }
-    } catch (error) {
-      console.error('Failed to fetch products:', error);
-      setError('Failed to load products, using default data');
-      // Use default products on error
-      setProducts(filterProductsByCategory(defaultProducts, category));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const filterProductsByCategory = (productList: any[], cat: string) => {
-    if (cat === "all") return productList;
-    return productList.filter(product => product.category === cat);
-  };
-
+  // 生成星级评分
   const getStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
       <svg
         key={i}
-        className={`w-4 h-4 ${i < Math.floor(rating) ? "text-yellow-400" : "text-gray-300"}`}
+        className={`w-4 h-4 ${i < Math.floor(rating) ? "text-[#CA8A04]" : "text-gray-300"}`}
         fill="currentColor"
         viewBox="0 0 20 20"
       >
@@ -129,87 +83,69 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
     ));
   };
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="bg-white rounded-md shadow-sm overflow-hidden animate-pulse">
-            <div className="aspect-square bg-gray-200"></div>
-            <div className="p-4">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-              <div className="h-8 bg-gray-200 rounded w-1/3 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6">
-      {products.map((product) => (
-        <div key={product.id} className="bg-white rounded-md shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-          <div className="aspect-square relative">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {filteredProducts.map((product) => (
+        <div key={product.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 border border-[#7C2D12]/20">
+          <div className="aspect-square relative overflow-hidden">
             <img
               src={product.image}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
             />
             {product.discount > 0 && (
-              <div className="absolute top-2 left-2">
-                <span className="bg-red-500 text-white text-sm font-bold px-2 py-1 rounded">
+              <div className="absolute top-3 left-3">
+                <span className="bg-[#B91C1C] text-white text-sm font-bold px-3 py-1 rounded-md">
                   -{product.discount}%
                 </span>
               </div>
             )}
             {product.bestSeller && (
-              <div className="absolute top-2 right-2">
-                <span className="bg-amazon-orange text-white text-xs font-bold px-2 py-1 rounded">
+              <div className="absolute top-3 right-3">
+                <span className="bg-[#CA8A04] text-white text-xs font-bold px-3 py-1 rounded-md">
                   畅销
                 </span>
               </div>
             )}
           </div>
 
-          <div className="p-4">
-            <div className="flex items-center mb-2">
+          <div className="p-6">
+            <div className="flex items-center mb-3">
               {getStars(product.rating)}
-              <span className="text-xs text-gray-500 ml-1">
+              <span className="text-xs text-[#450A0A] ml-2 font-['Noto_Sans_TC']">
                 ({product.reviewCount})
               </span>
             </div>
 
-            <h3 className="text-sm font-medium text-gray-900 mb-2 line-clamp-2">
+            <h3 className="text-base font-semibold text-[#450A0A] mb-3 line-clamp-2 font-['Noto_Serif_TC']">
               {product.name}
             </h3>
 
-            <div className="mb-3">
+            <div className="mb-4">
               <div className="flex items-baseline">
-                <span className="text-lg font-bold text-amazon-orange">
+                <span className="text-xl font-bold text-[#CA8A04] font-['Noto_Serif_TC']">
                   ¥{product.price}
                 </span>
                 {product.originalPrice > 0 && (
-                  <span className="text-sm text-gray-500 line-through ml-2">
+                  <span className="text-sm text-[#450A0A]/60 line-through ml-2 font-['Noto_Sans_TC']">
                     ¥{product.originalPrice}
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center text-xs text-gray-500 mb-3">
+            <div className="flex items-center text-xs text-[#450A0A] mb-4 font-['Noto_Sans_TC']">
               {product.inStock && (
-                <span className="text-green-600 mr-2">有货</span>
+                <span className="text-green-600 mr-3">有货</span>
               )}
               {product.fastDelivery && (
-                <span className="mr-2">快速配送</span>
+                <span className="mr-3">快速配送</span>
               )}
             </div>
 
             <Link
               href={`/products/${product.id}`}
-              className="block w-full bg-amazon-orange hover:bg-amazon-light-orange text-white text-sm font-medium py-2 px-4 rounded transition-colors duration-200 text-center"
+              className="block w-full bg-[#CA8A04] hover:bg-[#B47C03] text-white text-sm font-medium py-3 px-4 rounded-md transition-colors duration-300 text-center font-['Noto_Sans_TC']"
             >
               查看详情
             </Link>

@@ -29,8 +29,8 @@ export async function POST() {
         comment_en: 'This is my first zisha teapot purchase. The quality is excellent, the texture is smooth, and it brews tea beautifully. Customer service was very professional. Will buy again.',
         comment_ar: 'هذه أول عملية شراء لي لإبريق زيشا. الجودة ممتازة والملمس ناعم ويخمر الشاي بشكل جميل. خدمة العملاء كانت احترافية جداً. سأشتري مرة أخرى.',
         images: JSON.stringify([
-          'https://image.pollinations.ai/prompt/customer%20photo%20of%20zisha%20teapot%20on%20tea%20table%20realistic%20casual%20shot?width=400&height=400&seed=rev1',
-          'https://image.pollinations.ai/prompt/zisha%20teapot%20in%20use%20pouring%20tea%20customer%20photo?width=400&height=400&seed=rev2'
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=customer%20photo%20of%20zisha%20teapot%20on%20tea%20table%20realistic%20casual%20shot&image_size=square',
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20in%20use%20pouring%20tea%20customer%20photo&image_size=square'
         ])
       },
       {
@@ -41,8 +41,8 @@ export async function POST() {
         comment_en: 'Very satisfied with the custom zisha teapot. Fine workmanship, beautiful design, it\'s a work of art. Fast shipping and secure packaging.',
         comment_ar: 'راضٍ جداً عن إبريق زيشا المخصص. الصناعة دقيقة والتصميم جميل، إنه عمل فني. الشحن سريع والتغليف آمن.',
         images: JSON.stringify([
-          'https://image.pollinations.ai/prompt/beautiful%20zisha%20teapot%20on%20display%20shelf%20customer%20photo?width=400&height=400&seed=rev3',
-          'https://image.pollinations.ai/prompt/zisha%20teapot%20packaging%20box%20opened%20customer%20photo?width=400&height=400&seed=rev4'
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=beautiful%20zisha%20teapot%20on%20display%20shelf%20customer%20photo&image_size=square',
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20packaging%20box%20opened%20customer%20photo&image_size=square'
         ])
       },
       {
@@ -53,7 +53,7 @@ export async function POST() {
         comment_en: 'Good product quality at a reasonable price. Delivery took a bit longer than expected, but overall a pleasant shopping experience.',
         comment_ar: 'جودة المنتج جيدة والسعر معقول. التوصيل استغرق وقتاً أطول قليلاً من المتوقع، لكن بشكل عام تجربة تسوق ممتعة.',
         images: JSON.stringify([
-          'https://image.pollinations.ai/prompt/zisha%20tea%20cups%20on%20table%20customer%20photo%20casual?width=400&height=400&seed=rev5'
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20on%20table%20customer%20photo%20casual&image_size=square'
         ])
       },
       {
@@ -64,9 +64,9 @@ export async function POST() {
         comment_en: 'The clay quality of this zisha teapot is excellent with great breathability. The tea brewed is rich and mellow. The shop also included free tea accessories, very thoughtful.',
         comment_ar: 'جودة طين زيشا ممتازة مع نفاذية رائعة. الشاي المخمر غني وناعم. أضاف المتجر أيضاً ملحقات شاي مجانية، لطف جداً.',
         images: JSON.stringify([
-          'https://image.pollinations.ai/prompt/zisha%20teapot%20with%20tea%20accessories%20customer%20photo?width=400&height=400&seed=rev6',
-          'https://image.pollinations.ai/prompt/tea%20ceremony%20setup%20with%20zisha%20teapot%20casual%20photo?width=400&height=400&seed=rev7',
-          'https://image.pollinations.ai/prompt/close%20up%20of%20zisha%20teapot%20texture%20customer%20photo?width=400&height=400&seed=rev8'
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20with%20tea%20accessories%20customer%20photo&image_size=square',
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tea%20ceremony%20setup%20with%20zisha%20teapot%20casual%20photo&image_size=square',
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=close%20up%20of%20zisha%20teapot%20texture%20customer%20photo&image_size=square'
         ])
       },
       {
@@ -77,8 +77,8 @@ export async function POST() {
         comment_en: 'Third purchase, always satisfied. This Xi Shi teapot has a particularly elegant shape with smooth water flow. Perfect for both collection and use.',
         comment_ar: 'الشراء الثالث، دائماً راضٍ. إبريق شي شي له شكل أنيق بشكل خاص مع تدفق مياه سلس. مثالي للجمع والاستخدام.',
         images: JSON.stringify([
-          'https://image.pollinations.ai/prompt/elegant%20xi%20shi%20zisha%20teapot%20on%20wooden%20stand%20customer%20photo?width=400&height=400&seed=rev9',
-          'https://image.pollinations.ai/prompt/zisha%20teapot%20pouring%20water%20action%20shot%20customer%20photo?width=400&height=400&seed=rev10'
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20xi%20shi%20zisha%20teapot%20on%20wooden%20stand%20customer%20photo&image_size=square',
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20pouring%20water%20action%20shot%20customer%20photo&image_size=square'
         ])
       },
       {
@@ -89,8 +89,8 @@ export async function POST() {
         comment_en: 'The tea caddy has excellent sealing, moderate capacity, and beautiful appearance. Perfect for storing Pu-erh tea.',
         comment_ar: 'علبة الشاي لديها إغلاق ممتاز وسعة معتدلة ومظهر جميل. مثالية لتخزين شاي بوير.',
         images: JSON.stringify([
-          'https://image.pollinations.ai/prompt/zisha%20tea%20caddy%20with%20tea%20leaves%20customer%20photo?width=400&height=400&seed=rev11',
-          'https://image.pollinations.ai/prompt/beautiful%20tea%20storage%20jar%20zisha%20customer%20photo?width=400&height=400&seed=rev12'
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20caddy%20with%20tea%20leaves%20customer%20photo&image_size=square',
+          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=beautiful%20tea%20storage%20jar%20zisha%20customer%20photo&image_size=square'
         ])
       }
     ];

@@ -16,7 +16,7 @@ export default function ProductsPage() {
           price: 120,
           stock: 50,
           category: "Teapots",
-          image: "https://image.pollinations.ai/prompt/classic%20zisha%20teapot?width=200&height=200&seed=101",
+          image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=classic%20zisha%20teapot&image_size=square",
         },
         {
           id: 2,
@@ -24,7 +24,7 @@ export default function ProductsPage() {
           price: 85,
           stock: 30,
           category: "Cups",
-          image: "https://image.pollinations.ai/prompt/zisha%20tea%20cups%20set?width=200&height=200&seed=102",
+          image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20set&image_size=square",
         },
         {
           id: 3,
@@ -32,7 +32,7 @@ export default function ProductsPage() {
           price: 180,
           stock: 20,
           category: "Teapots",
-          image: "https://image.pollinations.ai/prompt/premium%20zisha%20teapot?width=200&height=200&seed=103",
+          image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot&image_size=square",
         },
       ]);
       setIsLoading(false);
