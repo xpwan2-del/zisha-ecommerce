@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import { Footer } from "@/components/Footer";
 import { LuckyDraw } from "@/components/LuckyDraw";
+import { useCurrency } from "@/lib/contexts/CurrencyContext";
+import { convertCurrency, formatCurrency } from "@/lib/utils/currency";
 
 interface ModuleConfig {
   module_hero: boolean;
@@ -73,6 +75,7 @@ function ProductImageCarousel({ product }: { product: any }) {
 
 export default function Home() {
   const { t, i18n } = useTranslation();
+  const { currency } = useCurrency();
   const [configs, setConfigs] = useState<ModuleConfig>({
     module_hero: true,
     module_categories: true,
@@ -219,11 +222,11 @@ export default function Home() {
                       <div className="mb-3">
                         <div className="flex items-baseline">
                           <span className="text-lg font-bold text-amazon-orange">
-                            ¥{product.price}
+                            {formatCurrency(convertCurrency(product.price, 'aed', currency), currency)}
                           </span>
                           {product.original_price > 0 && (
                             <span className="text-sm text-gray-500 line-through ml-2">
-                              ¥{product.original_price}
+                              {formatCurrency(convertCurrency(product.original_price, 'aed', currency), currency)}
                             </span>
                           )}
                         </div>
