@@ -326,6 +326,100 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: true, count: inserted.length, names: inserted.slice(0, 5) });
     }
 
+    if (action === 'batch_insert_cups') {
+      const cupNames = [
+        "紫砂杯", "朱泥杯", "段泥杯", "清水泥杯", "紫泥杯", "红泥杯", "本山绿杯", "墨绿泥杯",
+        "天青泥杯", "蟹黄泥杯", "龙血砂杯", "青灰泥杯", "紫茄泥杯", "芒果泥杯", "梨皮泥杯",
+        "桂花砂杯", "五彩泥杯", "粉墨泥杯", "紫红泥杯", "朱砂紫杯", "黑星砂杯", "赤紫泥杯",
+        "青灰段杯", "芝麻段杯", "黄金段杯", "老段泥杯", "小红泥杯", "大红袍杯", "朱泥小品杯",
+        "朱泥中品杯", "朱泥大品杯", "紫砂小品杯", "紫砂中品杯", "紫砂大品杯", "手拉胚杯",
+        "主人杯", "品茗杯", "闻香杯", "压手杯", "撇口杯", "敛口杯", "圆口杯", "方口杯",
+        "筋纹杯", "花口杯", "单杯", "对杯", "套杯", "个人杯", "待客杯", "收藏杯"
+      ];
+
+      const inserted = [];
+      for (let i = 0; i < 50; i++) {
+        const nameIdx = i % cupNames.length;
+        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20clay%20tea%20cup%20${encodeURIComponent(cupNames[nameIdx])}%20elegant%20design%20handcrafted%20professional%20photography&image_size=square_hd&seed=${i + 2000}`;
+        const name = `${cupNames[nameIdx]} ${Math.floor(i / cupNames.length) + 1}号`;
+        const price = 99 + (i * 23) % 500;
+        const stock = 20 + (i * 7) % 80;
+
+        await query(
+          `INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount, display_mode, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+          [name, `Zisha Tea Cup ${cupNames[nameIdx]} #${Math.floor(i / cupNames.length) + 1}`, `كوب شاي زيشا ${cupNames[nameIdx]} #${Math.floor(i / cupNames.length) + 1}`,
+           price, 0, stock, 2, imageUrl, JSON.stringify([imageUrl]),
+           `优质宜兴紫砂茶杯，${cupNames[nameIdx]}，泥料上乘，做工精细，适合品茗。`,
+           JSON.stringify(["宜兴紫砂", "手工制作", "品茗佳品"]), 0, 0, 'double']
+        );
+        inserted.push(name);
+      }
+      return NextResponse.json({ success: true, count: inserted.length, names: inserted.slice(0, 5) });
+    }
+
+    if (action === 'batch_insert_accessories') {
+      const accessoryNames = [
+        "茶盘", "茶海", "茶壶", "茶夹", "茶漏", "茶匙", "茶针", "茶则",
+        "茶盂", "茶桶", "茶巾", "茶宠", "茶案", "茶炉", "茶亭", "茶架",
+        "茶柜", "茶箱", "茶盒", "茶袋", "公道杯", "过滤网", "茶刷", "茶拔",
+        "壶叉", "壶钮", "壶盖", "壶身", "壶底", "壶嘴", "壶把", "壶肩",
+        "紫砂罐", "茶叶罐", "醒茶罐", "储茶罐", "旅行茶具", "办公茶具", "户外茶具"
+      ];
+
+      const inserted = [];
+      for (let i = 0; i < 50; i++) {
+        const nameIdx = i % accessoryNames.length;
+        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20tea%20accessory%20${encodeURIComponent(accessoryNames[nameIdx])}%20traditional%20handcrafted%20professional%20photography&image_size=square_hd&seed=${i + 3000}`;
+        const name = `${accessoryNames[nameIdx]} ${Math.floor(i / accessoryNames.length) + 1}号`;
+        const price = 39 + (i * 17) % 300;
+        const stock = 30 + (i * 11) % 70;
+
+        await query(
+          `INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount, display_mode, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+          [name, `Zisha Tea Accessory ${accessoryNames[nameIdx]} #${Math.floor(i / accessoryNames.length) + 1}`, `إكسسوار شاي زيشا ${accessoryNames[nameIdx]} #${Math.floor(i / accessoryNames.length) + 1}`,
+           price, 0, stock, 3, imageUrl, JSON.stringify([imageUrl]),
+           `优质茶具配件，${accessoryNames[nameIdx]}，做工精细，实用耐用。`,
+           JSON.stringify(["优质材料", "手工制作", "实用设计"]), 0, 0, 'double']
+        );
+        inserted.push(name);
+      }
+      return NextResponse.json({ success: true, count: inserted.length, names: inserted.slice(0, 5) });
+    }
+
+    if (action === 'batch_insert_sets') {
+      const setNames = [
+        "紫砂茶具套装", "朱泥茶具套装", "段泥茶具套装", "清水泥茶具套装", "紫泥茶具套装",
+        "红泥茶具套装", "本山绿茶具套装", "墨绿泥茶具套装", "天青泥茶具套装", "蟹黄泥茶具套装",
+        "茶具一壶四杯套装", "茶具一壶六杯套装", "茶具两壶六杯套装", "茶具旅行套装", "茶具办公套装",
+        "茶具户外套装", "茶具收藏套装", "茶具礼品套装", "茶具入门套装", "茶具进阶套装",
+        "茶具大师套装", "茶具名家套装", "茶具精品套装", "茶具普通套装", "茶具手拉胚套装",
+        "茶具机车套装", "茶具半手工套装", "茶具全手工套装", "茶具原矿套装", "茶具拼配套装"
+      ];
+
+      const inserted = [];
+      for (let i = 0; i < 30; i++) {
+        const nameIdx = i % setNames.length;
+        const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20yixing%20zisha%20tea%20set%20${encodeURIComponent(setNames[nameIdx])}%20complete%20traditional%20elegant%20professional%20photography&image_size=square_hd&seed=${i + 4000}`;
+        const name = `${setNames[nameIdx]} ${Math.floor(i / setNames.length) + 1}号`;
+        const price = 599 + (i * 47) % 2000;
+        const stock = 5 + (i * 3) % 30;
+        const displayMode = i % 4 === 0 ? 'single' : 'double';
+
+        await query(
+          `INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount, display_mode, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+          [name, `Zisha Tea Set ${setNames[nameIdx]} #${Math.floor(i / setNames.length) + 1}`, `مجموعة شاي زيشا ${setNames[nameIdx]} #${Math.floor(i / setNames.length) + 1}`,
+           price, 0, stock, 4, imageUrl, JSON.stringify([imageUrl]),
+           `优质宜兴紫砂茶具套装，${setNames[nameIdx]}，配置齐全，做工精细，是品茗待客的最佳选择。`,
+           JSON.stringify(["宜兴紫砂", "一壶多杯", "配置齐全", "礼品佳品"]), 0, 0, displayMode]
+        );
+        inserted.push(name);
+      }
+      return NextResponse.json({ success: true, count: inserted.length, names: inserted.slice(0, 5) });
+    }
+
     const body = await request.json();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
