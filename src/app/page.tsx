@@ -200,7 +200,7 @@ export default function Home() {
           <div className="lg:w-3/4">
             <h2 className="text-2xl font-bold mb-6">{t("nav.deals", "今日特惠")}</h2>
             {products.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6">
                 {products.map((product) => (
                   <div key={product.id} className="bg-white rounded-md shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                     <ProductImageCarousel product={product} />

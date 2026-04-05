@@ -131,7 +131,7 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6">
         {Array.from({ length: 4 }).map((_, index) => (
           <div key={index} className="bg-white rounded-md shadow-sm overflow-hidden animate-pulse">
             <div className="aspect-square bg-gray-200"></div>
@@ -148,7 +148,7 @@ export function FeaturedProducts({ category = "all" }: FeaturedProductsProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6">
       {products.map((product) => (
         <div key={product.id} className="bg-white rounded-md shadow-sm overflow-hidden hover:shadow-md transition-shadow">
           <div className="aspect-square relative">
