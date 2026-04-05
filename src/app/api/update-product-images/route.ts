@@ -46,11 +46,13 @@ export async function POST() {
       }
       
       // 生成主图和多张细节图
-      const mainImage = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${prompt}&image_size=square_hd`;
+      const productId = Number(product.id);
+      const encodedPrompt = encodeURIComponent(prompt.replace(/%20/g, ' '));
+      const mainImage = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=400&height=400&seed=${productId}`;
       const images = [
         mainImage,
-        `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${prompt}%20close%20up%20detail&image_size=square_hd`,
-        `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${prompt}%20side%20view&image_size=square_hd`
+        `https://image.pollinations.ai/prompt/${encodedPrompt}%20close%20up%20detail?width=400&height=400&seed=${productId + 1000}`,
+        `https://image.pollinations.ai/prompt/${encodedPrompt}%20side%20view?width=400&height=400&seed=${productId + 2000}`
       ];
       
       // 更新产品图片

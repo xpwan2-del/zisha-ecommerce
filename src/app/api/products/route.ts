@@ -422,20 +422,20 @@ export async function PUT(request: NextRequest) {
 
     if (action === 'batch_update_images') {
       const products = await query('SELECT id, category_id, name FROM products');
-      const placeholderImages: Record<string, string> = {
-        1: 'https://placehold.co/400x400/e8d4c4/ffffff?text=Teapot',
-        2: 'https://placehold.co/400x400/a8d5ba/ffffff?text=Tea+Cup',
-        3: 'https://placehold.co/400x400/8B7355/ffffff?text=Accessory',
-        4: 'https://placehold.co/400x400/27ae60/ffffff?text=Tea+Set'
+      const prompts: Record<string, string> = {
+        1: 'traditional%20chinese%20yixing%20zisha%20teapot%20purple%20clay%20handmade',
+        2: 'chinese%20zisha%20tea%20cup%20purple%20clay%20traditional%20handmade',
+        3: 'chinese%20zisha%20tea%20accessory%20traditional%20purple%20clay%20handicraft',
+        4: 'chinese%20zisha%20tea%20set%20complete%20teapot%20and%20cups%20purple%20clay'
       };
 
       let updated = 0;
       for (const product of products.rows) {
+        const productId = Number(product.id);
         const catId = String(product.category_id);
-        const placeholder = placeholderImages[catId] || placeholderImages['1'];
-        const imageUrl = placeholder.includes('?text=')
-          ? `${placeholder.split('?text=')[0]}?text=${encodeURIComponent(String(product.name || 'Product'))}`
-          : placeholder;
+        const basePrompt = prompts[catId] || prompts['1'];
+        const nameEncoded = encodeURIComponent(String(product.name || 'Product'));
+        const imageUrl = `https://image.pollinations.ai/prompt/${basePrompt}%20${nameEncoded}?width=400&height=400&seed=${productId}`;
 
         await query(
           'UPDATE products SET image = ?, images = ? WHERE id = ?',
