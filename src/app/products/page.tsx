@@ -194,7 +194,7 @@ function ProductsContent() {
                       onClick={() => handleProductClick(product.id)}
                     >
                       <div className="aspect-square overflow-hidden relative">
-                        {product.is_limited && product.discount > 0 && (
+                        {product.is_limited == 1 && product.discount > 0 && (
                           <div className="absolute top-4 left-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold z-10">
                             {product.discount}% OFF
                           </div>
