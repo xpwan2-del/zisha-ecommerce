@@ -420,6 +420,32 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: true, count: inserted.length, names: inserted.slice(0, 5) });
     }
 
+    if (action === 'batch_update_images') {
+      const products = await query('SELECT id, category_id, name FROM products');
+      const placeholderImages: Record<string, string> = {
+        1: 'https://placehold.co/400x400/e8d4c4/ffffff?text=Teapot',
+        2: 'https://placehold.co/400x400/a8d5ba/ffffff?text=Tea+Cup',
+        3: 'https://placehold.co/400x400/8B7355/ffffff?text=Accessory',
+        4: 'https://placehold.co/400x400/27ae60/ffffff?text=Tea+Set'
+      };
+
+      let updated = 0;
+      for (const product of products.rows) {
+        const catId = String(product.category_id);
+        const placeholder = placeholderImages[catId] || placeholderImages['1'];
+        const imageUrl = placeholder.includes('?text=')
+          ? `${placeholder.split('?text=')[0]}?text=${encodeURIComponent(String(product.name || 'Product'))}`
+          : placeholder;
+
+        await query(
+          'UPDATE products SET image = ?, images = ? WHERE id = ?',
+          [imageUrl, JSON.stringify([imageUrl]), product.id]
+        );
+        updated++;
+      }
+      return NextResponse.json({ success: true, count: updated });
+    }
+
     const body = await request.json();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
