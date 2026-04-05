@@ -18,6 +18,7 @@ interface DealProduct {
   discount: number;
   is_limited: boolean;
   stock: number;
+  category_id: number;
   activities: { id: number; name: string; name_en: string; icon: string; color: string }[];
 }
 
@@ -30,10 +31,10 @@ export default function DealsPage() {
 
   const categories = [
     { id: "all", name: "全部", name_en: "All" },
-    { id: "teapots", name: "茶壶", name_en: "Teapots" },
-    { id: "cups", name: "茶杯", name_en: "Cups" },
-    { id: "accessories", name: "配件", name_en: "Accessories" },
-    { id: "sets", name: "套组", name_en: "Sets" },
+    { id: "1", name: "茶壶", name_en: "Teapots" },
+    { id: "2", name: "茶杯", name_en: "Cups" },
+    { id: "3", name: "配件", name_en: "Accessories" },
+    { id: "4", name: "套组", name_en: "Sets" },
   ];
 
   useEffect(() => {
@@ -58,11 +59,7 @@ export default function DealsPage() {
   const filteredProducts = products.filter((product) => {
     if (product.discount <= 0) return false;
     if (activeCategory === "all") return true;
-    if (activeCategory === "teapots") return product.name_en?.toLowerCase().includes("teapot") || product.name?.includes("壶");
-    if (activeCategory === "cups") return product.name_en?.toLowerCase().includes("cup") || product.name?.includes("杯");
-    if (activeCategory === "accessories") return product.name_en?.toLowerCase().includes("accessory") || product.name?.includes("配件");
-    if (activeCategory === "sets") return product.name_en?.toLowerCase().includes("set") || product.name?.includes("套");
-    return true;
+    return product.category_id?.toString() === activeCategory;
   });
 
   const getActivityName = (activity: any) => {
