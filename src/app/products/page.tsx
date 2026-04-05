@@ -34,6 +34,13 @@ function ProductsContent() {
   const [totalPages, setTotalPages] = useState(1);
   const searchTriggerRef = useRef(0);
 
+  // Sync selectedCategory with URL when URL changes
+  useEffect(() => {
+    const categoryFromUrl = searchParams.get('category') || 'all';
+    setSelectedCategory(categoryFromUrl);
+    setPage(1);
+  }, [searchParams]);
+
   // 加载分类
   useEffect(() => {
     async function fetchCategories() {
