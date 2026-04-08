@@ -70,32 +70,43 @@ const generateProducts = () => {
       switch (category.name) {
         case '紫砂壶':
           const teapotTypes = ['西施', '石瓢', '仿古', '掇球', '容天', '汉铎', '秦权', '子冶石瓢', '景舟石瓢', '曼生壶', '供春', '龙蛋', '梨形', '僧帽', '合欢'];
-          productName = `宜兴紫砂壶 ${teapotTypes[i]}款`;
+          productName = `${productId}. 宜兴紫砂壶 ${teapotTypes[i]}款`;
           description = `采用正宗宜兴原矿紫砂泥，手工制作而成。${teapotTypes[i]}壶造型独特，出水流畅，是品茶爱好者的首选。`;
           features = ['正宗宜兴原矿紫砂', '手工制作', '200ml容量', '耐高温', '越用越润'];
           break;
         case '茶杯':
           const cupTypes = ['品茗杯', '功夫茶杯', '主人杯', '斗笠杯', '铃铛杯', '鸡心杯', '卧足杯', '高足杯', '直筒杯', '撇口杯', '收口杯', '鼓腹杯', '折沿杯', '葵口杯', '莲花杯'];
-          productName = `紫砂${cupTypes[i]} 套装`;
+          productName = `${productId}. 紫砂${cupTypes[i]} 套装`;
           description = `采用优质紫砂泥制作，质感细腻，透气性好。${cupTypes[i]}造型优美，适合品饮各种茶叶。`;
           features = ['优质紫砂泥', '细腻质感', '透气性好', '100ml容量', '易清洗'];
           break;
         case '茶叶罐':
           const caddyTypes = ['密封罐', '存储罐', '醒茶罐', '便携罐', '复古罐', '现代罐', '大容量罐', '小容量罐', '带盖罐', '陶瓷罐', '紫砂罐', '竹编罐', '木罐', '金属罐', '玻璃罐'];
-          productName = `紫砂${caddyTypes[i]}`;
+          productName = `${productId}. 紫砂${caddyTypes[i]}`;
           description = `采用优质紫砂泥制作，密封性能好，适合存储茶叶。${caddyTypes[i]}造型美观，实用性强。`;
           features = ['优质紫砂泥', '密封性能好', '防潮防虫', '美观实用', '易于保养'];
           break;
         case '套装':
           const setTypes = ['经典套装', '豪华套装', '旅行套装', '家庭套装', '商务套装', '礼品套装', '收藏套装', '入门套装', '大师套装', '限量套装', '定制套装', '传统套装', '现代套装', '精品套装', '尊享套装'];
-          productName = `紫砂茶具${setTypes[i]}`;
+          productName = `${productId}. 紫砂茶具${setTypes[i]}`;
           description = `包含茶壶、茶杯、茶盘等全套茶具，采用优质紫砂泥制作，工艺精湛，是品茶和送礼的绝佳选择。`;
           features = ['全套茶具', '优质紫砂泥', '工艺精湛', '送礼佳品', '收藏价值'];
           break;
       }
       
+      // 为一些产品添加今日特惠
+      let dailyDiscount = 0;
+      let dailyDiscountStartTime = '';
+      let dailyDiscountEndTime = '';
+      if (i % 3 === 0) {
+        dailyDiscount = Math.floor(Math.random() * 30) + 10; // 10-40%
+        dailyDiscountStartTime = new Date().toISOString();
+        const endTime = new Date();
+        endTime.setHours(23, 59, 59, 999);
+        dailyDiscountEndTime = endTime.toISOString();
+      }
+      
       products.push({
-        id: productId++,
         name: productName,
         name_en: `${productName} (Zisha)`,
         name_ar: `إبوة زيشا ${productName}`,
@@ -109,8 +120,14 @@ const generateProducts = () => {
         description: description,
         features: features,
         is_limited: i % 5 === 0,
-        discount: discount
+        discount: discount,
+        daily_discount: dailyDiscount,
+        daily_discount_start_time: dailyDiscountStartTime,
+        daily_discount_end_time: dailyDiscountEndTime,
+        display_mode: i % 3 === 0 ? 'single' : 'double'
       });
+      
+      productId++;
     }
   });
   
@@ -141,32 +158,40 @@ export async function POST(request: NextRequest) {
     const products = generateProducts();
     console.log(`生成了 ${products.length} 个产品`);
     
+    // 先删除现有产品数据
+    await query('DELETE FROM products');
+    console.log('已删除现有产品数据');
+    
     // 插入产品数据
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
-      await query(
-        `INSERT INTO products (id, name, name_en, name_ar, price, original_price, stock, category_id, image, images, video, description, features, is_limited, discount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          product.id,
-          product.name,
-          product.name_en,
-          product.name_ar,
-          product.price,
-          product.original_price,
-          product.stock,
-          product.category_id,
-          product.image,
-          JSON.stringify(product.images),
-          product.video,
-          product.description,
-          JSON.stringify(product.features),
-          product.is_limited ? 1 : 0,
-          product.discount
-        ]
-      );
-      if (i % 10 === 0) {
-        console.log(`已插入 ${i} 个产品`);
+      try {
+        await query(
+          `INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, description, is_limited, discount, daily_discount, daily_discount_start_time, daily_discount_end_time, display_mode)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            product.name,
+            product.name_en,
+            product.name_ar,
+            product.price,
+            product.original_price,
+            product.stock,
+            product.category_id,
+            product.image,
+            product.description,
+            product.is_limited ? 1 : 0,
+            product.discount,
+            product.daily_discount,
+            product.daily_discount_start_time,
+            product.daily_discount_end_time,
+            product.display_mode
+          ]
+        );
+        if (i % 10 === 0) {
+          console.log(`已插入 ${i} 个产品`);
+        }
+      } catch (error) {
+        console.error(`插入产品 ${product.name} 失败:`, error);
       }
     }
 

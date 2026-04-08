@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
+import { useCart } from "@/lib/contexts/CartContext";
+import { useAuth } from "@/lib/contexts/AuthContext";
 
 export function Header() {
   const router = useRouter();
@@ -11,8 +13,11 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState("/logo.png");
   const [activeCategory, setActiveCategory] = useState("all");
+  const { totalItems } = useCart();
+  const { user, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
     if (pathname === '/products') {
@@ -160,18 +165,66 @@ export function Header() {
             </div>
 
             {/* 购物车 */}
-            <a href="/cart" className="flex items-center hover:text-[#CA8A04] transition-colors duration-300">
+            <a href="/cart" className="flex items-center hover:text-[#CA8A04] transition-colors duration-300 relative">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
+              {totalItems > 0 && (
+                <span className="absolute -top-2 -right-2 bg-[#CA8A04] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-['Noto_Sans_TC']">
+                  {totalItems}
+                </span>
+              )}
             </a>
 
             {/* 用户账户 */}
-            <a href="/account" className="flex items-center hover:text-[#CA8A04] transition-colors duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </a>
+            <div className="relative">
+              <button 
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center hover:text-[#CA8A04] transition-colors duration-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                {isAuthenticated && user && (
+                  <span className="ml-2 text-sm font-['Noto_Sans_TC'] whitespace-nowrap">
+                    {user.name}
+                  </span>
+                )}
+              </button>
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-[#7C2D12]/20">
+                  {isAuthenticated ? (
+                    <>
+                      <a href="/account" className="block w-full text-left px-4 py-2 text-sm text-[#450A0A] hover:bg-[#FEF2F2] font-['Noto_Sans_TC']">
+                        {t("nav.account", "个人中心")}
+                      </a>
+                      <a href="/cart" className="block w-full text-left px-4 py-2 text-sm text-[#450A0A] hover:bg-[#FEF2F2] font-['Noto_Sans_TC']">
+                        {t("nav.cart", "购物车")}
+                      </a>
+                      <button
+                        onClick={async () => {
+                          await logout();
+                          router.push("/");
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-[#450A0A] hover:bg-[#FEF2F2] font-['Noto_Sans_TC']"
+                      >
+                        {t("nav.logout", "退出登录")}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <a href="/login" className="block w-full text-left px-4 py-2 text-sm text-[#450A0A] hover:bg-[#FEF2F2] font-['Noto_Sans_TC']">
+                        {t("nav.login", "登录")}
+                      </a>
+                      <a href="/register" className="block w-full text-left px-4 py-2 text-sm text-[#450A0A] hover:bg-[#FEF2F2] font-['Noto_Sans_TC']">
+                        {t("nav.register", "注册")}
+                      </a>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* 汉堡菜单按钮 */}
             <button

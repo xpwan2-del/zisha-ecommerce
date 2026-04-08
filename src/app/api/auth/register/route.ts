@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key';
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +52,33 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    return NextResponse.json({ user, message: 'Registration successful' }, { status: 201 });
+    // 生成 access token (2 hours)
+    const accessToken = jwt.sign(
+      {
+        user_id: user.id,
+        email: user.email,
+        role: user.role
+      },
+      JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+    
+    // 生成 refresh token (30 days)
+    const refreshToken = jwt.sign(
+      {
+        user_id: user.id,
+        email: user.email
+      },
+      REFRESH_TOKEN_SECRET,
+      { expiresIn: '30d' }
+    );
+    
+    return NextResponse.json({
+      user,
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      message: 'Registration successful'
+    }, { status: 201 });
   } catch (error) {
     console.error('Error registering user:', error);
     return NextResponse.json({ error: 'Failed to register user' }, { status: 500 });

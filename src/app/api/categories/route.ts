@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-const mockCategories = [
-  { id: 1, name: "茶壶", name_en: "Teapots", name_ar: "أبوات الشاي", description: "Yixing Zisha Teapots" },
-  { id: 2, name: "茶杯", name_en: "Cups", name_ar: "أكواب الشاي", description: "Zisha Tea Cups" },
-  { id: 3, name: "配件", name_en: "Accessories", name_ar: "الإكسسوارات", description: "Tea Accessories" },
-  { id: 4, name: "套组", name_en: "Sets", name_ar: "المجموعات", description: "Tea Sets" }
-];
-
 export async function GET(request: NextRequest) {
   try {
     const result = await query('SELECT id, name, name_en, name_ar, slug, description, image, created_at FROM categories ORDER BY created_at DESC');
-    if (result.rows && result.rows.length > 0) {
-      return NextResponse.json(result.rows);
-    }
-    return NextResponse.json(mockCategories);
+    return NextResponse.json(result.rows || []);
   } catch (error) {
     console.error('Error fetching categories:', error);
-    return NextResponse.json(mockCategories);
+    return NextResponse.json([]);
   }
 }
 

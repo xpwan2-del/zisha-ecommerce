@@ -70,26 +70,26 @@ export function ActivityCarousel() {
 
   const renderCarousel = (activityModules: HomeModule[]) => {
     return (
-      <section className={`py-8 px-4 bg-white transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+      <section className={`py-1 px-4 bg-white transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
         <div className="max-w-7xl mx-auto">
-          <div className="relative rounded-lg overflow-hidden shadow-lg h-[300px] md:h-[400px] mb-8">
+          <div className="relative rounded-lg overflow-hidden shadow-md h-[100px] sm:h-[160px] md:h-[200px]">
             {activityModules.map((activity, index) => (
               <div
                 key={activity.id}
                 className={`absolute inset-0 transition-opacity duration-1000 ${index === currentIndex ? 'opacity-100' : 'opacity-0'}`}
               >
-                <a href={activity.link || '#'} className="block h-full">
+                <a href={activity.link || '#'} className="block h-full w-full">
                   <img
                     src={activity.image}
                     alt={activity.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#450A0A]/80 to-transparent flex items-end">
-                    <div className="p-6 text-white">
-                      <h3 className="text-2xl md:text-3xl font-bold mb-2 font-['Noto_Serif_TC']">
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#450A0A]/95 via-[#450A0A]/50 to-transparent flex flex-col justify-end">
+                    <div className="p-3 sm:p-4 text-white w-full">
+                      <h3 className="text-sm sm:text-base md:text-xl font-bold mb-1 font-['Noto_Serif_TC'] leading-tight">
                         {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
                       </h3>
-                      <p className="text-base md:text-lg font-['Noto_Sans_TC']">
+                      <p className="text-xs sm:text-sm font-['Noto_Sans_TC'] leading-relaxed">
                         {getLocalizedText(activity.description, activity.description_en, activity.description_ar)}
                       </p>
                     </div>
@@ -98,12 +98,12 @@ export function ActivityCarousel() {
               </div>
             ))}
             
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
+            <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
               {activityModules.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentIndex(index)}
-                  className={`w-3 h-3 rounded-full transition-all duration-300 ${index === currentIndex ? 'bg-[#CA8A04] w-8' : 'bg-white/70'}`}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentIndex ? 'bg-[#CA8A04] w-6' : 'bg-white/70'}`}
                 ></button>
               ))}
             </div>

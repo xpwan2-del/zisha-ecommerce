@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS categories (
     name VARCHAR(100) NOT NULL,
     name_en VARCHAR(100) NOT NULL,
     name_ar VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
+    image VARCHAR(255) DEFAULT '',
     priority INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -31,6 +33,10 @@ CREATE TABLE IF NOT EXISTS products (
     after_sale TEXT DEFAULT '{}',
     is_limited BOOLEAN DEFAULT false,
     discount INTEGER DEFAULT 0,
+    daily_discount INTEGER DEFAULT 0,
+    daily_discount_start_time TIMESTAMP,
+    daily_discount_end_time TIMESTAMP,
+    display_mode VARCHAR(20) DEFAULT 'double',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -191,6 +197,21 @@ CREATE TABLE IF NOT EXISTS recommendations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 创建购物车表
+CREATE TABLE IF NOT EXISTS cart_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES users(id),
+    product_id INTEGER REFERENCES products(id),
+    quantity INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建购物车表索引
+CREATE INDEX IF NOT EXISTS idx_cart_items_user_id ON cart_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_product_id ON cart_items(product_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cart_items_user_product ON cart_items(user_id, product_id);
+
 -- 创建活动类别表
 CREATE TABLE IF NOT EXISTS activity_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -225,6 +246,7 @@ CREATE TABLE IF NOT EXISTS lucky_draws (
     end_time TIMESTAMP NOT NULL,
     status VARCHAR(20) DEFAULT 'active', -- active, completed, cancelled
     winner_id INTEGER, -- 中奖用户ID
+    winning_number INTEGER, -- 中奖号码
     winning_time TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -296,6 +318,21 @@ CREATE TABLE IF NOT EXISTS contact (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 创建物流表
+CREATE TABLE IF NOT EXISTS order_logistics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL,
+    tracking_number VARCHAR(100) NOT NULL,
+    carrier VARCHAR(100) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    estimated_delivery DATE,
+    actual_delivery DATETIME,
+    updates TEXT DEFAULT '[]',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
@@ -315,11 +352,17 @@ INSERT INTO activity_categories (name, name_en, name_ar, icon, color, status) VA
 ('一元购抽奖', 'Lucky Draw', 'سحب النعمة', 'gift', '#FF3366', 'active');
 
 -- 插入测试数据
-INSERT INTO categories (name, name_en, name_ar, description, priority) VALUES
-('紫砂壶', 'Zisha Teapot', 'إبريق زيشا', '传统紫砂壶', 1),
-('茶杯', 'Teacup', 'فنجان شاي', '精美茶杯', 2),
-('茶叶罐', 'Tea Caddy', 'علبة شاي', '茶叶 storage', 3),
-('套装', 'Set', 'مجموعة', '茶壶套装', 4);
+INSERT INTO categories (name, name_en, name_ar, slug, description, image, priority) VALUES
+('紫砂壶', 'Zisha Teapot', 'إبريق زيشا', 'zisha-teapot', '传统紫砂壶', '', 1),
+('茶杯', 'Teacup', 'فنجان شاي', 'teacup', '精美茶杯', '', 2),
+('茶叶罐', 'Tea Caddy', 'علبة شاي', 'tea-caddy', '茶叶 storage', '', 3),
+('套装', 'Set', 'مجموعة', 'set', '茶壶套装', '', 4);
+
+-- 插入一元购活动测试数据
+INSERT INTO lucky_draws (product_id, total_equity, price_per_equity, current_equity, start_time, end_time, status) VALUES
+(1, 1000, 1.00, 350, '2026-04-01 00:00:00', '2026-04-30 23:59:59', 'active'),
+(2, 800, 1.00, 620, '2026-04-01 00:00:00', '2026-04-30 23:59:59', 'active'),
+(3, 1200, 1.00, 150, '2026-04-01 00:00:00', '2026-04-30 23:59:59', 'active');
 
 INSERT INTO teapot_types (name, name_en, name_ar, images, min_capacity, max_capacity, base_price, description) VALUES
 ('石瓢', 'Shi Piao', 'شيه پياو', '[]', 150, 300, 300, '经典壶型'),
@@ -342,7 +385,7 @@ INSERT INTO system_configs (config_key, config_value, description) VALUES
 ('module_testimonials', 'true', '客户评价模块'),
 ('module_contact', 'true', '联系我们模块'),
 ('module_customize', 'false', '定制功能模块（需要开启才能显示定制页面）'),
-('module_lucky_draw', 'false', '一元购抽奖模块（需要开启才能显示一元购页面）');
+('module_lucky_draw', 'true', '一元购抽奖模块（需要开启才能显示一元购页面）');
 
 INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features) VALUES
 ('经典石瓢壶', 'Classic Shi Piao Teapot', 'إبريق شيه پياو الكلاسيكي', 300, 350, 20, 1, 'https://neeko-copilot.bytedance.net/api/text2image?prompt=zisha%20teapot%20shi%20piao%20style&size=square_hd', '[]', '经典石瓢壶，传统工艺制作', '[]'),

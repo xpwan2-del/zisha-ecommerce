@@ -41,26 +41,26 @@ export default function AboutPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-[#FDF2F8] middle-east-pattern flex items-center justify-center">
+        <div className="text-xl text-[#831843] font-['Noto_Sans_Arabic']">Loading...</div>
       </div>
     );
   }
 
   if (!about) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">No data</div>
+      <div className="min-h-screen bg-[#FDF2F8] middle-east-pattern flex items-center justify-center">
+        <div className="text-xl text-[#831843] font-['Noto_Sans_Arabic']">No data</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#FDF2F8] middle-east-pattern">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold mb-6">{about.title}</h1>
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <p className="mb-4 text-gray-700 leading-relaxed">{about.content}</p>
+        <h1 className="text-3xl font-bold font-['Noto_Naskh_Arabic'] text-[#831843] mb-8 text-center">{about.title}</h1>
+        <div className="glass-effect rounded-lg shadow-md p-6">
+          <p className="mb-4 text-[#831843] leading-relaxed font-['Noto_Sans_Arabic']">{about.content}</p>
         </div>
       </div>
     </div>

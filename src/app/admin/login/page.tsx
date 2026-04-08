@@ -24,40 +24,40 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-      <div className="w-full max-w-md p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold text-center mb-8 text-primary">Admin Login</h1>
+    <div className="min-h-screen flex items-center justify-center bg-[#FDF2F8] middle-east-pattern">
+      <div className="w-full max-w-md p-8 glass-effect rounded-lg shadow-lg border border-[#DB2777]/20">
+        <h1 className="text-3xl font-bold text-center mb-8 font-['Noto_Naskh_Arabic'] text-[#831843]">Admin Login</h1>
         {error && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">
+          <div className="mb-4 p-3 bg-[#DB2777]/20 text-[#DB2777] rounded">
             {error}
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block mb-2 font-medium">Email</label>
+            <label htmlFor="email" className="block mb-2 font-medium font-['Noto_Sans_Arabic'] text-[#831843]">Email</label>
             <input
               type="email"
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-2 border border-[#DB2777]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#CA8A04] font-['Noto_Sans_Arabic'] text-[#831843]"
               required
             />
           </div>
           <div>
-            <label htmlFor="password" className="block mb-2 font-medium">Password</label>
+            <label htmlFor="password" className="block mb-2 font-medium font-['Noto_Sans_Arabic'] text-[#831843]">Password</label>
             <input
               type="password"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-2 border border-[#DB2777]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#CA8A04] font-['Noto_Sans_Arabic'] text-[#831843]"
               required
             />
           </div>
           <button
             type="submit"
-            className="w-full bg-primary hover:bg-primary/90 text-white py-3 rounded-lg font-medium transition-all duration-300"
+            className="w-full bg-[#CA8A04] hover:bg-[#B47C03] text-white py-3 rounded-lg font-['Noto_Sans_Arabic'] font-medium transition-all duration-300"
           >
             Login
           </button>

@@ -68,22 +68,22 @@ export default function ReviewsPage() {
     setCurrentImageIndex((prev) => (prev < currentImages.length - 1 ? prev + 1 : 0));
   };
 
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number, uniqueKey: string = '') => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
     const stars = [];
 
     for (let i = 0; i < fullStars; i++) {
-      stars.push(<span key={i} className="text-yellow-400">★</span>);
+      stars.push(<span key={`${uniqueKey}-full-${i}`} className="text-yellow-400">★</span>);
     }
 
     if (hasHalfStar) {
-      stars.push(<span key="half" className="text-yellow-400">☆</span>);
+      stars.push(<span key={`${uniqueKey}-half`} className="text-yellow-400">☆</span>);
     }
 
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
-      stars.push(<span key={`empty-${i}`} className="text-gray-300">★</span>);
+      stars.push(<span key={`${uniqueKey}-empty-${i}`} className="text-gray-300">★</span>);
     }
 
     return stars;
@@ -130,7 +130,7 @@ export default function ReviewsPage() {
               <div key={review.id} className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="text-lg">{renderStars(review.rating)}</div>
+                    <div className="text-lg">{renderStars(review.rating, `review-${review.id}`)}</div>
                     <span className="text-sm text-gray-600">{Number(review.rating).toFixed(1)}</span>
                   </div>
                   <span className="text-sm text-gray-500">{formatDate(review.created_at)}</span>
@@ -143,7 +143,7 @@ export default function ReviewsPage() {
                     <div className="flex gap-2 flex-wrap">
                       {review.images.map((image, index) => (
                         <div
-                          key={index}
+                          key={`review-${review.id}-image-${index}`}
                           className="relative w-20 h-20 cursor-pointer group"
                           onClick={() => openModal(review.images, index)}
                         >
@@ -210,15 +210,14 @@ export default function ReviewsPage() {
         )}
       </div>
 
-      {modalOpen && (
-        <ImageModal
-          images={currentImages}
-          currentIndex={currentImageIndex}
-          onClose={closeModal}
-          onPrev={handlePrev}
-          onNext={handleNext}
-        />
-      )}
+      <ImageModal
+        isOpen={modalOpen}
+        images={currentImages}
+        currentIndex={currentImageIndex}
+        onClose={closeModal}
+        onPrev={handlePrev}
+        onNext={handleNext}
+      />
     </div>
   );
 }

@@ -20,8 +20,17 @@ class PayPalClient {
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('=== [PayPal Payment API] Processing payment request ===');
+    
     const body = await req.json();
+    console.log('Received payment data:', JSON.stringify(body, null, 2));
+    
     const { amount, currency = 'AED', items } = body;
+    console.log('Processing payment - Amount:', amount, 'Currency:', currency, 'Items count:', items?.length || 0);
+    
+    // 生成订单号
+    const orderId = `ORD-${Date.now()}`;
+    console.log('Generated order ID:', orderId);
     
     const paypalClient = new PayPalClient();
     
@@ -55,12 +64,21 @@ export async function POST(req: NextRequest) {
       },
     });
     
+    console.log('Creating PayPal order...');
     const response = await paypalClient.execute(paypalRequest) as any;
     
+    console.log('PayPal order created successfully:', {
+      order_id: response.result.id,
+      status: response.result.status,
+      links: response.result.links?.map((link: any) => ({ rel: link.rel, href: link.href })) || []
+    });
+    
     const approvalUrl = response.result.links?.find((link: any) => link.rel === 'approve')?.href;
+    console.log('Approval URL:', approvalUrl);
     
     return NextResponse.json({ id: response.result.id, url: approvalUrl });
   } catch (error) {
+    console.error('=== [PayPal Payment API] Error ===');
     console.error('PayPal error:', error);
     return NextResponse.json({ error: 'Payment creation failed' }, { status: 500 });
   }

@@ -547,13 +547,36 @@ export default function CustomizePage() {
   }, [customData, step]);
   
   // 计算价格
-  const calculatePrice = () => {
-    let basePrice = customData.teapotType?.base_price || 0;
-    let materialPrice = customData.material?.price_modifier || 0;
-    let engravingPrice = customData.engraving.enabled ? 50 : 0;
-    let patternPrice = customData.pattern.enabled ? 30 : 0;
+  const [priceData, setPriceData] = useState<any>(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  
+  const calculatePrice = async () => {
+    if (!customData.teapotType || !customData.material) {
+      return 0;
+    }
     
-    return basePrice + materialPrice + engravingPrice + patternPrice;
+    try {
+      setPriceLoading(true);
+      const response = await fetch('/api/customize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(customData),
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setPriceData(data.data);
+        return data.data.totalPrice;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error calculating price:', error);
+      return 0;
+    } finally {
+      setPriceLoading(false);
+    }
   };
   
   // 下一步
@@ -571,17 +594,19 @@ export default function CustomizePage() {
   };
   
   // 完成定制
-  const handleComplete = () => {
-    const totalPrice = calculatePrice();
+  const handleComplete = async () => {
+    const totalPrice = await calculatePrice();
     
-    addToCart({
-      id: parseInt(`custom-${Date.now()}`.replace('custom-', '')),
-      name: `${customData.teapotType?.name} 定制紫砂壶`,
-      price: totalPrice,
-      image: customData.teapotType?.images ? JSON.parse(customData.teapotType.images)[0] : ''
-    });
-    
-    router.push('/cart');
+    if (totalPrice > 0 && priceData) {
+      addToCart({
+        id: parseInt(`custom-${Date.now()}`.replace('custom-', '')),
+        name: priceData.productName,
+        price: totalPrice,
+        image: priceData.productImage
+      });
+      
+      router.push('/cart');
+    }
   };
   
   if (isLoading) {
@@ -994,7 +1019,7 @@ export default function CustomizePage() {
                       )}
                       <div className="flex justify-between font-semibold pt-4 mt-2">
                         <span className="text-[#450A0A]">{t('customize.total_price')}:</span>
-                        <span className="text-[#CA8A04] text-2xl">{calculatePrice().toFixed(2)} AED</span>
+                        <span className="text-[#CA8A04] text-2xl">{priceData?.totalPrice?.toFixed(2) || '0.00'} AED</span>
                       </div>
                     </div>
                   </div>
@@ -1023,21 +1048,29 @@ export default function CustomizePage() {
                       <span className="text-gray-600">{t('customize.capacity')}:</span>
                       <span className="font-medium text-[#450A0A]">{customData.capacity}ml</span>
                     </div>
+                    <div className="flex justify-between items-center py-2 border-b border-[#CA8A04]/10">
+                      <span className="text-gray-600">{t('customize.base_price')}:</span>
+                      <span className="font-medium text-[#450A0A]">{priceData?.priceBreakdown?.basePrice?.toFixed(2) || '0.00'} AED</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-[#CA8A04]/10">
+                      <span className="text-gray-600">{t('customize.material_price')}:</span>
+                      <span className="font-medium text-[#450A0A]">{priceData?.priceBreakdown?.materialPrice?.toFixed(2) || '0.00'} AED</span>
+                    </div>
                     {customData.engraving.enabled && (
                       <div className="flex justify-between items-center py-2 border-b border-[#CA8A04]/10">
                         <span className="text-gray-600">{t('customize.engraving')}:</span>
-                        <span className="font-medium text-[#CA8A04]">+50 AED</span>
+                        <span className="font-medium text-[#CA8A04]">+{priceData?.priceBreakdown?.engravingPrice?.toFixed(2) || '0.00'} AED</span>
                       </div>
                     )}
                     {customData.pattern.enabled && (
                       <div className="flex justify-between items-center py-2 border-b border-[#CA8A04]/10">
                         <span className="text-gray-600">{t('customize.pattern')}:</span>
-                        <span className="font-medium text-[#CA8A04]">+30 AED</span>
+                        <span className="font-medium text-[#CA8A04]">+{priceData?.priceBreakdown?.patternPrice?.toFixed(2) || '0.00'} AED</span>
                       </div>
                     )}
                     <div className="flex justify-between font-semibold pt-4 mt-2">
                       <span className="text-[#450A0A]">{t('customize.total_price')}:</span>
-                      <span className="text-[#CA8A04] text-2xl">{calculatePrice().toFixed(2)} AED</span>
+                      <span className="text-[#CA8A04] text-2xl">{priceData?.totalPrice?.toFixed(2) || '0.00'} AED</span>
                     </div>
                   </div>
                 </div>

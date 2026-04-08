@@ -41,39 +41,11 @@ export default function CategoriesPage() {
         const data = await response.json();
         setCategories(data);
       } else {
-        setCategories([
-          {
-            id: '1',
-            name: "Teapots",
-            description: "Zisha teapots of various sizes and designs",
-            image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapots%20collection&image_size=square",
-            priority: 0,
-          },
-          {
-            id: '2',
-            name: "Cups",
-            description: "Zisha tea cups and sets",
-            image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups&image_size=square",
-            priority: 1,
-          },
-          {
-            id: '3',
-            name: "Accessories",
-            description: "Tea accessories and tools",
-            image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tea%20accessories&image_size=square",
-            priority: 2,
-          },
-          {
-            id: '4',
-            name: "Sets",
-            description: "Complete tea sets with teapot and cups",
-            image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20set&image_size=square",
-            priority: 3,
-          },
-        ]);
+        setCategories([]);
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error);
+      setCategories([]);
     } finally {
       setIsLoading(false);
     }
@@ -103,36 +75,75 @@ export default function CategoriesPage() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this category?')) {
-      setCategories(categories.filter(category => category.id !== id));
+      try {
+        const response = await fetch(`/api/categories?id=${id}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          setCategories(categories.filter(category => category.id !== id));
+        } else {
+          alert('Failed to delete category');
+        }
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        alert('Failed to delete category');
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (isEditing && editingCategory) {
-      setCategories(categories.map(cat => 
-        cat.id === editingCategory.id 
-          ? { ...cat, ...formData }
-          : cat
-      ));
-    } else {
-      const newCategory: Category = {
-        id: Date.now().toString(),
-        ...formData,
-      };
-      setCategories([...categories, newCategory]);
+    try {
+      if (isEditing && editingCategory) {
+        // 编辑分类
+        const response = await fetch(`/api/categories/${editingCategory.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        if (response.ok) {
+          const updatedCategory = await response.json();
+          setCategories(categories.map(cat => 
+            cat.id === editingCategory.id 
+              ? updatedCategory
+              : cat
+          ));
+        } else {
+          alert('Failed to update category');
+        }
+      } else {
+        // 添加分类
+        const response = await fetch('/api/categories', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        if (response.ok) {
+          const newCategory = await response.json();
+          setCategories([...categories, newCategory]);
+        } else {
+          alert('Failed to add category');
+        }
+      }
+      
+      setShowModal(false);
+      setFormData({
+        name: '',
+        description: '',
+        image: '',
+        priority: 0,
+      });
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      alert('Failed to submit form');
     }
-    
-    setShowModal(false);
-    setFormData({
-      name: '',
-      description: '',
-      image: '',
-      priority: 0,
-    });
   };
 
   const sortedCategories = [...categories].sort((a, b) => a.priority - b.priority);

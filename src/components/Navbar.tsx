@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
 import { useCart } from '@/lib/contexts/CartContext';
@@ -92,12 +93,12 @@ export function Navbar() {
                 </button>
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50">
-                    <a href="/profile" className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                      Profile
-                    </a>
-                    <a href="/orders" className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <Link href="/account" className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                      Account
+                    </Link>
+                    <Link href="/orders" className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                       Orders
-                    </a>
+                    </Link>
                     <button 
                       onClick={logout}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -109,13 +110,13 @@ export function Navbar() {
               </div>
             ) : (
               <div className="flex items-center space-x-2">
-                <a href="/login" className="text-xs text-gray-600 dark:text-gray-300 hover:text-amazon-blue">
+                <Link href="/login" className="text-xs text-gray-600 dark:text-gray-300 hover:text-amazon-blue">
                   Sign in
-                </a>
+                </Link>
                 <span className="text-gray-400">|</span>
-                <a href="/register" className="text-xs text-gray-600 dark:text-gray-300 hover:text-amazon-blue">
+                <Link href="/register" className="text-xs text-gray-600 dark:text-gray-300 hover:text-amazon-blue">
                   Create account
-                </a>
+                </Link>
               </div>
             )}
           </div>
@@ -125,9 +126,9 @@ export function Navbar() {
       {/* Main navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-16">
-          <a href="/" className="flex-shrink-0 flex items-center">
+          <Link href="/" className="flex-shrink-0 flex items-center">
             <span className="text-2xl font-bold text-amazon-blue">Zisha Pottery</span>
-          </a>
+          </Link>
           
           {/* Search bar */}
           <div className="flex-1 mx-6">
@@ -161,7 +162,7 @@ export function Navbar() {
             >
               {theme === 'light' ? '🌙' : '☀️'}
             </button>
-            <a href="/cart" className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 relative">
+            <Link href="/cart" className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 relative">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
@@ -170,7 +171,7 @@ export function Navbar() {
                   {totalItems}
                 </span>
               )}
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -189,24 +190,24 @@ export function Navbar() {
               <span>All</span>
             </button>
             <div className="hidden sm:flex items-center gap-4 lg:gap-6 flex-nowrap overflow-x-auto">
-              <a href="/products" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              <Link href="/products" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 All
-              </a>
-              <a href="/products?category=1" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              </Link>
+              <Link href="/products?category=1" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.0') || 'Teapots'}
-              </a>
-              <a href="/products?category=2" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              </Link>
+              <Link href="/products?category=2" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.1') || 'Cups'}
-              </a>
-              <a href="/products?category=3" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              </Link>
+              <Link href="/products?category=3" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.2') || 'Accessories'}
-              </a>
-              <a href="/products?category=4" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              </Link>
+              <Link href="/products?category=4" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 {t('categories.items.3') || 'Sets'}
-              </a>
-              <a href="/customize" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
+              </Link>
+              <Link href="/customize" className="text-sm text-gray-800 dark:text-gray-100 hover:text-amazon-orange whitespace-nowrap px-2 py-1">
                 Customize
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -216,12 +217,12 @@ export function Navbar() {
       {isMenuOpen && (
         <div className="sm:hidden bg-white dark:bg-gray-800 shadow-lg">
           <div className="pt-2 pb-3 space-y-1">
-            <a href="/products" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <Link href="/products" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               All Products
-            </a>
-            <a href="/customize" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
+            </Link>
+            <Link href="/customize" className="block px-4 py-2 text-base font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
               Customize
-            </a>
+            </Link>
           </div>
         </div>
       )}

@@ -37,42 +37,42 @@ export default function ContactPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-[#FDF2F8] middle-east-pattern flex items-center justify-center">
+        <div className="text-xl text-[#831843] font-['Noto_Sans_Arabic']">Loading...</div>
       </div>
     );
   }
 
   if (!contact) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">No data</div>
+      <div className="min-h-screen bg-[#FDF2F8] middle-east-pattern flex items-center justify-center">
+        <div className="text-xl text-[#831843] font-['Noto_Sans_Arabic']">No data</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#FDF2F8] middle-east-pattern">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold mb-6">{contact.title}</h1>
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <p className="mb-6 text-gray-700">{contact.description}</p>
+        <h1 className="text-3xl font-bold font-['Noto_Naskh_Arabic'] text-[#831843] mb-8 text-center">{contact.title}</h1>
+        <div className="glass-effect rounded-lg shadow-md p-6">
+          <p className="mb-6 text-[#831843] font-['Noto_Sans_Arabic']">{contact.description}</p>
           <div className="space-y-4">
             <div>
-              <h2 className="text-lg font-semibold mb-2 text-gray-900">Email</h2>
-              <p className="text-gray-700">{contact.email}</p>
+              <h2 className="text-lg font-semibold mb-2 font-['Noto_Naskh_Arabic'] text-[#831843]">Email</h2>
+              <p className="text-[#831843] font-['Noto_Sans_Arabic']">{contact.email}</p>
             </div>
             <div>
-              <h2 className="text-lg font-semibold mb-2 text-gray-900">Phone</h2>
-              <p className="text-gray-700">{contact.phone}</p>
+              <h2 className="text-lg font-semibold mb-2 font-['Noto_Naskh_Arabic'] text-[#831843]">Phone</h2>
+              <p className="text-[#831843] font-['Noto_Sans_Arabic']">{contact.phone}</p>
             </div>
             <div>
-              <h2 className="text-lg font-semibold mb-2 text-gray-900">Address</h2>
-              <p className="text-gray-700">{contact.address}</p>
+              <h2 className="text-lg font-semibold mb-2 font-['Noto_Naskh_Arabic'] text-[#831843]">Address</h2>
+              <p className="text-[#831843] font-['Noto_Sans_Arabic']">{contact.address}</p>
             </div>
             <div>
-              <h2 className="text-lg font-semibold mb-2 text-gray-900">Opening Hours</h2>
-              <p className="text-gray-700 whitespace-pre-line">{contact.opening_hours}</p>
+              <h2 className="text-lg font-semibold mb-2 font-['Noto_Naskh_Arabic'] text-[#831843]">Opening Hours</h2>
+              <p className="text-[#831843] font-['Noto_Sans_Arabic'] whitespace-pre-line">{contact.opening_hours}</p>
             </div>
           </div>
         </div>

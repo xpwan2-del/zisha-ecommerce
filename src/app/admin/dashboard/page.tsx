@@ -41,17 +41,35 @@ export default function AdminDashboard() {
       description: 'Edit contact page information',
       link: '/admin/contact',
       icon: '📞'
+    },
+    {
+      title: 'Activities',
+      description: 'Manage lucky draw activities',
+      link: '/admin/activities',
+      icon: '🎁'
+    },
+    {
+      title: 'Home Modules',
+      description: 'Manage home page modules',
+      link: '/admin/home-modules',
+      icon: '🏠'
+    },
+    {
+      title: 'Translations',
+      description: 'Manage translations',
+      link: '/admin/translations',
+      icon: '🌐'
     }
   ];
 
   return (
-    <div className="py-12 px-4">
+    <div className="py-12 px-4 bg-[#FDF2F8] middle-east-pattern min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-12">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold font-['Noto_Naskh_Arabic'] text-[#831843]">Admin Dashboard</h1>
           <button 
             onClick={() => router.push('/')}
-            className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300"
+            className="bg-[#CA8A04] hover:bg-[#B47C03] text-white px-4 py-2 rounded-lg font-['Noto_Sans_Arabic'] font-medium transition-all duration-300"
           >
             View Store
           </button>
@@ -62,11 +80,11 @@ export default function AdminDashboard() {
             <div
               key={index}
               onClick={() => router.push(item.link)}
-              className="bg-white dark:bg-dark/80 p-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:scale-105 border border-gray-200 dark:border-gray-700"
+              className="glass-effect p-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:scale-105 border border-[#DB2777]/20"
             >
               <div className="text-4xl mb-4">{item.icon}</div>
-              <h2 className="text-xl font-semibold mb-2">{item.title}</h2>
-              <p className="text-gray-600 dark:text-gray-300">{item.description}</p>
+              <h2 className="text-xl font-semibold mb-2 font-['Noto_Naskh_Arabic'] text-[#831843]">{item.title}</h2>
+              <p className="font-['Noto_Sans_Arabic'] text-[#831843]/70">{item.description}</p>
             </div>
           ))}
         </div>

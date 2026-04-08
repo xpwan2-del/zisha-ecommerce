@@ -7,6 +7,7 @@ import { CartProvider } from "@/lib/contexts/CartContext";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { CurrencyProvider } from "@/lib/contexts/CurrencyContext";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh" className="translated-ltr">
       <body className={inter.className}>
         <ThemeProvider>
           <LanguageProvider>
@@ -35,6 +36,7 @@ export default function RootLayout({
                   <main>
                     {children}
                   </main>
+                  <Footer />
                 </CurrencyProvider>
               </CartProvider>
             </AuthProvider>

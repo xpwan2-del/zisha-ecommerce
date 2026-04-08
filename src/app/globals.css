@@ -1,4 +1,5 @@
 /* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;500;600;700&display=swap');
 
 @tailwind base;
@@ -6,28 +7,28 @@
 @tailwind utilities;
 
 :root {
-  /* Zisha Pottery Design System Colors */
-  --primary: #7C2D12;
-  --secondary: #B91C1C;
+  /* Middle East Zisha Pottery Design System Colors */
+  --primary: #DB2777;
+  --secondary: #F472B6;
   --cta: #CA8A04;
-  --background: #FEF2F2;
-  --text: #450A0A;
+  --background: #FDF2F8;
+  --text: #831843;
   
-  --foreground-rgb: 69, 10, 10;
-  --background-rgb: 254, 242, 242;
+  --foreground-rgb: 131, 24, 67;
+  --background-rgb: 253, 242, 248;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --foreground-rgb: 254, 242, 242;
-    --background-rgb: 69, 10, 10;
+    --foreground-rgb: 253, 242, 248;
+    --background-rgb: 30, 27, 75;
   }
 }
 
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
-  font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: 'Noto Sans Arabic', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -50,23 +51,23 @@ body {
 }
 
 .zisha-btn-outline {
-  @apply border-2 border-[#7C2D12] hover:bg-[#7C2D12] hover:text-white text-[#450A0A] py-3 px-6 rounded-md font-medium transition-all duration-300;
+  @apply border-2 border-[#DB2777] hover:bg-[#DB2777] hover:text-white text-[#831843] py-3 px-6 rounded-md font-medium transition-all duration-300;
 }
 
 .zisha-card {
-  @apply bg-white dark:bg-gray-800 rounded-md border border-[#7C2D12]/20 p-6 hover:shadow-lg transition-all duration-300;
+  @apply bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-md border border-[#DB2777]/20 p-6 hover:shadow-lg transition-all duration-300;
 }
 
 .zisha-input {
-  @apply border border-[#7C2D12]/30 rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#CA8A04] focus:border-transparent;
+  @apply border border-[#DB2777]/30 rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#CA8A04] focus:border-transparent;
 }
 
 .zisha-price {
-  @apply text-xl font-bold text-[#450A0A] dark:text-white;
+  @apply text-xl font-bold text-[#831843] dark:text-white;
 }
 
 .zisha-discount {
-  @apply text-[#B91C1C] font-medium;
+  @apply text-[#DB2777] font-medium;
 }
 
 .zisha-rating {
@@ -79,13 +80,13 @@ body {
 
 /* Typography */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Noto Serif TC', serif;
+  font-family: 'Noto Naskh Arabic', 'Noto Serif TC', serif;
   font-weight: 700;
   color: var(--text);
 }
 
 p {
-  font-family: 'Noto Sans TC', sans-serif;
+  font-family: 'Noto Sans Arabic', 'Noto Sans TC', sans-serif;
   color: var(--text);
 }
 
@@ -141,4 +142,30 @@ button, a, [role="button"] {
 
 .animate-scroll:hover {
   animation-play-state: paused;
+}
+
+/* 玻璃效果 */
+.glass-effect {
+  @apply bg-white/70 backdrop-blur-md border border-white/30 shadow-lg;
+}
+
+/* 中东风格装饰 */
+.middle-east-pattern {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path d="M50 0 L100 50 L50 100 L0 50 Z" fill="none" stroke="%23DB2777" stroke-width="1" opacity="0.1"/></svg>');
+  background-repeat: repeat;
+  background-size: 100px;
+}
+
+/* 流体动画 */
+@keyframes fluid {
+  0%, 100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+  50% {
+    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+  }
+}
+
+.fluid-animation {
+  animation: fluid 8s ease-in-out infinite;
 }

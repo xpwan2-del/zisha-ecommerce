@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 
 interface ImageModalProps {
+  isOpen: boolean;
   images: string[];
   currentIndex: number;
   onClose: () => void;
@@ -10,7 +11,8 @@ interface ImageModalProps {
   onNext: () => void;
 }
 
-export default function ImageModal({ images, currentIndex, onClose, onPrev, onNext }: ImageModalProps) {
+export default function ImageModal({ isOpen, images, currentIndex, onClose, onPrev, onNext }: ImageModalProps) {
+  if (!isOpen) return null;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -82,7 +84,7 @@ export default function ImageModal({ images, currentIndex, onClose, onPrev, onNe
           <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
             {images.map((_, index) => (
               <div
-                key={index}
+                key={`modal-${index}`}
                 className={`w-2 h-2 rounded-full ${
                   index === currentIndex ? 'bg-white' : 'bg-gray-500'
                 }`}

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useTranslation();
   const { login } = useAuth();
   
@@ -16,6 +17,25 @@ export default function LoginPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  
+  // Load saved email from localStorage
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('remembered_email');
+    console.log('========== [Login Page] ==========');
+    console.log('1. Loading saved email from localStorage:', savedEmail);
+    if (savedEmail) {
+      setFormData(prev => ({ ...prev, email: savedEmail }));
+      setRememberMe(true);
+      console.log('2. Email loaded successfully:', savedEmail);
+    } else {
+      console.log('2. No saved email found in localStorage');
+    }
+    console.log('========== [Login Page END] ==========');
+  }, []);
+  
+  // Get redirect URL from query params
+  const redirectUrl = searchParams?.get('redirect') || '/account';
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,9 +43,30 @@ export default function LoginPage() {
     setError('');
     
     try {
+      console.log('========== [Login Page] ==========');
+      console.log('1. Attempting login with email:', formData.email);
+      console.log('2. Remember me:', rememberMe);
+      console.log('3. Redirect URL after login:', redirectUrl);
+      
       await login(formData.email, formData.password);
-      router.push('/account');
+      
+      // Save email to localStorage if remember me is checked
+      if (rememberMe) {
+        localStorage.setItem('remembered_email', formData.email);
+        console.log('4. Email saved to localStorage for remember me');
+      } else {
+        localStorage.removeItem('remembered_email');
+        console.log('4. Remember me not checked, email removed from localStorage');
+      }
+      
+      console.log('5. Login successful, redirecting to:', redirectUrl);
+      console.log('========== [Login Page END - SUCCESS] ==========');
+      
+      router.push(redirectUrl);
     } catch (err) {
+      console.error('========== [Login Page ERROR] ==========');
+      console.error('Login failed:', err);
+      console.error('========== [Login Page ERROR END] ==========');
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
@@ -33,27 +74,27 @@ export default function LoginPage() {
   };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-[#FDF2F8] middle-east-pattern py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
+          <h2 className="mt-6 text-3xl font-extrabold font-['Noto_Naskh_Arabic'] text-[#831843]">
             {t('login.title')}
           </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+          <p className="mt-2 text-sm font-['Noto_Sans_Arabic'] text-[#831843]/70">
             {t('login.subtitle')}
           </p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg">
+            <div className="bg-[#DB2777]/10 border border-[#DB2777]/30 text-[#DB2777] p-3 rounded-lg">
               {error}
             </div>
           )}
           
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="email" className="block text-sm font-medium font-['Noto_Sans_Arabic'] text-[#831843]">
                 {t('login.email')}
               </label>
               <input
@@ -63,12 +104,12 @@ export default function LoginPage() {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                className="mt-1 block w-full px-3 py-2 border border-[#DB2777]/30 bg-white/90 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#CA8A04] focus:border-transparent"
               />
             </div>
             
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="password" className="block text-sm font-medium font-['Noto_Sans_Arabic'] text-[#831843]">
                 {t('login.password')}
               </label>
               <input
@@ -78,7 +119,7 @@ export default function LoginPage() {
                 required
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                className="mt-1 block w-full px-3 py-2 border border-[#DB2777]/30 bg-white/90 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#CA8A04] focus:border-transparent"
               />
             </div>
           </div>
@@ -89,9 +130,11 @@ export default function LoginPage() {
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
-                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 text-[#CA8A04] focus:ring-[#CA8A04] border-[#DB2777]/30 rounded"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+              <label htmlFor="remember-me" className="ml-2 block text-sm font-['Noto_Sans_Arabic'] text-[#831843]/70">
                 {t('login.remember')}
               </label>
             </div>
@@ -99,7 +142,7 @@ export default function LoginPage() {
             <div className="text-sm">
               <a
                 href="#"
-                className="font-medium text-primary hover:text-primary/80"
+                className="font-medium text-[#CA8A04] hover:text-[#B47C03]"
               >
                 {t('login.forgot_password')}
               </a>
@@ -110,7 +153,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[#CA8A04] hover:bg-[#B47C03] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#CA8A04] disabled:opacity-50 font-['Noto_Sans_Arabic']"
             >
               {isLoading ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -121,11 +164,11 @@ export default function LoginPage() {
           </div>
           
           <div className="text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-sm font-['Noto_Sans_Arabic'] text-[#831843]/70">
               {t('login.no_account')}{' '}
               <a
                 href="/register"
-                className="font-medium text-primary hover:text-primary/80"
+                className="font-medium text-[#CA8A04] hover:text-[#B47C03]"
               >
                 {t('login.sign_up')}
               </a>
@@ -135,10 +178,10 @@ export default function LoginPage() {
         
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
+            <div className="w-full border-t border-[#DB2777]/20"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400">
+            <span className="px-2 bg-[#FDF2F8] text-[#831843]/70 font-['Noto_Sans_Arabic']">
               {t('login.or')}
             </span>
           </div>
@@ -147,7 +190,7 @@ export default function LoginPage() {
         <div className="grid grid-cols-3 gap-3">
           <button
             type="button"
-            className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            className="inline-flex justify-center py-2 px-4 border border-[#DB2777]/30 rounded-md shadow-sm bg-white/90 text-sm font-medium text-[#831843] hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#CA8A04]"
           >
             <span className="sr-only">Sign in with Google</span>
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -157,7 +200,7 @@ export default function LoginPage() {
           
           <button
             type="button"
-            className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            className="inline-flex justify-center py-2 px-4 border border-[#DB2777]/30 rounded-md shadow-sm bg-white/90 text-sm font-medium text-[#831843] hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#CA8A04]"
           >
             <span className="sr-only">Sign in with Apple</span>
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -167,7 +210,7 @@ export default function LoginPage() {
           
           <button
             type="button"
-            className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            className="inline-flex justify-center py-2 px-4 border border-[#DB2777]/30 rounded-md shadow-sm bg-white/90 text-sm font-medium text-[#831843] hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#CA8A04]"
           >
             <span className="sr-only">Sign in with Facebook</span>
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">

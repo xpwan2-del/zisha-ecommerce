@@ -1,56 +1,22 @@
-import { createClient } from '@libsql/client';
+import sqlite3 from 'sqlite3';
+import { open, Database } from 'sqlite';
 
-let client: ReturnType<typeof createClient> | null = null;
+let db: Database | null = null;
 
-function getClient() {
-  if (!client) {
-    const isVercel = process.env.VERCEL === '1';
-
-    if (isVercel) {
-      const dbUrl = process.env.TURSO_DATABASE_URL;
-      const authToken = process.env.TURSO_AUTH_TOKEN;
-
-      if (dbUrl && authToken) {
-        client = createClient({
-          url: dbUrl,
-          authToken: authToken,
-        });
-      }
-    } else {
-      client = createClient({
-        url: 'file:./zisha-ecommerce.db',
-      });
-    }
-  }
-  return client;
-}
-
-export async function query(sql: string, params?: any[]) {
-  const db = getClient();
-
+// Open database connection
+export async function getDB() {
   if (!db) {
-    console.error('数据库未初始化');
-    return { rows: [], rowCount: 0 };
-  }
-
-  try {
-    const result = await db.execute({
-      sql,
-      args: params || [],
+    db = await open({
+      filename: './src/lib/db/database.sqlite',
+      driver: sqlite3.Database
     });
-
-    return {
-      rows: result.rows || [],
-      rowCount: result.rows?.length || 0,
-    };
-  } catch (error) {
-    console.error('数据库查询错误:', error);
-    throw error;
   }
+  return db;
 }
 
-export async function getDb() {
-  return getClient();
+// Execute a query
+export async function query(sql: string, params: any[] = []) {
+  const database = await getDB();
+  const result = await database.all(sql, params);
+  return { rows: result };
 }
-
-export { getClient };
