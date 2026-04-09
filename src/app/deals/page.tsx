@@ -28,14 +28,24 @@ export default function DealsPage() {
   const [products, setProducts] = useState<DealProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
+  const [categories, setCategories] = useState<any[]>([]);
 
-  const categories = [
-    { id: "all", name: "全部", name_en: "All" },
-    { id: "1", name: "茶壶", name_en: "Teapots" },
-    { id: "2", name: "茶杯", name_en: "Cups" },
-    { id: "3", name: "配件", name_en: "Accessories" },
-    { id: "4", name: "套组", name_en: "Sets" },
-  ];
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const response = await fetch('/api/categories');
+        const data = await response.json();
+        if (data && data.success && Array.isArray(data.data)) {
+          setCategories(data.data);
+        } else if (Array.isArray(data)) {
+          setCategories(data);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    }
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     async function fetchDeals() {
@@ -69,70 +79,77 @@ export default function DealsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="bg-gradient-to-r from-amazon-orange to-orange-500 text-white py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold mb-2">{t("nav.deals", "今日特惠")}</h1>
+    <div className="min-h-screen bg-[#FAFAF9]">
+      <div className="bg-gradient-to-r from-[#CA8A04] to-[#D9A51B] text-white py-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Cormorant, serif' }}>{t("nav.deals", "今日特惠")}</h1>
           <p className="text-white/80">限时优惠，抢购从速！</p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex overflow-x-auto gap-2 mb-8 pb-2">
-          {categories.map((cat) => (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Category filter - Luxury Style */}
+        <div className="flex flex-wrap justify-center gap-3 mb-10">
+          <button
+            onClick={() => setActiveCategory("all")}
+            className={`px-6 py-3 rounded-sm text-sm font-medium tracking-wide transition-all duration-300 ${activeCategory === "all" 
+              ? 'bg-[#CA8A04] text-white shadow-lg shadow-[#CA8A04]/20' 
+              : 'bg-white border border-[#E7E5E4] text-[#44403C] hover:border-[#CA8A04] hover:shadow-sm'}`}
+          >
+            {t('products.all') || '全部'}
+          </button>
+          {categories.map((category) => (
             <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                activeCategory === cat.id
-                  ? "bg-amazon-orange text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-              }`}
+              key={category.id}
+              onClick={() => setActiveCategory(category.id.toString())}
+              className={`px-6 py-3 rounded-sm text-sm font-medium tracking-wide transition-all duration-300 ${activeCategory === category.id.toString() 
+                ? 'bg-[#CA8A04] text-white shadow-lg shadow-[#CA8A04]/20' 
+                : 'bg-white border border-[#E7E5E4] text-[#44403C] hover:border-[#CA8A04] hover:shadow-sm'}`}
             >
-              {i18n.language === "zh" ? cat.name : cat.name_en}
+              {i18n.language === 'zh' ? category.name : i18n.language === 'en' ? category.name_en : category.name_ar}
             </button>
           ))}
         </div>
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amazon-orange"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#CA8A04]"></div>
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 text-center">
+          <div className="bg-white border border-[#E7E5E4] rounded-sm p-8 text-center">
             <div className="flex justify-center mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-[#A8A29E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold text-amazon-dark dark:text-white mb-4">
+            <h2 className="text-2xl font-semibold text-[#1C1917] mb-4" style={{ fontFamily: 'Cormorant, serif' }}>
               暂无特惠商品
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-8">
+            <p className="text-[#78716C] mb-8">
               限时特惠活动正在准备中，敬请期待！
             </p>
             <Link
               href="/products"
-              className="inline-flex items-center px-6 py-3 bg-amazon-orange hover:bg-orange-600 text-white font-medium rounded-md transition-colors"
+              className="inline-flex items-center px-8 py-4 bg-[#CA8A04] hover:bg-[#B47C03] text-white font-medium rounded-sm transition-colors duration-300 tracking-wide"
             >
               {t("products.viewAll", "浏览所有商品")}
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group"
+                className="bg-white border border-[#E7E5E4] rounded-sm overflow-hidden hover:shadow-lg transition-all duration-300 group"
               >
                 <div className="aspect-square relative overflow-hidden">
                   {product.discount > 0 && (
-                    <div className="absolute top-2 left-2 z-10 bg-red-500 text-white text-sm font-bold px-2 py-1 rounded">
+                    <div className="absolute top-2 left-2 z-10 bg-[#CA8A04] text-white text-sm font-bold px-3 py-1 rounded-sm">
                       -{product.discount}%
                     </div>
                   )}
                   {product.is_limited && (
-                    <div className="absolute top-2 right-2 z-10 bg-amazon-orange text-white text-xs font-bold px-2 py-1 rounded">
+                    <div className="absolute top-2 right-2 z-10 bg-[#CA8A04] text-white text-xs font-bold px-3 py-1 rounded-sm">
                       限量
                     </div>
                   )}
@@ -146,7 +163,7 @@ export default function DealsPage() {
                 </div>
 
                 <div className="p-4">
-                  <div className="flex flex-wrap gap-1 mb-2">
+                  <div className="flex flex-wrap gap-1 mb-3">
                     {product.activities?.slice(0, 2).map((activity) => (
                       <span
                         key={activity.id}
@@ -159,29 +176,29 @@ export default function DealsPage() {
                   </div>
 
                   <Link href={`/products/${product.id}`}>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2 line-clamp-2 hover:text-amazon-orange transition-colors">
+                    <h3 className="text-sm font-medium text-[#1C1917] mb-2 line-clamp-2 hover:text-[#CA8A04] transition-colors">
                       {i18n.language === "zh" ? product.name : i18n.language === "ar" ? product.name_ar : product.name_en || product.name}
                     </h3>
                   </Link>
 
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg font-bold text-red-500">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg font-bold text-[#CA8A04]">
                       {formatCurrency(convertCurrency(product.price, "aed", currency), currency)}
                     </span>
                     {product.original_price > 0 && product.original_price > product.price && (
-                      <span className="text-sm text-gray-400 line-through">
+                      <span className="text-sm text-[#A8A29E] line-through">
                         {formatCurrency(convertCurrency(product.original_price, "aed", currency), currency)}
                       </span>
                     )}
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-[#78716C]">
                       {t("products.stock", { count: product.stock })}
                     </span>
                     <Link
                       href={`/products/${product.id}`}
-                      className="text-sm font-medium text-amazon-orange hover:text-orange-600 transition-colors"
+                      className="text-sm font-medium text-[#CA8A04] hover:underline transition-colors"
                     >
                       {t("products.view", "查看")}
                     </Link>

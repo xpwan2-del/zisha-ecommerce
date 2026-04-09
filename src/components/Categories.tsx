@@ -1,88 +1,140 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
-interface HomeData {
-  modules: any[];
-  guarantees: any[];
-  categories: any[];
-  products: {
-    products: any[];
-    total: number;
-    totalPages: number;
-  };
-}
-
-interface CategoriesProps {
-  data: HomeData;
-}
-
-export function Categories({ data }: CategoriesProps) {
+export function Categories() {
   const { t } = useTranslation();
-  const pathname = usePathname();
-  const [activeCategory, setActiveCategory] = useState("all");
+  const originalCategories = t('categories.items', { returnObjects: true }) as string[];
   
-  // 从 props 中获取分类数据
-  const categories = data.categories || [];
+  // 添加 All 选项到分类列表开头
+  const categories = ['All', ...originalCategories];
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // 检测当前活动分类
-  useEffect(() => {
-    if (pathname === '/products') {
-      const params = new URLSearchParams(window.location.search);
-      setActiveCategory(params.get('category') || 'all');
-    } else {
-      setActiveCategory('all');
-    }
-  }, [pathname]);
+  // 分类的英文翻译（用于装饰性显示）
+  const categoryEnNames = ['ALL', 'Teapots', 'Tea Cups', 'Accessories', 'Gift Sets'];
+  
+  // 分类的简短描述
+  const categoryDescs = [
+    '全部精选 · 匠心之作',
+    '传世之作 · 匠心独运',
+    '品茗雅器 · 温润如玉', 
+    '茶道配件 · 精致考究',
+    '礼赠佳品 · 尊贵典雅'
+  ];
 
   return (
-    <section className="py-12 px-4 bg-[#FDF2F8] middle-east-pattern">
-      <div className="max-w-7xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-8 font-['Noto_Naskh_Arabic'] text-[#831843]">{t('categories.title')}</h2>
-        
-        {/* 移动端的Tab控件 */}
-        <div className="md:hidden mb-6">
-          <div className="flex overflow-x-auto scrollbar-hide border-b border-[#DB2777]/20">
-            <Link
-              href="/products"
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 ${activeCategory === 'all' ? 'border-[#CA8A04] text-[#CA8A04]' : 'border-transparent text-[#831843] hover:text-[#CA8A04]'} transition-colors duration-300 font-['Noto_Sans_Arabic']`}
-            >
-              全部
-            </Link>
-            {categories.map((category) => (
-              <Link
-                key={category.id}
-                href={`/products?category=${category.id}`}
-                className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 ${activeCategory === category.id.toString() ? 'border-[#CA8A04] text-[#CA8A04]' : 'border-transparent text-[#831843] hover:text-[#CA8A04]'} transition-colors duration-300 font-['Noto_Sans_Arabic']`}
-              >
-                {category.name}
-              </Link>
-            ))}
+    <section className="py-8 px-4 bg-[#FAFAF9]">
+      <div className="max-w-5xl mx-auto">
+        {/* Section Header - Luxury Minimal Style */}
+        <div className="text-center mb-12">
+          <span className="inline-block text-xs text-[#CA8A04] tracking-[0.3em] uppercase font-medium mb-4">
+            Collection
+          </span>
+          <h2 
+            className="text-3xl md:text-4xl font-light text-[#1C1917] mb-4"
+            style={{ fontFamily: 'Cormorant, serif' }}
+          >
+            {t('categories.title') || '产品分类'}
+          </h2>
+          <div className="flex items-center justify-center gap-3">
+            <div className="w-12 h-px bg-[#D4D4D4]"></div>
+            <div className="w-2 h-2 rotate-45 border border-[#CA8A04]"></div>
+            <div className="w-12 h-px bg-[#D4D4D4]"></div>
           </div>
         </div>
-        
-        {/* 桌面端的按钮 */}
-        <div className="hidden md:flex flex-wrap justify-center gap-4">
-          <Link 
-            href="/products"
-            className={`bg-white/80 glass-effect px-6 py-4 rounded-md shadow-sm border border-[#DB2777]/20 transition-all duration-300 hover:shadow-md hover:bg-white/90 text-center min-w-[120px] ${activeCategory === 'all' ? 'border-[#CA8A04] bg-white/90' : ''}`}
-          >
-            <h3 className="text-lg font-semibold mb-1 font-['Noto_Naskh_Arabic'] text-[#831843]">全部</h3>
-            <p className="text-xs text-[#831843]/70 font-['Noto_Sans_Arabic']">所有产品</p>
-          </Link>
-          {categories.map((category) => (
-            <Link 
-              key={category.id} 
-              href={`/products?category=${category.id}`}
-              className={`bg-white/80 glass-effect px-6 py-4 rounded-md shadow-sm border border-[#DB2777]/20 transition-all duration-300 hover:shadow-md hover:bg-white/90 text-center min-w-[120px] ${activeCategory === category.id.toString() ? 'border-[#CA8A04] bg-white/90' : ''}`}
+
+        {/* Categories - Slim Cards in One Row */}
+        <div className="grid grid-cols-5 gap-4">
+          {categories.map((category: string, index: number) => (
+            <div 
+              key={index} 
+              className="group cursor-pointer relative"
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
             >
-              <h3 className="text-lg font-semibold mb-1 font-['Noto_Naskh_Arabic'] text-[#831843]">{category.name}</h3>
-              <p className="text-xs text-[#831843]/70 font-['Noto_Sans_Arabic']">{category.description}</p>
-            </Link>
+              {/* Card Container */}
+              <div className={`
+                relative bg-white border transition-all duration-500 ease-out
+                ${hoveredIndex === index 
+                  ? 'border-[#CA8A04] shadow-lg shadow-[#CA8A04]/10' 
+                  : 'border-[#E7E5E4] shadow-sm'
+                }
+              `}>
+                {/* Top Gold Line - Appears on Hover */}
+                <div className={`
+                  absolute top-0 left-0 right-0 h-[1px] bg-[#CA8A04] transition-transform duration-500 origin-left
+                  ${hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'}
+                `}></div>
+                
+                {/* Content */}
+                <div className="p-4 text-center">
+                  {/* Category Number */}
+                  <span className={`
+                    text-xs tracking-widest transition-colors duration-300
+                    ${hoveredIndex === index ? 'text-[#CA8A04]' : 'text-[#A8A29E]'}
+                  `}>
+                    0{index + 1}
+                  </span>
+                  
+                  {/* Main Category Name */}
+                  <h3 
+                    className={`
+                      text-lg font-normal mt-2 mb-1 transition-colors duration-300
+                      ${hoveredIndex === index ? 'text-[#CA8A04]' : 'text-[#1C1917]'}
+                    `}
+                    style={{ fontFamily: 'Cormorant, serif' }}
+                  >
+                    {category === 'All' ? '全部' : category}
+                  </h3>
+                  
+                  {/* English Name */}
+                  <p className="text-xs text-[#A8A29E] tracking-[0.2em] uppercase mb-2">
+                    {categoryEnNames[index]}
+                  </p>
+                  
+                  {/* Decorative Line */}
+                  <div className={`
+                    w-4 h-px mx-auto mb-2 transition-all duration-500
+                    ${hoveredIndex === index ? 'w-8 bg-[#CA8A04]' : 'bg-[#D4D4D4]'}
+                  `}></div>
+                  
+                  {/* Description */}
+                  <p className="text-xs text-[#78716C] font-light tracking-wide">
+                    {categoryDescs[index]}
+                  </p>
+                  
+                  {/* Explore Link - Appears on Hover */}
+                  <div className={`
+                    mt-3 overflow-hidden transition-all duration-500
+                    ${hoveredIndex === index ? 'opacity-100 max-h-6' : 'opacity-0 max-h-0'}
+                  `}>
+                    <span className="inline-flex items-center text-xs text-[#CA8A04] tracking-widest uppercase">
+                      探索系列
+                      <svg className="w-2.5 h-2.5 ml-1 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Corner Decoration */}
+                <div className={`
+                  absolute bottom-0 right-0 w-4 h-4 transition-opacity duration-500
+                  ${hoveredIndex === index ? 'opacity-100' : 'opacity-0'}
+                `}>
+                  <div className="absolute bottom-1 right-1 w-2 h-2 border-r border-b border-[#CA8A04]"></div>
+                </div>
+              </div>
+            </div>
           ))}
+        </div>
+        
+        {/* Bottom Decorative Text */}
+        <div className="text-center mt-12">
+          <p className="text-xs text-[#A8A29E] tracking-[0.2em] uppercase">
+            Handcrafted Excellence Since 1990
+          </p>
         </div>
       </div>
     </section>
