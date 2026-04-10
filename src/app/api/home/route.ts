@@ -162,11 +162,15 @@ export async function GET(request: NextRequest) {
       activity_icon: product.discount > 0 ? 'tag' : product.daily_discount > 0 ? 'fire' : undefined
     }));
     
+    // 提取活动数据
+    const activities = sortedModules.filter(module => module.type === 'activity');
+    
     // 构建首页数据
     const homeData = {
       modules: sortedModules,
       categories: sortedCategories,
-      products: products
+      products: products,
+      activities: activities
     };
     
     return NextResponse.json(homeData);

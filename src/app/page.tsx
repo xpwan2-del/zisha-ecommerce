@@ -4,34 +4,28 @@ import { useState, useEffect } from 'react';
 import { HomeModules } from '@/components/HomeModules';
 import { Categories } from '@/components/Categories';
 import { FeaturedProducts } from '@/components/FeaturedProducts';
+import { ActivityMarquee } from '@/components/ActivityMarquee';
 
 export default function Home() {
   const [homeData, setHomeData] = useState<any>(null);
   const [productsData, setProductsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 并行获取数据
-        const [homeResponse, productsResponse] = await Promise.all([
-          fetch('/api/home'),
-          fetch('/api/products?limit=20')
-        ]);
+        // 只获取home数据，产品数据由FeaturedProducts组件自己获取
+        const homeResponse = await fetch('/api/home');
 
         if (!homeResponse.ok) throw new Error('Failed to fetch home data');
-        if (!productsResponse.ok) throw new Error('Failed to fetch products data');
 
         const homeData = await homeResponse.json();
-        const productsResponseData = await productsResponse.json();
-
-        console.log('Products API response:', productsResponseData);
-        console.log('Products API data:', productsResponseData.data);
 
         setHomeData(homeData);
-        // 只传递API响应中的data字段给FeaturedProducts组件
-        setProductsData(productsResponseData.data);
+        // 不再传递产品数据，让FeaturedProducts组件自己获取
+        setProductsData(null);
       } catch (err) {
         setError('Failed to load data');
         console.error(err);
@@ -54,7 +48,7 @@ export default function Home() {
     );
   }
 
-  if (error || !homeData || !productsData) {
+  if (error || !homeData) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#FAFAF9]">
         <div className="text-center">
@@ -73,8 +67,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#FAFAF9] text-[#0C0A09]">
       <HomeModules data={homeData} />
-      <Categories data={homeData} />
-      <FeaturedProducts data={productsData} />
+      <ActivityMarquee activities={homeData.activities || []} />
+      <Categories onCategorySelect={setSelectedCategory} />
+      <FeaturedProducts category={selectedCategory} />
     </div>
   );
 }

@@ -3,7 +3,11 @@
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 
-export function Categories() {
+interface CategoriesProps {
+  onCategorySelect: (category: string) => void;
+}
+
+export function Categories({ onCategorySelect }: CategoriesProps) {
   const { t } = useTranslation();
   const originalCategories = t('categories.items', { returnObjects: true }) as string[];
   
@@ -49,11 +53,12 @@ export function Categories() {
           <div className="flex space-x-4 min-w-max">
             {categories.map((category: string, index: number) => (
               <div 
-                key={index} 
-                className="group cursor-pointer relative w-64 flex-shrink-0"
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
+              key={index} 
+              className="group cursor-pointer relative w-64 flex-shrink-0"
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              onClick={() => onCategorySelect(category === 'All' ? 'all' : (index).toString())}
+            >
                 {/* Card Container */}
                 <div className={`
                   relative bg-white border transition-all duration-500 ease-out

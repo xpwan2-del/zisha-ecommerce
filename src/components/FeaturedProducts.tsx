@@ -26,7 +26,7 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [allProducts, setAllProducts] = useState<any[]>([]);
-  const productsPerPage = 9;
+  const productsPerPage = 12;
 
   // 模拟产品数据
   const defaultProducts = [
@@ -87,14 +87,7 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
 
   useEffect(() => {
     fetchProducts();
-  }, [category, data]);
-
-  // Handle pagination
-  useEffect(() => {
-    const startIndex = (currentPage - 1) * productsPerPage;
-    const endIndex = startIndex + productsPerPage;
-    setProducts(allProducts.slice(startIndex, endIndex));
-  }, [currentPage, allProducts, productsPerPage]);
+  }, [category, data, currentPage]);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -150,24 +143,35 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
         }
       } else {
         // Fetch from API if no data provided
-        const response = await fetch(`/api/products?category=${category}`);
+        const response = await fetch(`/api/products?category_id=${category}&page=${currentPage}&limit=12`);
         const apiData = await response.json();
         
         if (apiData.success && apiData.data && apiData.data.products) {
           const products = apiData.data.products;
           const pagination = apiData.data.pagination || {};
           
-          const filteredProducts = filterProductsByCategory(products, category);
-          setAllProducts(filteredProducts);
-          setTotalPages(pagination.total_pages || Math.ceil(filteredProducts.length / productsPerPage));
-          setCurrentPage(1); // Reset to first page
+          // 处理产品数据，确保数据结构正确
+          const processedProducts = products.map((product: any) => ({
+            ...product,
+            originalPrice: product.original_price || product.originalPrice,
+            rating: parseFloat(product.rating) || 4.5,
+            reviewCount: product.review_count || product.reviewCount || 0,
+            category: product.category_id || product.category,
+            inStock: product.stock > 0,
+            fastDelivery: true, // Default fast delivery
+            bestSeller: product.id <= 2, // Mark first 2 products as best sellers
+            image: product.image || product.main_image, // Use image or main_image
+          }));
+          
+          setProducts(processedProducts);
+          setTotalPages(pagination.total_pages || 1);
+          // 不重置currentPage，因为我们是根据currentPage获取数据的
         } else {
           // Use default products if API returns non-array
           console.warn('API returned non-array data, using default products');
           const filteredProducts = filterProductsByCategory(defaultProducts, category);
-          setAllProducts(filteredProducts);
+          setProducts(filteredProducts);
           setTotalPages(Math.ceil(filteredProducts.length / productsPerPage));
-          setCurrentPage(1); // Reset to first page
         }
       }
     } catch (error) {
@@ -177,7 +181,6 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
       const filteredProducts = filterProductsByCategory(defaultProducts, category);
       setAllProducts(filteredProducts);
       setTotalPages(Math.ceil(filteredProducts.length / productsPerPage));
-      setCurrentPage(1); // Reset to first page
     } finally {
       setIsLoading(false);
     }
@@ -197,26 +200,20 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
   // 分类活动标签
   const getDiscountBadges = (product: any) => {
     const badges = [];
-    if (product.discount > 0) {
+    // 处理API返回的促销信息
+    if (product.promotion && product.promotion.discount_percent) {
       badges.push({
         type: 'discount',
-        text: `特惠 ${product.discount}%`,
+        text: `特惠 ${product.promotion.discount_percent}%`,
         color: '#EF4444'
       });
     }
-    if (product.daily_discount > 0) {
+    // 检查是否有今日特惠活动
+    if (product.activities && product.activities.some((activity: any) => activity.name === '今日特惠')) {
       badges.push({
         type: 'daily',
-        text: `今日特惠 ${product.daily_discount}%`,
+        text: '今日特惠',
         color: '#F59E0B'
-      });
-    }
-    if (product.discount > 0 || product.daily_discount > 0) {
-      const totalDiscount = (product.discount || 0) + (product.daily_discount || 0);
-      badges.push({
-        type: 'total',
-        text: `总特惠 ${totalDiscount}%`,
-        color: '#8B5CF6'
       });
     }
     return badges;
@@ -303,7 +300,7 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
         
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 9 }).map((_, index) => (
+            {Array.from({ length: 12 }).map((_, index) => (
               <div key={index} className="bg-white rounded-md shadow-sm overflow-hidden animate-pulse">
                 <div className="aspect-square bg-gray-200"></div>
                 <div className="p-4">

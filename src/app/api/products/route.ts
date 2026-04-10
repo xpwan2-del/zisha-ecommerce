@@ -22,7 +22,7 @@ function parseJSON(value: any, defaultValue: any = []): any {
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get('page') || '1');
-  const limit = parseInt(url.searchParams.get('limit') || '20');
+  const limit = parseInt(url.searchParams.get('limit') || '12');
   const category_id = url.searchParams.get('category_id');
   const activity_id = url.searchParams.get('activity_id');
   const promotion_id = url.searchParams.get('promotion_id');
@@ -108,7 +108,6 @@ export async function GET(request: NextRequest) {
         p.description, p.description_en, p.description_ar,
         p.price, p.original_price, p.stock,
         p.image, p.images,
-        p.capacity, p.weight, p.material, p.height, p.width,
         p.category_id, p.created_at,
         c.name as category_name,
         c.name_en as category_name_en,
@@ -131,7 +130,7 @@ export async function GET(request: NextRequest) {
 
       // 查询产品关联的活动分类
       const activitiesResult = await query(
-        `SELECT ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url
+        `SELECT ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url, ac.color
          FROM product_activities pa
          JOIN activity_categories ac ON pa.activity_category_id = ac.id
          WHERE pa.product_id = ?`,
@@ -139,8 +138,8 @@ export async function GET(request: NextRequest) {
       );
       const activities = activitiesResult.rows || [];
 
-      // 查询产品的促销信息
-      const promotionResult = await query(
+      // 查询产品的所有促销信息
+      const promotionsResult = await query(
         `SELECT 
           pp.id as product_promotion_id,
           pp.promotion_id,
@@ -154,11 +153,26 @@ export async function GET(request: NextRequest) {
          FROM product_promotions pp
          JOIN promotions pr ON pp.promotion_id = pr.id
          WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
-         ORDER BY pr.discount_percent DESC
-         LIMIT 1`,
+         ORDER BY pr.discount_percent DESC`,
         [productId]
       );
-      const promotion = promotionResult.rows?.[0] || null;
+      const promotions = promotionsResult.rows || [];
+
+      // 选择最大折扣的促销作为主促销
+      const promotion = promotions.length > 0 ? promotions[0] : null;
+
+      // 查询商品特性
+      const featuresResult = await query(
+        `SELECT 
+          pf.id, pf.template_id, pf.value, pf.value_en, pf.value_ar,
+          ft.name, ft.name_en, ft.name_ar
+         FROM product_features pf
+         JOIN feature_templates ft ON pf.template_id = ft.id
+         WHERE pf.product_id = ?
+         ORDER BY ft."order" ASC`,
+        [productId]
+      );
+      const features = featuresResult.rows || [];
 
       // 查询评价统计
       const reviewResult = await query(
@@ -187,19 +201,36 @@ export async function GET(request: NextRequest) {
         image: row.image || (images.length > 0 ? images[0] : ''),
         images: images,
         parameters: {
-          capacity: row.capacity || '',
-          weight: row.weight || '',
-          material: row.material || '',
-          height: row.height || '',
-          width: row.width || ''
+          capacity: features.find((f: any) => f.name === '容量')?.value || '',
+          weight: features.find((f: any) => f.name === '重量')?.value || '',
+          material: features.find((f: any) => f.name === '材质')?.value || '',
+          height: features.find((f: any) => f.name === '高度')?.value || '',
+          width: features.find((f: any) => f.name === '宽度')?.value || ''
         },
+        features: features.map((feature: any) => ({
+          id: feature.id,
+          template_id: feature.template_id,
+          name: feature.name,
+          name_en: feature.name_en,
+          name_ar: feature.name_ar,
+          value: feature.value,
+          value_en: feature.value_en,
+          value_ar: feature.value_ar
+        })),
         category: {
           id: row.category_id,
           name: row.category_name,
           name_en: row.category_name_en,
           name_ar: row.category_name_ar
         },
-        activities: activities,
+        activities: activities.map((activity: any) => ({
+          id: activity.id,
+          name: activity.name,
+          name_en: activity.name_en,
+          name_ar: activity.name_ar,
+          icon_url: activity.icon_url,
+          color: activity.color
+        })),
         promotion: promotion ? {
           id: promotion.promotion_id,
           product_promotion_id: promotion.product_promotion_id,
@@ -211,6 +242,17 @@ export async function GET(request: NextRequest) {
           original_price: parseFloat(promotion.original_price),
           promotion_price: parseFloat(promotion.promotion_price)
         } : null,
+        promotions: promotions.map((promo: any) => ({
+          id: promo.promotion_id,
+          product_promotion_id: promo.product_promotion_id,
+          name: promo.promotion_name,
+          name_en: promo.promotion_name_en,
+          name_ar: promo.promotion_name_ar,
+          type: promo.promotion_type,
+          discount_percent: promo.discount_percent,
+          original_price: parseFloat(promo.original_price),
+          promotion_price: parseFloat(promo.promotion_price)
+        })),
         review_count: reviewCount,
         rating: rating,
         created_at: row.created_at
@@ -250,7 +292,7 @@ export async function POST(request: NextRequest) {
       description, description_en, description_ar,
       price, original_price, stock,
       category_id, image, images,
-      capacity, weight, material, height, width
+      features = []
     } = body;
 
     const result = await query(
@@ -259,15 +301,13 @@ export async function POST(request: NextRequest) {
         description, description_en, description_ar,
         price, original_price, stock,
         category_id, image, images,
-        capacity, weight, material, height, width,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       [
         name, name_en, name_ar,
         description, description_en, description_ar,
         price, original_price || price, stock || 0,
-        category_id, image, JSON.stringify(images || []),
-        capacity, weight, material, height, width
+        category_id, image, JSON.stringify(images || [])
       ]
     );
 
@@ -288,6 +328,16 @@ export async function POST(request: NextRequest) {
       ) VALUES (?, ?, ?, ?, ?, datetime('now'))`,
       [productId, 'create', 'product', JSON.stringify({ name, price }), 'system']
     );
+
+    // 创建商品特性
+    for (const feature of features) {
+      await query(
+        `INSERT INTO product_features (
+          product_id, template_id, value, value_en, value_ar, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+        [productId, feature.template_id, feature.value, feature.value_en || feature.value, feature.value_ar || feature.value]
+      );
+    }
 
     return NextResponse.json({
       success: true,
