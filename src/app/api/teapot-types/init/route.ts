@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // 插入测试数据
     await query(`
       INSERT INTO teapot_types (name, name_en, name_ar, images, min_capacity, max_capacity, base_price, description)
-      VALUES
+      VALUES 
       ('石瓢', 'Shi Piao', 'شيه پياو', '["https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20shi%20piao%20style%20front%20view&image_size=square", "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20shi%20piao%20style%20side%20view&image_size=square"]', 150, 300, 300, '经典壶型'),
       ('西施', 'Xi Shi', 'شي شي', '["https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20xi%20shi%20style%20front%20view&image_size=square", "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20xi%20shi%20style%20side%20view&image_size=square"]', 100, 250, 350, '最受欢迎'),
       ('井栏', 'Jing Lan', 'جينغ لان', '["https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20jing%20lan%20style%20front%20view&image_size=square", "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20jing%20lan%20style%20side%20view&image_size=square"]', 200, 400, 400, '方器代表'),

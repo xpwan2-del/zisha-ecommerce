@@ -1,9 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import React from 'react';
 
 interface ImageModalProps {
-  isOpen: boolean;
   images: string[];
   currentIndex: number;
   onClose: () => void;
@@ -11,88 +10,46 @@ interface ImageModalProps {
   onNext: () => void;
 }
 
-export default function ImageModal({ isOpen, images, currentIndex, onClose, onPrev, onNext }: ImageModalProps) {
-  if (!isOpen) return null;
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft') onPrev();
-      if (e.key === 'ArrowRight') onNext();
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'unset';
-    };
-  }, [onClose, onPrev, onNext]);
-
+export default function ImageModal({ images, currentIndex, onClose, onPrev, onNext }: ImageModalProps) {
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300 transition-colors z-10"
-        aria-label="Close"
+        className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-70 transition-colors"
+        onClick={onClose}
       >
-        ×
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
       </button>
-
-      {images.length > 1 && (
-        <>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPrev();
-            }}
-            className="absolute left-4 text-white text-5xl hover:text-gray-300 transition-colors z-10"
-            aria-label="Previous"
-          >
-            ‹
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onNext();
-            }}
-            className="absolute right-4 text-white text-5xl hover:text-gray-300 transition-colors z-10"
-            aria-label="Next"
-          >
-            ›
-          </button>
-        </>
-      )}
-
-      <div 
-        className="relative max-w-5xl max-h-[90vh] w-full mx-4"
-        onClick={(e) => e.stopPropagation()}
+      
+      <button
+        className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-70 transition-colors"
+        onClick={onPrev}
       >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      
+      <div className="max-w-4xl max-h-[90vh] relative">
         <img
           src={images[currentIndex]}
           alt={`Image ${currentIndex + 1}`}
-          className="w-full h-full object-contain rounded-lg"
+          className="w-full h-auto max-h-[90vh] object-contain"
         />
-        
-        {images.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-            {images.map((_, index) => (
-              <div
-                key={`modal-${index}`}
-                className={`w-2 h-2 rounded-full ${
-                  index === currentIndex ? 'bg-white' : 'bg-gray-500'
-                }`}
-              />
-            ))}
-          </div>
-        )}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full">
+          {currentIndex + 1} / {images.length}
+        </div>
       </div>
+      
+      <button
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-70 transition-colors"
+        onClick={onNext}
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
     </div>
   );
 }

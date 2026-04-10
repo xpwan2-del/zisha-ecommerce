@@ -1,22 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { CartProvider } from "@/lib/contexts/CartContext";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { CurrencyProvider } from "@/lib/contexts/CurrencyContext";
-import { Header } from "@/components/Header";
+import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Zisha Pottery | Premium Teaware",
   description: "Authentic Chinese Zisha pottery for tea enthusiasts in the Middle East",
-  icons: {
-    icon: "/logo.png",
-  },
 };
 
 export default function RootLayout({
@@ -25,15 +19,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh" className="translated-ltr">
-      <body className={inter.className}>
+    <html lang="zh-CN">
+      <body className="antialiased bg-[#FAFAF9] text-[#0C0A09]">
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>
               <CartProvider>
                 <CurrencyProvider>
-                  <Header />
-                  <main>
+                  <Navbar />
+                  <main className="pt-16">
                     {children}
                   </main>
                   <Footer />

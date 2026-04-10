@@ -1,245 +1,234 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-const mockProducts = [
-  {
-    id: 1,
-    name: "Classic Zisha Teapot",
-    name_en: "Classic Zisha Teapot",
-    name_ar: "إبوة زيشا الكلاسيكية",
-    price: 120,
-    original_price: 150,
-    stock: 50,
-    category_id: "teapots",
-    image: "https://placehold.co/400x400/e8d4c4/ffffff?text=Classic+Zisha+Teapot",
-    images: [
-      "https://placehold.co/400x400/e8d4c4/ffffff?text=Classic+Zisha+Teapot",
-      "https://placehold.co/400x400/d4a574/ffffff?text=Side+View",
-      "https://placehold.co/400x400/c9a686/ffffff?text=Top+View",
-      "https://placehold.co/400x400/b89776/ffffff?text=With+Tea"
-    ],
-    description: "Handcrafted from authentic Yixing clay, this classic zisha teapot is perfect for brewing all types of tea. The natural porous nature of zisha clay helps to enhance the flavor of tea over time, making it a favorite among tea enthusiasts.",
-    features: [
-      "Authentic Yixing clay",
-      "Handcrafted by skilled artisans",
-      "150ml capacity",
-      "Heat resistant",
-      "Enhances tea flavor"
-    ],
-    specifications: {
-      weight: "300g",
-      size: "15cm x 10cm x 8cm",
-      capacity: "150ml",
-      material: "Zisha clay"
-    },
-    shipping: {
-      free_shipping: true,
-      min_order: 100
-    },
-    after_sale: {
-      return_policy: "7-day return policy",
-      refund_policy: "Full refund within 7 days",
-      warranty: "1 year warranty"
-    },
-    is_limited: true,
-    discount: 20
-  },
-  {
-    id: 2,
-    name: "Zisha Tea Cup Set",
-    name_en: "Zisha Tea Cup Set",
-    name_ar: "مجموعة أكواب الشاي من زيشا",
-    price: 85,
-    original_price: 100,
-    stock: 30,
-    category_id: "cups",
-    image: "https://placehold.co/400x400/a8d5ba/ffffff?text=Zisha+Tea+Cup+Set",
-    images: [
-      "https://placehold.co/400x400/a8d5ba/ffffff?text=Zisha+Tea+Cup+Set",
-      "https://placehold.co/400x400/7bc4c4/ffffff?text=Close+Up",
-      "https://placehold.co/400x400/5dade2/ffffff?text=Stacked",
-      "https://placehold.co/400x400/48c9b0/ffffff?text=With+Tea"
-    ],
-    description: "Beautiful set of 4 zisha tea cups, perfect for tea ceremonies. Each cup is handcrafted with attention to detail.",
-    features: [
-      "Set of 4 cups",
-      "Handmade",
-      "Elegant design",
-      "Dishwasher safe"
-    ],
-    specifications: {
-      weight: "200g",
-      size: "8cm x 6cm x 5cm",
-      capacity: "80ml",
-      material: "Zisha clay"
-    },
-    shipping: {
-      free_shipping: true,
-      min_order: 100
-    },
-    after_sale: {
-      return_policy: "7-day return policy",
-      refund_policy: "Full refund within 7 days",
-      warranty: "1 year warranty"
-    },
-    is_limited: false,
-    discount: 0
-  },
-  {
-    id: 3,
-    name: "Premium Zisha Teapot",
-    name_en: "Premium Zisha Teapot",
-    name_ar: "إبوة زيشا المميزة",
-    price: 200,
-    original_price: 250,
-    stock: 20,
-    category_id: "teapots",
-    image: "https://placehold.co/400x400/f4d03f/ffffff?text=Premium+Zisha+Teapot",
-    images: [
-      "https://placehold.co/400x400/f4d03f/ffffff?text=Premium+Zisha+Teapot",
-      "https://placehold.co/400x400/e74c3c/ffffff?text=Side+View",
-      "https://placehold.co/400x400/c0392b/ffffff?text=Top+View"
-    ],
-    description: "Premium quality zisha teapot with gold trim, perfect for special occasions. The gold accents add a touch of elegance while maintaining the traditional functionality.",
-    features: [
-      "Premium quality",
-      "Gold trim",
-      "200ml capacity",
-      "Handcrafted"
-    ],
-    specifications: {
-      weight: "350g",
-      size: "16cm x 12cm x 10cm",
-      capacity: "200ml",
-      material: "Zisha clay with gold trim"
-    },
-    shipping: {
-      free_shipping: true,
-      min_order: 100
-    },
-    after_sale: {
-      return_policy: "7-day return policy",
-      refund_policy: "Full refund within 7 days",
-      warranty: "1 year warranty"
-    },
-    is_limited: true,
-    discount: 15
-  },
-  {
-    id: 4,
-    name: "Traditional Tea Set",
-    name_en: "Traditional Tea Set",
-    name_ar: "مجموعة الشاي التقليدية",
-    price: 350,
-    original_price: 400,
-    stock: 15,
-    category_id: "sets",
-    image: "https://placehold.co/400x400/27ae60/ffffff?text=Traditional+Tea+Set",
-    images: [
-      "https://placehold.co/400x400/27ae60/ffffff?text=Traditional+Tea+Set",
-      "https://placehold.co/400x400/2ecc71/ffffff?text=Side+View"
-    ],
-    description: "Complete traditional tea set with teapot and 6 cups. Perfect for hosting tea ceremonies or enjoying tea with family and friends.",
-    features: [
-      "Complete set",
-      "Teapot + 6 cups",
-      "Traditional design",
-      "Gift packaging"
-    ],
-    specifications: {
-      weight: "800g",
-      size: "25cm x 20cm x 15cm",
-      capacity: "Teapot: 300ml, Cups: 80ml",
-      material: "Zisha clay"
-    },
-    shipping: {
-      free_shipping: true,
-      min_order: 100
-    },
-    after_sale: {
-      return_policy: "7-day return policy",
-      refund_policy: "Full refund within 7 days",
-      warranty: "1 year warranty"
-    },
-    is_limited: false,
-    discount: 10
+// 辅助函数：计算库存状态
+function getStockStatus(stock: number): string {
+  if (stock <= 0) return '缺货';
+  if (stock <= 5) return '紧张';
+  if (stock <= 20) return '有限';
+  return '充足';
+}
+
+// 辅助函数：解析JSON字段
+function parseJSON(value: any, defaultValue: any = []): any {
+  if (!value) return defaultValue;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return defaultValue;
   }
-];
+}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  
+
   try {
-    const result = await query(
-      'SELECT * FROM products WHERE id = ?',
+    // 查询产品基本信息
+    const productResult = await query(
+      `SELECT
+        p.*,
+        c.name as category_name,
+        c.name_en as category_name_en,
+        c.name_ar as category_name_ar
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.id = ?`,
       [id]
     );
-    
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+
+    if (!productResult.rows || productResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Product not found' },
+        { status: 404 }
+      );
     }
-    
-    const product = result.rows[0];
 
-    // 确保数值类型正确并计算库存状态
-    product.price = parseFloat(String(product.price)) || 0;
-    product.original_price = parseFloat(String(product.original_price)) || 0;
-    product.stock = parseInt(String(product.stock)) || 0;
-    (product as any).inStock = product.stock > 0;
+    const row = productResult.rows[0];
 
-    // 计算基于评价的平均评分
-    const reviewStats = await query(
-      'SELECT COUNT(*) as count, AVG(rating) as avg_rating FROM reviews WHERE product_id = ?',
+    // 解析JSON字段
+    const images = parseJSON(row.images, []);
+    const features = parseJSON(row.features, []);
+    const specifications = parseJSON(row.specifications, {});
+    const shipping = parseJSON(row.shipping, {});
+    const after_sale = parseJSON(row.after_sale, {});
+
+    // 查询产品关联的活动分类
+    const activitiesResult = await query(
+      `SELECT ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url
+       FROM product_activities pa
+       JOIN activity_categories ac ON pa.activity_category_id = ac.id
+       WHERE pa.product_id = ?`,
       [id]
     );
-    const stats = reviewStats.rows[0];
-    (product as any).reviewCount = parseInt(String(stats?.count || 0));
-    (product as any).rating = stats?.avg_rating ? parseFloat(String(stats.avg_rating)).toFixed(1) : 5.0;
+    const activities = activitiesResult.rows || [];
 
-    if (product.images && typeof product.images === 'string') {
-      try {
-        product.images = JSON.parse(String(product.images));
-      } catch (e) {
-        product.images = [] as any;
-      }
-    }
-    
-    if (product.features && typeof product.features === 'string') {
-      try {
-        product.features = JSON.parse(product.features);
-      } catch (e) {
-        product.features = [] as any;
-      }
-    }
-    
-    if (product.specifications && typeof product.specifications === 'string') {
-      try {
-        product.specifications = JSON.parse(product.specifications);
-      } catch (e) {
-        product.specifications = {} as any;
-      }
-    }
-    
-    if (product.shipping && typeof product.shipping === 'string') {
-      try {
-        product.shipping = JSON.parse(product.shipping);
-      } catch (e) {
-        product.shipping = {} as any;
-      }
-    }
-    
-    if (product.after_sale && typeof product.after_sale === 'string') {
-      try {
-        product.after_sale = JSON.parse(product.after_sale);
-      } catch (e) {
-        product.after_sale = {} as any;
-      }
-    }
-    
-    return NextResponse.json(product);
+    // 查询产品的促销信息
+    const promotionResult = await query(
+      `SELECT
+        pp.id as product_promotion_id,
+        pp.promotion_id,
+        pp.original_price,
+        pp.promotion_price,
+        pr.name as promotion_name,
+        pr.name_en as promotion_name_en,
+        pr.name_ar as promotion_name_ar,
+        pr.discount_percent,
+        pr.type as promotion_type,
+        pr.start_time,
+        pr.end_time
+       FROM product_promotions pp
+       JOIN promotions pr ON pp.promotion_id = pr.id
+       WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
+       ORDER BY pr.discount_percent DESC
+       LIMIT 1`,
+      [id]
+    );
+    const promotion = promotionResult.rows?.[0] || null;
+
+    // 查询评价统计
+    const reviewResult = await query(
+      `SELECT COUNT(*) as count, AVG(rating) as avg_rating
+       FROM reviews
+       WHERE product_id = ?`,
+      [id]
+    );
+    const reviewCount = parseInt(String(reviewResult.rows?.[0]?.count || 0));
+    const avgRating = reviewResult.rows?.[0]?.avg_rating;
+    const rating = avgRating ? parseFloat(String(avgRating)).toFixed(1) : '5.0';
+
+    // 查询库存变动历史（最近10条）
+    const inventoryHistoryResult = await query(
+      `SELECT
+        id,
+        change_type,
+        quantity,
+        before_stock,
+        after_stock,
+        reason,
+        operator_name,
+        created_at
+       FROM inventory_logs
+       WHERE product_id = ?
+       ORDER BY created_at DESC
+       LIMIT 10`,
+      [id]
+    );
+    const inventoryHistory = inventoryHistoryResult.rows || [];
+
+    // 查询产品操作日志（最近10条）
+    const operationLogsResult = await query(
+      `SELECT
+        id,
+        action,
+        field_name,
+        old_value,
+        new_value,
+        operator_name,
+        ip_address,
+        created_at
+       FROM product_logs
+       WHERE product_id = ?
+       ORDER BY created_at DESC
+       LIMIT 10`,
+      [id]
+    );
+    const operationLogs = operationLogsResult.rows || [];
+
+    // 查询关联推荐产品（同分类的其他产品，排除当前产品）
+    const relatedProductsResult = await query(
+      `SELECT
+        p.id, p.name, p.name_en, p.name_ar,
+        p.price, p.original_price, p.image,
+        c.name as category_name
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.category_id = ? AND p.id != ?
+       ORDER BY p.id DESC
+       LIMIT 4`,
+      [row.category_id, id]
+    );
+    const relatedProducts = (relatedProductsResult.rows || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      name_en: p.name_en,
+      name_ar: p.name_ar,
+      price: parseFloat(p.price) || 0,
+      original_price: parseFloat(p.original_price) || 0,
+      image: p.image,
+      category: { name: p.category_name }
+    }));
+
+    // 构建完整的产品详情数据
+    const product = {
+      id: row.id,
+      name: row.name,
+      name_en: row.name_en,
+      name_ar: row.name_ar,
+      description: row.description,
+      description_en: row.description_en,
+      description_ar: row.description_ar,
+      price: parseFloat(row.price) || 0,
+      original_price: parseFloat(row.original_price) || parseFloat(row.price) || 0,
+      stock: parseInt(row.stock) || 0,
+      stock_status: getStockStatus(parseInt(row.stock) || 0),
+      image: row.image || (images.length > 0 ? images[0] : ''),
+      images: images,
+      video: row.video || '',
+      parameters: {
+        capacity: row.capacity || '',
+        weight: row.weight || '',
+        material: row.material || '',
+        height: row.height || '',
+        width: row.width || ''
+      },
+      features: features,
+      specifications: specifications,
+      shipping: shipping,
+      after_sale: after_sale,
+      is_limited: Boolean(row.is_limited),
+      discount: parseInt(row.discount) || 0,
+      display_mode: row.display_mode || 'double',
+      category: {
+        id: row.category_id,
+        name: row.category_name,
+        name_en: row.category_name_en,
+        name_ar: row.category_name_ar
+      },
+      activities: activities,
+      promotion: promotion ? {
+        id: promotion.promotion_id,
+        product_promotion_id: promotion.product_promotion_id,
+        name: promotion.promotion_name,
+        name_en: promotion.promotion_name_en,
+        name_ar: promotion.promotion_name_ar,
+        type: promotion.promotion_type,
+        discount_percent: promotion.discount_percent,
+        original_price: parseFloat(promotion.original_price),
+        promotion_price: parseFloat(promotion.promotion_price),
+        start_time: promotion.start_time,
+        end_time: promotion.end_time
+      } : null,
+      review_count: reviewCount,
+      rating: rating,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      // 扩展数据
+      inventory_history: inventoryHistory,
+      operation_logs: operationLogs,
+      related_products: relatedProducts
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: product
+    });
+
   } catch (error) {
     console.error('Error fetching product:', error);
-    return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch product' },
+      { status: 500 }
+    );
   }
 }
 
@@ -247,59 +236,136 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    
-    const { name, name_en, name_ar, price, original_price, stock, category_id, image, images, video, description, features, specifications, shipping, after_sale, is_limited, discount } = body;
-    
+
+    const {
+      name, name_en, name_ar,
+      description, description_en, description_ar,
+      price, original_price, stock,
+      category_id, image, images, video,
+      features, specifications, shipping, after_sale,
+      is_limited, discount, capacity, weight, material, height, width
+    } = body;
+
+    // 获取旧数据用于日志记录
+    const oldProductResult = await query(
+      'SELECT name, price, stock FROM products WHERE id = ?',
+      [id]
+    );
+    const oldProduct = oldProductResult.rows?.[0];
+
     const result = await query(
       `UPDATE products SET
-       name = ?,
-       name_en = ?,
-       name_ar = ?,
-       price = ?,
-       original_price = ?,
-       stock = ?,
-       category_id = ?,
-       image = ?,
-       images = ?,
-       video = ?,
-       description = ?,
-       features = ?,
-       specifications = ?,
-       shipping = ?,
-       after_sale = ?,
-       is_limited = ?,
-       discount = ?
+       name = ?, name_en = ?, name_ar = ?,
+       description = ?, description_en = ?, description_ar = ?,
+       price = ?, original_price = ?, stock = ?,
+       category_id = ?, image = ?, images = ?, video = ?,
+       features = ?, specifications = ?, shipping = ?, after_sale = ?,
+       is_limited = ?, discount = ?,
+       capacity = ?, weight = ?, material = ?, height = ?, width = ?,
+       updated_at = datetime('now')
        WHERE id = ?`,
-      [name, name_en, name_ar, price, original_price || 0, stock, category_id, image, JSON.stringify(images || []), video || '', description, JSON.stringify(features || []), JSON.stringify(specifications || {}), JSON.stringify(shipping || {}), JSON.stringify(after_sale || {}), is_limited || false, discount || 0, id]
+      [
+        name, name_en, name_ar,
+        description, description_en, description_ar,
+        price, original_price || price, stock,
+        category_id, image, JSON.stringify(images || []), video || '',
+        JSON.stringify(features || []), JSON.stringify(specifications || {}),
+        JSON.stringify(shipping || {}), JSON.stringify(after_sale || {}),
+        is_limited ? 1 : 0, discount || 0,
+        capacity, weight, material, height, width,
+        id
+      ]
     );
-    
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+
+    if (!result.rows || result.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Product not found' },
+        { status: 404 }
+      );
     }
-    
-    return NextResponse.json(result.rows[0]);
+
+    // 记录操作日志
+    await query(
+      `INSERT INTO product_logs (
+        product_id, action, field_name, old_value, new_value, operator_name, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [
+        id,
+        'update',
+        'product',
+        JSON.stringify({ name: oldProduct?.name, price: oldProduct?.price }),
+        JSON.stringify({ name, price }),
+        'system'
+      ]
+    );
+
+    // 如果库存变化，记录库存日志
+    if (oldProduct && parseInt(oldProduct.stock) !== parseInt(stock)) {
+      await query(
+        `INSERT INTO inventory_logs (
+          product_id, change_type, quantity,
+          before_stock, after_stock, reason, operator_name, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        [
+          id,
+          'adjust',
+          parseInt(stock) - parseInt(oldProduct.stock),
+          parseInt(oldProduct.stock),
+          parseInt(stock),
+          '产品更新',
+          'system'
+        ]
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { id, message: 'Product updated successfully' }
+    });
+
   } catch (error) {
     console.error('Error updating product:', error);
-    return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to update product' },
+      { status: 500 }
+    );
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    
+
+    // 记录删除日志
+    await query(
+      `INSERT INTO product_logs (
+        product_id, action, field_name, old_value, operator_name, created_at
+      ) VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+      [id, 'delete', 'product', JSON.stringify({ id }), 'system']
+    );
+
     const result = await query(
       'DELETE FROM products WHERE id = ?',
       [id]
     );
-    
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+
+    if (!result.rows || result.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Product not found' },
+        { status: 404 }
+      );
     }
-    
-    return NextResponse.json({ message: 'Product deleted successfully' });
+
+    return NextResponse.json({
+      success: true,
+      data: { message: 'Product deleted successfully' }
+    });
+
   } catch (error) {
     console.error('Error deleting product:', error);
-    return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete product' },
+      { status: 500 }
+    );
   }
 }

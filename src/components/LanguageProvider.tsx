@@ -1,26 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n/i18n";
-import { useEffect, useState } from "react";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
-
+  const [isReady, setIsReady] = useState(false);
+  
   useEffect(() => {
-    const saved = localStorage.getItem('language');
-    if (saved && ['en', 'zh', 'ar'].includes(saved)) {
-      i18n.changeLanguage(saved);
+    // Wait for i18n to be initialized
+    if (i18n.isInitialized) {
+      setIsReady(true);
     } else {
-      const browserLang = navigator.language.split('-')[0];
-      if (['en', 'zh', 'ar'].includes(browserLang)) {
-        i18n.changeLanguage(browserLang);
-      }
+      const handleInit = () => setIsReady(true);
+      i18n.on('initialized', handleInit);
+      return () => i18n.off('initialized', handleInit);
     }
-    setReady(true);
   }, []);
 
-  if (!ready) {
+  if (!isReady) {
     return null;
   }
 

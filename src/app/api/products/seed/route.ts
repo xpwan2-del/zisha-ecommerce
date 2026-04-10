@@ -1,204 +1,212 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-// 为每个类目生成相关的图片URL，确保每张图片角度不同
-const generateCategoryImages = (category: string, count: number) => {
-  const images = [];
-  // 不同角度的描述
-  const angles = [
-    'front view',
-    'side view',
-    'top view',
-    'detail close-up',
-    'in use with tea',
-    'traditional setting'
-  ];
-  
-  for (let i = 1; i <= count; i++) {
-    const gallery = [];
-    for (let j = 0; j < 6; j++) {
-      let prompt = '';
-      switch (category) {
-        case '紫砂壶':
-          prompt = `Yixing zisha teapot traditional Chinese pottery ${angles[j]} ${i} professional photography`;
-          break;
-        case '茶杯':
-          prompt = `Zisha tea cups set traditional Chinese ${angles[j]} ${i} professional photography`;
-          break;
-        case '茶叶罐':
-          prompt = `Tea caddy zisha pottery ${angles[j]} ${i} professional photography`;
-          break;
-        case '套装':
-          prompt = `Complete zisha tea set with teapot and cups ${angles[j]} ${i} professional photography`;
-          break;
-      }
-      const encodedPrompt = encodeURIComponent(prompt);
-      gallery.push(`https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${encodedPrompt}&image_size=square`);
-    }
-    images.push({
-      main: gallery[0],
-      gallery
-    });
-  }
-  return images;
-};
-
-// 生成产品数据
-const generateProducts = () => {
-  const categories = [
-    { id: 1, name: "紫砂壶", count: 15 },
-    { id: 2, name: "茶杯", count: 15 },
-    { id: 3, name: "茶叶罐", count: 15 },
-    { id: 4, name: "套装", count: 15 }
-  ];
-  
-  const products: any[] = [];
-  let productId = 1;
-  
-  categories.forEach(category => {
-    const categoryImages = generateCategoryImages(category.name, category.count);
-    
-    for (let i = 0; i < category.count; i++) {
-      const price = Math.floor(Math.random() * 2000) + 299;
-      const originalPrice = Math.round(price * (1 + (Math.random() * 0.3 + 0.1)));
-      const discount = Math.round(((originalPrice - price) / originalPrice) * 100);
-      
-      let productName = '';
-      let description = '';
-      let features: string[] = [];
-      
-      switch (category.name) {
-        case '紫砂壶':
-          const teapotTypes = ['西施', '石瓢', '仿古', '掇球', '容天', '汉铎', '秦权', '子冶石瓢', '景舟石瓢', '曼生壶', '供春', '龙蛋', '梨形', '僧帽', '合欢'];
-          productName = `${productId}. 宜兴紫砂壶 ${teapotTypes[i]}款`;
-          description = `采用正宗宜兴原矿紫砂泥，手工制作而成。${teapotTypes[i]}壶造型独特，出水流畅，是品茶爱好者的首选。`;
-          features = ['正宗宜兴原矿紫砂', '手工制作', '200ml容量', '耐高温', '越用越润'];
-          break;
-        case '茶杯':
-          const cupTypes = ['品茗杯', '功夫茶杯', '主人杯', '斗笠杯', '铃铛杯', '鸡心杯', '卧足杯', '高足杯', '直筒杯', '撇口杯', '收口杯', '鼓腹杯', '折沿杯', '葵口杯', '莲花杯'];
-          productName = `${productId}. 紫砂${cupTypes[i]} 套装`;
-          description = `采用优质紫砂泥制作，质感细腻，透气性好。${cupTypes[i]}造型优美，适合品饮各种茶叶。`;
-          features = ['优质紫砂泥', '细腻质感', '透气性好', '100ml容量', '易清洗'];
-          break;
-        case '茶叶罐':
-          const caddyTypes = ['密封罐', '存储罐', '醒茶罐', '便携罐', '复古罐', '现代罐', '大容量罐', '小容量罐', '带盖罐', '陶瓷罐', '紫砂罐', '竹编罐', '木罐', '金属罐', '玻璃罐'];
-          productName = `${productId}. 紫砂${caddyTypes[i]}`;
-          description = `采用优质紫砂泥制作，密封性能好，适合存储茶叶。${caddyTypes[i]}造型美观，实用性强。`;
-          features = ['优质紫砂泥', '密封性能好', '防潮防虫', '美观实用', '易于保养'];
-          break;
-        case '套装':
-          const setTypes = ['经典套装', '豪华套装', '旅行套装', '家庭套装', '商务套装', '礼品套装', '收藏套装', '入门套装', '大师套装', '限量套装', '定制套装', '传统套装', '现代套装', '精品套装', '尊享套装'];
-          productName = `${productId}. 紫砂茶具${setTypes[i]}`;
-          description = `包含茶壶、茶杯、茶盘等全套茶具，采用优质紫砂泥制作，工艺精湛，是品茶和送礼的绝佳选择。`;
-          features = ['全套茶具', '优质紫砂泥', '工艺精湛', '送礼佳品', '收藏价值'];
-          break;
-      }
-      
-      // 为一些产品添加今日特惠
-      let dailyDiscount = 0;
-      let dailyDiscountStartTime = '';
-      let dailyDiscountEndTime = '';
-      if (i % 3 === 0) {
-        dailyDiscount = Math.floor(Math.random() * 30) + 10; // 10-40%
-        dailyDiscountStartTime = new Date().toISOString();
-        const endTime = new Date();
-        endTime.setHours(23, 59, 59, 999);
-        dailyDiscountEndTime = endTime.toISOString();
-      }
-      
-      products.push({
-        name: productName,
-        name_en: `${productName} (Zisha)`,
-        name_ar: `إبوة زيشا ${productName}`,
-        price: price,
-        original_price: originalPrice,
-        stock: Math.floor(Math.random() * 80) + 20,
-        category_id: category.id,
-        image: categoryImages[i].main,
-        images: categoryImages[i].gallery,
-        video: i === 0 ? "https://www.w3schools.com/html/mov_bbb.mp4" : null,
-        description: description,
-        features: features,
-        is_limited: i % 5 === 0,
-        discount: discount,
-        daily_discount: dailyDiscount,
-        daily_discount_start_time: dailyDiscountStartTime,
-        daily_discount_end_time: dailyDiscountEndTime,
-        display_mode: i % 3 === 0 ? 'single' : 'double'
-      });
-      
-      productId++;
-    }
-  });
-  
-  return products;
-};
-
 export async function POST(request: NextRequest) {
   try {
-    console.log('开始导入产品数据...');
-    
-    // 检查categories表数据
-    const categoriesResult = await query('SELECT * FROM categories');
-    console.log('Categories:', categoriesResult.rows);
-    
-    // 先删除引用products表的表数据
-    console.log('删除引用表数据...');
-    await query('DELETE FROM order_items');
-    await query('DELETE FROM product_activities');
-    await query('DELETE FROM reviews');
-    await query('DELETE FROM recommendations');
-    console.log('引用表数据删除完成');
-    
-    // 删除产品数据
-    console.log('删除现有产品数据...');
-    await query('DELETE FROM products');
-    console.log('产品数据删除完成');
+    // Start transaction
+    await query('BEGIN');
 
-    const products = generateProducts();
-    console.log(`生成了 ${products.length} 个产品`);
-    
-    // 先删除现有产品数据
+    // Clear existing products
     await query('DELETE FROM products');
-    console.log('已删除现有产品数据');
-    
-    // 插入产品数据
-    for (let i = 0; i < products.length; i++) {
-      const product = products[i];
-      try {
-        await query(
-          `INSERT INTO products (name, name_en, name_ar, price, original_price, stock, category_id, image, description, is_limited, discount, daily_discount, daily_discount_start_time, daily_discount_end_time, display_mode)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            product.name,
-            product.name_en,
-            product.name_ar,
-            product.price,
-            product.original_price,
-            product.stock,
-            product.category_id,
-            product.image,
-            product.description,
-            product.is_limited ? 1 : 0,
-            product.discount,
-            product.daily_discount,
-            product.daily_discount_start_time,
-            product.daily_discount_end_time,
-            product.display_mode
-          ]
-        );
-        if (i % 10 === 0) {
-          console.log(`已插入 ${i} 个产品`);
-        }
-      } catch (error) {
-        console.error(`插入产品 ${product.name} 失败:`, error);
+
+    // Seed data
+    const products = [
+      {
+        id: 1,
+        name: "Classic Zisha Teapot",
+        name_en: "Classic Zisha Teapot",
+        name_ar: "إبوة زيشا الكلاسيكية",
+        price: 120,
+        original_price: 150,
+        stock: 50,
+        category_id: "teapots",
+        image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=classic%20zisha%20teapot%20with%20traditional%20design%20front%20view&image_size=square",
+        images: [
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=classic%20zisha%20teapot%20with%20traditional%20design%20front%20view&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=classic%20zisha%20teapot%20side%20view&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=classic%20zisha%20teapot%20top%20view&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=classic%20zisha%20teapot%20with%20tea%20inside&image_size=square"
+        ],
+        description: "Handcrafted from authentic Yixing clay, this classic zisha teapot is perfect for brewing all types of tea. The natural porous nature of zisha clay helps to enhance the flavor of tea over time, making it a favorite among tea enthusiasts.",
+        features: [
+          "Authentic Yixing clay",
+          "Handcrafted by skilled artisans",
+          "150ml capacity",
+          "Heat resistant",
+          "Enhances tea flavor"
+        ],
+        is_limited: true,
+        discount: 20
+      },
+      {
+        id: 2,
+        name: "Zisha Tea Cup Set",
+        name_en: "Zisha Tea Cup Set",
+        name_ar: "مجموعة أكواب الشاي من زيشا",
+        price: 85,
+        original_price: 100,
+        stock: 30,
+        category_id: "cups",
+        image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20set%20of%204%20arranged%20on%20table&image_size=square",
+        images: [
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20set%20of%204%20arranged%20on%20table&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20close%20up&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20stacked&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups%20with%20tea%20inside&image_size=square"
+        ],
+        description: "This elegant set of zisha tea cups is perfect for enjoying tea with friends and family. Each cup is handcrafted from authentic Yixing clay, providing a unique drinking experience.",
+        features: [
+          "Set of 4 cups",
+          "Authentic Yixing clay",
+          "60ml capacity each",
+          "Smooth finish",
+          "Stackable design"
+        ],
+        is_limited: false,
+        discount: 0
+      },
+      {
+        id: 3,
+        name: "Premium Zisha Teapot",
+        name_en: "Premium Zisha Teapot",
+        name_ar: "إبوة زيشا المميزة",
+        price: 180,
+        original_price: 220,
+        stock: 20,
+        category_id: "teapots",
+        image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot%20with%20intricate%20carving%20front%20view&image_size=square",
+        images: [
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot%20with%20intricate%20carving%20front%20view&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot%20side%20view%20with%20carvings&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot%20top%20view&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot%20with%20wooden%20handle&image_size=square"
+        ],
+        description: "This premium zisha teapot features intricate hand-carved designs and is made from the finest Yixing clay. It's a true work of art that will enhance any tea ceremony.",
+        features: [
+          "Premium Yixing clay",
+          "Intricate hand-carved designs",
+          "200ml capacity",
+          "Wooden handle",
+          "Comes with a gift box"
+        ],
+        is_limited: true,
+        discount: 18
+      },
+      {
+        id: 4,
+        name: "Zisha Tea Set Complete",
+        name_en: "Zisha Tea Set Complete",
+        name_ar: "مجموعة الشاي الكاملة من زيشا",
+        price: 280,
+        original_price: 350,
+        stock: 15,
+        category_id: "sets",
+        image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=complete%20zisha%20tea%20set%20with%20teapot%20cups%20and%20tray&image_size=square",
+        images: [
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=complete%20zisha%20tea%20set%20with%20teapot%20cups%20and%20tray&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20set%20arranged%20on%20table&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20set%20close%20up&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20set%20with%20brewing%20tea&image_size=square"
+        ],
+        description: "This complete zisha tea set includes a teapot, four cups, and a tea tray. It's everything you need to start enjoying the traditional Chinese tea ceremony at home.",
+        features: [
+          "Complete tea set",
+          "Authentic Yixing clay",
+          "Teapot + 4 cups + tray",
+          "Elegant design",
+          "Perfect for gifting"
+        ],
+        is_limited: true,
+        discount: 20
+      },
+      {
+        id: 5,
+        name: "Zisha Tea Accessories",
+        name_en: "Zisha Tea Accessories",
+        name_ar: "إكسسوارات الشاي من زيشا",
+        price: 50,
+        original_price: 60,
+        stock: 40,
+        category_id: "accessories",
+        image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20accessories%20set%20with%20strainer%20spoon%20and%20pick&image_size=square",
+        images: [
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20accessories%20set%20with%20strainer%20spoon%20and%20pick&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tea%20strainer%20close%20up&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tea%20spoon%20and%20pick&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tea%20accessories%20in%20use&image_size=square"
+        ],
+        description: "This set of zisha tea accessories includes a tea strainer, tea spoon, and tea pick. These essential tools will enhance your tea brewing experience.",
+        features: [
+          "Set of 3 accessories",
+          "Strainer + spoon + pick",
+          "Durable construction",
+          "Easy to clean",
+          "Essential for tea brewing"
+        ],
+        is_limited: false,
+        discount: 0
+      },
+      {
+        id: 6,
+        name: "Mini Zisha Teapot",
+        name_en: "Mini Zisha Teapot",
+        name_ar: "إبوة زيشا المصغرة",
+        price: 90,
+        original_price: 110,
+        stock: 25,
+        category_id: "teapots",
+        image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mini%20zisha%20teapot%20portable%20front%20view&image_size=square",
+        images: [
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mini%20zisha%20teapot%20portable%20front%20view&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mini%20zisha%20teapot%20side%20view&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mini%20zisha%20teapot%20with%20tea%20inside&image_size=square",
+          "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mini%20zisha%20teapot%20in%20hand&image_size=square"
+        ],
+        description: "This compact mini zisha teapot is perfect for travel or for enjoying a single cup of tea. Despite its small size, it retains all the qualities of a traditional zisha teapot.",
+        features: [
+          "Compact size",
+          "Perfect for travel",
+          "80ml capacity",
+          "Lightweight design",
+          "Portable and convenient"
+        ],
+        is_limited: true,
+        discount: 18
       }
+    ];
+
+    // Insert products
+    for (const product of products) {
+      await query(
+        `INSERT INTO products (id, name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          product.id,
+          product.name,
+          product.name_en,
+          product.name_ar,
+          product.price,
+          product.original_price,
+          product.stock,
+          product.category_id,
+          product.image,
+          JSON.stringify(product.images),
+          product.description,
+          JSON.stringify(product.features),
+          product.is_limited ? 1 : 0,
+          product.discount
+        ]
+      );
     }
 
-    console.log('所有产品插入成功');
-    return NextResponse.json({ message: 'Products seeded successfully', count: products.length });
+    // Commit transaction
+    await query('COMMIT');
+
+    return NextResponse.json({ message: 'Products seeded successfully' }, { status: 200 });
   } catch (error) {
+    // Rollback transaction on error
+    await query('ROLLBACK');
     console.error('Error seeding products:', error);
-    return NextResponse.json({ error: 'Failed to seed products', details: error }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to seed products' }, { status: 500 });
   }
 }

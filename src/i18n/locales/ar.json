@@ -1,16 +1,4 @@
 {
-  "nav": {
-    "deals": "عروض اليوم",
-    "allProducts": "جميع المنتجات",
-    "customize": "تخصيص",
-    "luckyDraw": "السحب",
-    "reviews": "المراجعات",
-    "about": "معلومات عنا",
-    "contact": "اتصل بنا",
-    "account": "الحساب",
-    "cart": "السلة",
-    "admin": "الإدارة"
-  },
   "hero": {
     "title": "فخار زيشا الأصلي",
     "subtitle": "أدوات شاي عالية الجودة من الصين",
@@ -59,15 +47,7 @@
     "add_to_cart": "أضف إلى السلة",
     "buy_now": "اشتر الآن",
     "description": "الوصف",
-    "reviews": "التقييمات",
-    "page_info": "إجمالي {{total}} منتج، الصفحة {{currentPage}} من {{totalPages}}"
-  },
-  "pagination": {
-    "total": "إجمالي {{total}} منتج",
-    "current_page": "الصفحة {{currentPage}}",
-    "total_pages": "من {{totalPages}}",
-    "prev": "السابق",
-    "next": "التالي"
+    "reviews": "التقييمات"
   },
   "about": {
     "title": "عن فخار زيشا",

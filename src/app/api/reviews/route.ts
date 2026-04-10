@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireAuth, requireAdmin } from '@/lib/auth';
 
 // GET /api/reviews - Get all reviews
 export async function GET(request: NextRequest) {
@@ -63,41 +64,71 @@ export async function GET(request: NextRequest) {
       };
     });
     
-    return NextResponse.json({ reviews });
+    return NextResponse.json({
+      success: true,
+      data: reviews
+    });
   } catch (error) {
     console.error('Error fetching reviews:', error);
-    return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch reviews' },
+      { status: 500 }
+    );
   }
 }
 
 // POST /api/reviews - Create a new review
 export async function POST(request: NextRequest) {
   try {
+    // 验证登录
+    const authResult = requireAuth(request);
+    if (authResult.response) {
+      return authResult.response;
+    }
+
     const data = await request.json();
-    const { product_id, user_id, rating, comment, comment_en, comment_ar, images } = data;
+    const { product_id, rating, comment, comment_en, comment_ar, images } = data;
+    
+    // 从JWT中获取user_id
+    const user_id = authResult.user?.id;
     
     const result = await query(
       'INSERT INTO reviews (product_id, user_id, rating, comment, comment_en, comment_ar, images) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *',
       [product_id, user_id, rating, comment, comment_en, comment_ar, JSON.stringify(images || [])]
     );
     
-    return NextResponse.json(result.rows[0]);
+    return NextResponse.json({
+      success: true,
+      data: result.rows[0]
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating review:', error);
-    return NextResponse.json({ error: 'Failed to create review' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to create review' },
+      { status: 500 }
+    );
   }
 }
 
-// DELETE /api/reviews - Delete all reviews
+// DELETE /api/reviews - Delete all reviews (admin only)
 export async function DELETE() {
   try {
+    // 验证管理员权限
+    const adminResult = requireAdmin(new NextRequest('http://localhost'));
+    if (adminResult.response) {
+      return adminResult.response;
+    }
+
     await query('DELETE FROM reviews');
-    return NextResponse.json({ message: 'All reviews deleted successfully' });
+    return NextResponse.json({
+      success: true,
+      data: { message: 'All reviews deleted successfully' }
+    });
   } catch (error) {
     console.error('Error deleting reviews:', error);
-    return NextResponse.json({ 
-      error: 'Failed to delete reviews', 
-      details: error 
-    }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete reviews' },
+      { status: 500 }
+    );
   }
 }
