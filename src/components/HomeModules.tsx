@@ -74,7 +74,7 @@ export function HomeModules({ data }: HomeModulesProps) {
     
     return (
       <section className="relative bg-[#FAFAF9] overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-4 md:pt-20 md:pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
           {/* Combined Carousel - Luxury Style */}
           <div className="relative rounded-sm overflow-hidden shadow-2xl h-[400px] md:h-[500px] mb-8 bg-white">
             {allSlides.map((slide, index) => (

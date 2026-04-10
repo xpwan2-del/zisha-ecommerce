@@ -10,7 +10,6 @@ export default function Home() {
   const [productsData, setProductsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string | number>("all");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,10 +43,6 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const handleCategorySelect = (categoryId: string | number) => {
-    setActiveCategory(categoryId);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#FAFAF9]">
@@ -78,22 +73,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#FAFAF9] text-[#0C0A09]">
       <HomeModules data={homeData} />
-      
-      {/* Same container structure as products page */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Luxury Categories - Same as Products Page */}
-        <Categories 
-          data={homeData}
-          selectedCategory={activeCategory}
-          onCategorySelect={handleCategorySelect}
-        />
-
-        {/* Products Grid - Same as Products Page */}
-        <FeaturedProducts 
-          category={activeCategory === "all" ? "all" : activeCategory.toString()}
-          data={productsData}
-        />
-      </div>
+      <Categories data={homeData} />
+      <FeaturedProducts data={productsData} />
     </div>
   );
 }

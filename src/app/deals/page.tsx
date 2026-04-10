@@ -5,8 +5,6 @@ import { useTranslation } from "react-i18next";
 import Link from "next/link";
 import { useCurrency } from "@/lib/contexts/CurrencyContext";
 import { convertCurrency, formatCurrency } from "@/lib/utils/currency";
-import { Categories } from "@/components/Categories";
-import { ProductCard } from "@/components/ProductCard";
 
 interface DealProduct {
   id: number;
@@ -29,20 +27,24 @@ export default function DealsPage() {
   const { currency } = useCurrency();
   const [products, setProducts] = useState<DealProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<string | number>("all");
-  const [homeData, setHomeData] = useState<any>(null);
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [categories, setCategories] = useState<any[]>([]);
 
   useEffect(() => {
-    async function fetchHomeData() {
+    async function fetchCategories() {
       try {
-        const response = await fetch('/api/home');
+        const response = await fetch('/api/categories');
         const data = await response.json();
-        setHomeData(data);
+        if (data && data.success && Array.isArray(data.data)) {
+          setCategories(data.data);
+        } else if (Array.isArray(data)) {
+          setCategories(data);
+        }
       } catch (error) {
-        console.error('Error fetching home data:', error);
+        console.error('Error fetching categories:', error);
       }
     }
-    fetchHomeData();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -67,23 +69,14 @@ export default function DealsPage() {
   const filteredProducts = products.filter((product) => {
     if (product.discount <= 0) return false;
     if (activeCategory === "all") return true;
-    return product.category_id?.toString() === activeCategory.toString();
+    return product.category_id?.toString() === activeCategory;
   });
 
-  const handleCategorySelect = (categoryId: string | number) => {
-    setActiveCategory(categoryId);
+  const getActivityName = (activity: any) => {
+    if (i18n.language === "zh") return activity.name;
+    if (i18n.language === "ar") return activity.name_ar || activity.name_en || activity.name;
+    return activity.name_en || activity.name;
   };
-
-  if (isLoading || !homeData) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#FAFAF9]">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-2 border-[#CA8A04] border-t-transparent" role="status"></div>
-          <p className="mt-4 text-[#78716C] text-sm tracking-wide">加载中...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#FAFAF9]">
@@ -94,27 +87,33 @@ export default function DealsPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Luxury Categories - Same as Home Page */}
-        <Categories 
-          data={homeData}
-          selectedCategory={activeCategory}
-          onCategorySelect={handleCategorySelect}
-        />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Category filter - Luxury Style */}
+        <div className="flex flex-wrap justify-center gap-3 mb-10">
+          <button
+            onClick={() => setActiveCategory("all")}
+            className={`px-6 py-3 rounded-sm text-sm font-medium tracking-wide transition-all duration-300 ${activeCategory === "all" 
+              ? 'bg-[#CA8A04] text-white shadow-lg shadow-[#CA8A04]/20' 
+              : 'bg-white border border-[#E7E5E4] text-[#44403C] hover:border-[#CA8A04] hover:shadow-sm'}`}
+          >
+            {t('products.all') || '全部'}
+          </button>
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => setActiveCategory(category.id.toString())}
+              className={`px-6 py-3 rounded-sm text-sm font-medium tracking-wide transition-all duration-300 ${activeCategory === category.id.toString() 
+                ? 'bg-[#CA8A04] text-white shadow-lg shadow-[#CA8A04]/20' 
+                : 'bg-white border border-[#E7E5E4] text-[#44403C] hover:border-[#CA8A04] hover:shadow-sm'}`}
+            >
+              {i18n.language === 'zh' ? category.name : i18n.language === 'en' ? category.name_en : category.name_ar}
+            </button>
+          ))}
+        </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 9 }).map((_, index) => (
-              <div key={index} className="bg-white rounded-md shadow-sm overflow-hidden animate-pulse">
-                <div className="aspect-square bg-gray-200"></div>
-                <div className="p-4">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/3 mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                </div>
-              </div>
-            ))}
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#CA8A04]"></div>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="bg-white border border-[#E7E5E4] rounded-sm p-8 text-center">
@@ -137,9 +136,75 @@ export default function DealsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <div
+                key={product.id}
+                className="bg-white border border-[#E7E5E4] rounded-sm overflow-hidden hover:shadow-lg transition-all duration-300 group"
+              >
+                <div className="aspect-square relative overflow-hidden">
+                  {product.discount > 0 && (
+                    <div className="absolute top-2 left-2 z-10 bg-[#CA8A04] text-white text-sm font-bold px-3 py-1 rounded-sm">
+                      -{product.discount}%
+                    </div>
+                  )}
+                  {product.is_limited && (
+                    <div className="absolute top-2 right-2 z-10 bg-[#CA8A04] text-white text-xs font-bold px-3 py-1 rounded-sm">
+                      限量
+                    </div>
+                  )}
+                  <Link href={`/products/${product.id}`}>
+                    <img
+                      src={product.images?.[0] || product.image || "https://placehold.co/400x400/e8d4c4/ffffff?text=Zisha"}
+                      alt={i18n.language === "zh" ? product.name : i18n.language === "ar" ? product.name_ar : product.name_en || product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </Link>
+                </div>
+
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {product.activities?.slice(0, 2).map((activity) => (
+                      <span
+                        key={activity.id}
+                        className="text-xs px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: activity.color + "20", color: activity.color }}
+                      >
+                        {getActivityName(activity)}
+                      </span>
+                    ))}
+                  </div>
+
+                  <Link href={`/products/${product.id}`}>
+                    <h3 className="text-sm font-medium text-[#1C1917] mb-2 line-clamp-2 hover:text-[#CA8A04] transition-colors">
+                      {i18n.language === "zh" ? product.name : i18n.language === "ar" ? product.name_ar : product.name_en || product.name}
+                    </h3>
+                  </Link>
+
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg font-bold text-[#CA8A04]">
+                      {formatCurrency(convertCurrency(product.price, "aed", currency), currency)}
+                    </span>
+                    {product.original_price > 0 && product.original_price > product.price && (
+                      <span className="text-sm text-[#A8A29E] line-through">
+                        {formatCurrency(convertCurrency(product.original_price, "aed", currency), currency)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[#78716C]">
+                      {t("products.stock", { count: product.stock })}
+                    </span>
+                    <Link
+                      href={`/products/${product.id}`}
+                      className="text-sm font-medium text-[#CA8A04] hover:underline transition-colors"
+                    >
+                      {t("products.view", "查看")}
+                    </Link>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         )}

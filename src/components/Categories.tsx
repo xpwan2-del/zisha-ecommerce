@@ -1,222 +1,142 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
 
-interface Category {
-  id: string | number;
-  name: string;
-  name_en?: string;
-  name_ar?: string;
-  image?: string;
-}
-
-interface CategoriesProps {
-  data?: any;
-  categories?: Category[];
-  selectedCategory?: string | number;
-  onCategorySelect?: (categoryId: string | number) => void;
-  showHeader?: boolean;
-  compact?: boolean;
-}
-
-export function Categories({ 
-  data, 
-  categories: propCategories, 
-  selectedCategory = "all", 
-  onCategorySelect, 
-  showHeader = true, 
-  compact = false 
-}: CategoriesProps) {
-  const { t, i18n } = useTranslation();
-
-  // 从data或propCategories获取分类数据
-  const getCategories = (): Category[] => {
-    if (propCategories && Array.isArray(propCategories)) {
-      return propCategories;
-    }
-    
-    if (data && data.categories && Array.isArray(data.categories)) {
-      return data.categories;
-    }
-    
-    // 默认分类数据
-    return [
-      {
-        id: "1",
-        name: "紫砂壶",
-        name_en: "Teapots",
-        name_ar: "إبوات الشاي"
-      },
-      {
-        id: "2",
-        name: "茶杯",
-        name_en: "Cups",
-        name_ar: "أكواب"
-      },
-      {
-        id: "3",
-        name: "茶配件",
-        name_en: "Accessories",
-        name_ar: "أكسسوارات"
-      },
-      {
-        id: "4",
-        name: "套装",
-        name_en: "Sets",
-        name_ar: "مجموعات"
-      }
-    ];
-  };
-
-  const categories = getCategories();
+export function Categories() {
+  const { t } = useTranslation();
+  const originalCategories = t('categories.items', { returnObjects: true }) as string[];
   
-  // 添加All选项到开头
-  const allCategory: Category = {
-    id: "all",
-    name: t('products.all') || '全部',
-    name_en: "ALL",
-    name_ar: "الكل"
-  };
+  // 添加 All 选项到分类列表开头
+  const categories = ['All', ...originalCategories];
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // 分类的英文翻译（用于装饰性显示）
+  const categoryEnNames = ['All Products', 'Teapots', 'Tea Cups', 'Accessories', 'Gift Sets'];
   
-  const allCategories = [allCategory, ...categories];
-
-  // 获取分类名称（多语言）
-  const getCategoryName = (category: Category) => {
-    if (i18n.language === "zh") return category.name;
-    if (i18n.language === "ar") return category.name_ar || category.name_en || category.name;
-    return category.name_en || category.name;
-  };
-
-  // 获取分类英文名称（用于显示）
-  const getCategoryEnName = (category: Category) => {
-    if (category.id === "all") return "ALL";
-    return category.name_en?.toUpperCase() || category.name.toUpperCase();
-  };
-
-  // 获取分类描述
-  const getCategoryDescription = (category: Category) => {
-    const descriptions = {
-      "all": "全部精选 · 匠心之作",
-      "1": "传世之作 · 匠心独运",
-      "2": "品茗雅器 · 温润如玉",
-      "3": "茶道配件 · 精致考究",
-      "4": "礼赠佳品 · 尊贵典雅"
-    };
-    return descriptions[category.id as keyof typeof descriptions] || "精选系列";
-  };
-
-  // 处理分类点击
-  const handleCategoryClick = (categoryId: string | number) => {
-    if (onCategorySelect) {
-      onCategorySelect(categoryId);
-    }
-  };
-
-  // 检查分类是否被选中
-  const isCategorySelected = (categoryId: string | number) => {
-    return selectedCategory === categoryId;
-  };
-
-  if (!showHeader && compact) {
-    return (
-      <div className="mb-8">
-        <div className="flex flex-wrap gap-3 justify-center">
-          {allCategories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => handleCategoryClick(category.id)}
-              className={`px-6 py-3 rounded-md transition-all duration-300 ${isCategorySelected(category.id) 
-                ? 'bg-[#CA8A04] text-white font-medium' 
-                : 'bg-white border border-[#E7E5E4] text-[#1C1917] hover:border-[#CA8A04] hover:shadow-md'}
-              `}
-            >
-              {getCategoryName(category)}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  // 分类的简短描述
+  const categoryDescs = [
+    '全部精选 · 匠心之作',
+    '传世之作 · 匠心独运',
+    '品茗雅器 · 温润如玉', 
+    '茶道配件 · 精致考究',
+    '礼赠佳品 · 尊贵典雅'
+  ];
 
   return (
-    <section className="py-8 bg-[#FAFAF9]">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header - Luxury Style */}
-        {showHeader && (
-          <div className="text-center mb-8">
-            <p className="text-sm text-[#CA8A04] tracking-widest uppercase font-medium mb-4">
-              精选系列
-            </p>
-            <h2 
-              className="text-3xl font-bold text-[#1C1917] mb-4"
-              style={{ fontFamily: 'Cormorant, serif' }}
-            >
-              {t('categories.title') || '产品分类'}
-            </h2>
-            <div className="w-24 h-px bg-[#CA8A04] mx-auto"></div>
+    <section className="py-16 px-4 bg-[#FAFAF9]">
+      <div className="max-w-5xl mx-auto">
+        {/* Section Header - Luxury Minimal Style */}
+        <div className="text-center mb-12">
+          <span className="inline-block text-xs text-[#CA8A04] tracking-[0.3em] uppercase font-medium mb-4">
+            Collection
+          </span>
+          <h2 
+            className="text-3xl md:text-4xl font-light text-[#1C1917] mb-4"
+            style={{ fontFamily: 'Cormorant, serif' }}
+          >
+            {t('categories.title') || '产品分类'}
+          </h2>
+          <div className="flex items-center justify-center gap-3">
+            <div className="w-12 h-px bg-[#D4D4D4]"></div>
+            <div className="w-2 h-2 rotate-45 border border-[#CA8A04]"></div>
+            <div className="w-12 h-px bg-[#D4D4D4]"></div>
           </div>
-        )}
+        </div>
 
-        {/* Categories Grid - Luxury Style */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {allCategories.map((category, index) => (
-            <div 
-              key={category.id}
-              className={`group cursor-pointer transition-all duration-300 ${isCategorySelected(category.id) ? 'scale-105' : ''}`}
-              onClick={() => handleCategoryClick(category.id)}
-            >
-              <div className={`relative overflow-hidden rounded-sm bg-white shadow-sm p-4 border-2 transition-all duration-300 ${isCategorySelected(category.id) 
-                ? 'border-[#CA8A04] bg-[#FFFBEB] shadow-md' 
-                : 'border-transparent hover:border-[#CA8A04] hover:shadow-md'}
-              `}>
-                {/* Number badge */}
-                <div className="absolute top-3 left-3 text-[#CA8A04] font-bold text-xs tracking-wider">
-                  {index + 1 < 10 ? `0${index + 1}` : index + 1}
-                </div>
-                
-                <div className="text-center pt-2">
-                  {/* Category Title - Luxury Style */}
-                  <h3 
-                    className={`text-xl font-semibold text-center transition-colors duration-300 ${isCategorySelected(category.id) 
-                      ? 'text-[#CA8A04]' 
-                      : 'text-[#1C1917] group-hover:text-[#CA8A04]'}
-                    `}
-                    style={{ fontFamily: 'Cormorant, serif' }}
-                  >
-                    {getCategoryName(category)}
-                  </h3>
+        {/* Categories - Horizontal Scroll on Mobile */}
+        <div className="overflow-x-auto pb-4">
+          <div className="flex space-x-4 min-w-max">
+            {categories.map((category: string, index: number) => (
+              <div 
+                key={index} 
+                className="group cursor-pointer relative w-64 flex-shrink-0"
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                {/* Card Container */}
+                <div className={`
+                  relative bg-white border transition-all duration-500 ease-out
+                  ${hoveredIndex === index 
+                    ? 'border-[#CA8A04] shadow-lg shadow-[#CA8A04]/10' 
+                    : 'border-[#E7E5E4] shadow-sm'
+                  }
+                `}>
+                  {/* Top Gold Line - Appears on Hover */}
+                  <div className={`
+                    absolute top-0 left-0 right-0 h-[1px] bg-[#CA8A04] transition-transform duration-500 origin-left
+                    ${hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'}
+                  `}></div>
                   
-                  {/* Category English Name */}
-                  <p className="text-xs text-[#78716C] mt-1 font-medium tracking-wider">
-                    {getCategoryEnName(category)}
-                  </p>
-                  
-                  {/* Divider */}
-                  <div className="w-6 h-px bg-[#E7E5E4] mx-auto my-3 transition-colors duration-300 group-hover:bg-[#CA8A04]"></div>
-                  
-                  {/* Category Description */}
-                  <p className="text-xs text-[#78716C] text-center">
-                    {getCategoryDescription(category)}
-                  </p>
-                  
-                  {/* Hover Arrow */}
-                  <div className="mt-4 flex justify-center">
-                    <div className="w-6 h-6 rounded-full bg-[#FAFAF9] flex items-center justify-center transition-all duration-300 group-hover:bg-[#CA8A04] group-hover:text-white">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: '#CA8A04' }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
+                  {/* Content */}
+                  <div className="p-6 lg:p-8 text-center">
+                    {/* Category Number */}
+                    <span className={`
+                      text-xs tracking-widest transition-colors duration-300
+                      ${hoveredIndex === index ? 'text-[#CA8A04]' : 'text-[#A8A29E]'}
+                    `}>
+                      0{index + 1}
+                    </span>
+                    
+                    {/* Main Category Name */}
+                    <h3 
+                      className={`
+                        text-xl lg:text-2xl font-normal mt-3 mb-2 transition-colors duration-300
+                        ${hoveredIndex === index ? 'text-[#CA8A04]' : 'text-[#1C1917]'}
+                      `}
+                      style={{ fontFamily: 'Cormorant, serif' }}
+                    >
+                      {category === 'All' ? '全部' : category}
+                    </h3>
+                    
+                    {/* English Name */}
+                    <p className="text-xs text-[#A8A29E] tracking-[0.2em] uppercase mb-3">
+                      {categoryEnNames[index]}
+                    </p>
+                    
+                    {/* Decorative Line */}
+                    <div className={`
+                      w-6 h-px mx-auto mb-3 transition-all duration-500
+                      ${hoveredIndex === index ? 'w-12 bg-[#CA8A04]' : 'bg-[#D4D4D4]'}
+                    `}></div>
+                    
+                    {/* Description */}
+                    <p className="text-xs text-[#78716C] font-light tracking-wide">
+                      {categoryDescs[index]}
+                    </p>
+                    
+                    {/* Explore Link - Appears on Hover */}
+                    <div className={`
+                      mt-4 overflow-hidden transition-all duration-500
+                      ${hoveredIndex === index ? 'opacity-100 max-h-8' : 'opacity-0 max-h-0'}
+                    `}>
+                      <span className="inline-flex items-center text-xs text-[#CA8A04] tracking-widest uppercase">
+                        探索系列
+                        <svg className="w-3 h-3 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                        </svg>
+                      </span>
                     </div>
                   </div>
+                  
+                  {/* Corner Decoration */}
+                  <div className={`
+                    absolute bottom-0 right-0 w-6 h-6 transition-opacity duration-500
+                    ${hoveredIndex === index ? 'opacity-100' : 'opacity-0'}
+                  `}>
+                    <div className="absolute bottom-1 right-1 w-3 h-3 border-r border-b border-[#CA8A04]"></div>
+                  </div>
                 </div>
-                
-                {/* Corner decoration */}
-                <div className={`absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 transition-colors duration-300 ${isCategorySelected(category.id) 
-                  ? 'border-[#CA8A04]' 
-                  : 'border-transparent group-hover:border-[#CA8A04]'}
-                `}></div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+        
+        {/* Bottom Decorative Text */}
+        <div className="text-center mt-12">
+          <p className="text-xs text-[#A8A29E] tracking-[0.2em] uppercase">
+            Handcrafted Excellence Since 1990
+          </p>
         </div>
       </div>
     </section>
