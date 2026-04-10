@@ -78,15 +78,22 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#FAFAF9] text-[#0C0A09]">
       <HomeModules data={homeData} />
-      <Categories 
-        data={homeData}
-        selectedCategory={activeCategory}
-        onCategorySelect={handleCategorySelect}
-      />
-      <FeaturedProducts 
-        category={activeCategory === "all" ? "all" : activeCategory.toString()}
-        data={productsData}
-      />
+      
+      {/* Same container structure as products page */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Luxury Categories - Same as Products Page */}
+        <Categories 
+          data={homeData}
+          selectedCategory={activeCategory}
+          onCategorySelect={handleCategorySelect}
+        />
+
+        {/* Products Grid - Same as Products Page */}
+        <FeaturedProducts 
+          category={activeCategory === "all" ? "all" : activeCategory.toString()}
+          data={productsData}
+        />
+      </div>
     </div>
   );
 }
