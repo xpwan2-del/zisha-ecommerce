@@ -162,8 +162,25 @@ export async function GET(request: NextRequest) {
       activity_icon: product.discount > 0 ? 'tag' : product.daily_discount > 0 ? 'fire' : undefined
     }));
     
-    // 提取活动数据
-    const activities = sortedModules.filter(module => module.type === 'activity');
+    // 从数据库获取促销活动数据
+    const promotionsResult = await query('SELECT id, name, name_en, name_ar, description, type, discount_percent, start_time, end_time, status FROM promotions ORDER BY id');
+    
+    // 构建活动数据
+    const activities = promotionsResult.rows.map((promotion: any) => ({
+      id: promotion.id,
+      type: promotion.type || 'activity',
+      title: promotion.name,
+      title_en: promotion.name_en,
+      title_ar: promotion.name_ar,
+      description: promotion.description || `折扣 ${promotion.discount_percent}%`,
+      description_en: promotion.description || `Discount ${promotion.discount_percent}%`,
+      description_ar: promotion.description || `خصم ${promotion.discount_percent}%`,
+      image: `/images/promotions/default-promotion.jpg`, // 使用默认活动图片
+      link: `/deals?promotion_id=${promotion.id}`,
+      is_active: promotion.status === 'active',
+      order: promotion.id,
+      discount_percent: promotion.discount_percent
+    }));
     
     // 构建首页数据
     const homeData = {

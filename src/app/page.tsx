@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { HomeModules } from '@/components/HomeModules';
 import { Categories } from '@/components/Categories';
 import { FeaturedProducts } from '@/components/FeaturedProducts';
-import { ActivityMarquee } from '@/components/ActivityMarquee';
 
 export default function Home() {
   const [homeData, setHomeData] = useState<any>(null);
@@ -67,7 +66,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#FAFAF9] text-[#0C0A09]">
       <HomeModules data={homeData} />
-      <ActivityMarquee activities={homeData.activities || []} />
       <Categories onCategorySelect={setSelectedCategory} />
       <FeaturedProducts category={selectedCategory} />
     </div>

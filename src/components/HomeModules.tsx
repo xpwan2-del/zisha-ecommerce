@@ -179,30 +179,126 @@ export function HomeModules({ data }: HomeModulesProps) {
             </div>
           </div>
           
-          {/* Scrolling service guarantees - Luxury Style */}
+          {/* Scrolling promotions - Luxury Style */}
           <div className="overflow-hidden bg-white rounded-sm shadow-sm border border-[#E7E5E4] p-5">
+            <h3 className="text-lg font-medium text-[#1C1917] mb-4">平台活动</h3>
             <div className="flex animate-scroll whitespace-nowrap">
-              <div className="flex space-x-10 py-2">
-                {guarantees.map((guarantee) => (
-                  <div key={guarantee.id} className="flex items-center space-x-3 flex-shrink-0 px-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: '#CA8A04' }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-sm text-[#44403C] font-medium tracking-wide">
-                      {getLocalizedText(guarantee.text, guarantee.text_en, guarantee.text_ar)}
-                    </span>
+              <div className="flex space-x-6 py-2">
+                {data.activities && data.activities.length > 0 ? (
+                  <>
+                    {data.activities.map((activity: any) => (
+                      <div 
+                        key={activity.id} 
+                        className="flex flex-col items-center space-x-3 flex-shrink-0 px-4 w-72"
+                      >
+                        <a href={activity.link || '#'} className="block w-full group">
+                          <div className="flex items-center space-x-4 p-4 border border-[#E7E5E4] rounded-sm shadow-sm hover:shadow-md transition-shadow duration-300 bg-white">
+                            {/* 活动图标 */}
+                            <div className="flex-shrink-0">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all duration-300 hover:scale-105 ${
+                                activity.type === 'daily' ? 'bg-[#CA8A04]' :
+                                activity.type === 'special' ? 'bg-[#DB2777]' :
+                                activity.type === 'category' ? 'bg-[#F472B6]' :
+                                activity.type === 'product' ? 'bg-[#D4A520]' :
+                                'bg-[#CA8A04]'
+                              }`}>
+                                {activity.type === 'daily' && (
+                                  <img src="/images/icons/promotion-daily.svg" alt="Daily promotion" className="w-6 h-6 text-white" />
+                                )}
+                                {activity.type === 'special' && (
+                                  <img src="/images/icons/promotion-special.svg" alt="Special promotion" className="w-6 h-6 text-white" />
+                                )}
+                                {activity.type === 'category' && (
+                                  <img src="/images/icons/promotion-category.svg" alt="Category promotion" className="w-6 h-6 text-white" />
+                                )}
+                                {activity.type === 'product' && (
+                                  <img src="/images/icons/promotion-product.svg" alt="Product promotion" className="w-6 h-6 text-white" />
+                                )}
+                                {!['daily', 'special', 'category', 'product'].includes(activity.type) && (
+                                  <img src="/images/icons/promotion-daily.svg" alt="Promotion" className="w-6 h-6 text-white" />
+                                )}
+                              </div>
+                            </div>
+                            {/* 活动信息 */}
+                            <div className="flex-grow">
+                              {/* 折扣标签 */}
+                              {activity.discount_percent && (
+                                <div className="inline-block bg-[#CA8A04] text-white text-xs font-medium px-2 py-0.5 rounded-sm mb-1">
+                                  {activity.discount_percent}% OFF
+                                </div>
+                              )}
+                              <h4 className="text-sm font-medium text-[#1C1917] group-hover:text-[#CA8A04] transition-colors duration-300">
+                                {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
+                              </h4>
+                              <p className="text-xs text-[#78716C]">
+                                {getLocalizedText(activity.description, activity.description_en, activity.description_ar)}
+                              </p>
+                            </div>
+                          </div>
+                        </a>
+                      </div>
+                    ))}
+                    {/* 重复一次活动列表，使滚动更流畅 */}
+                    {data.activities.map((activity: any) => (
+                      <div 
+                        key={`dup-${activity.id}`} 
+                        className="flex flex-col items-center space-x-3 flex-shrink-0 px-4 w-64"
+                      >
+                        <a href={activity.link || '#'} className="block w-full group">
+                          <div className="flex items-center space-x-4 p-4 border border-[#E7E5E4] rounded-sm shadow-sm hover:shadow-md transition-shadow duration-300 bg-white">
+                            {/* 活动图标 */}
+                            <div className="flex-shrink-0">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all duration-300 hover:scale-105 ${
+                                activity.type === 'daily' ? 'bg-[#CA8A04]' :
+                                activity.type === 'special' ? 'bg-[#DB2777]' :
+                                activity.type === 'category' ? 'bg-[#F472B6]' :
+                                activity.type === 'product' ? 'bg-[#D4A520]' :
+                                'bg-[#CA8A04]'
+                              }`}>
+                                {activity.type === 'daily' && (
+                                  <img src="/images/icons/promotion-daily.svg" alt="Daily promotion" className="w-6 h-6 text-white" />
+                                )}
+                                {activity.type === 'special' && (
+                                  <img src="/images/icons/promotion-special.svg" alt="Special promotion" className="w-6 h-6 text-white" />
+                                )}
+                                {activity.type === 'category' && (
+                                  <img src="/images/icons/promotion-category.svg" alt="Category promotion" className="w-6 h-6 text-white" />
+                                )}
+                                {activity.type === 'product' && (
+                                  <img src="/images/icons/promotion-product.svg" alt="Product promotion" className="w-6 h-6 text-white" />
+                                )}
+                                {!['daily', 'special', 'category', 'product'].includes(activity.type) && (
+                                  <img src="/images/icons/promotion-daily.svg" alt="Promotion" className="w-6 h-6 text-white" />
+                                )}
+                              </div>
+                            </div>
+                            {/* 活动信息 */}
+                            <div className="flex-grow">
+                              {/* 折扣标签 */}
+                              {activity.discount_percent && (
+                                <div className="inline-block bg-[#CA8A04] text-white text-xs font-medium px-2 py-0.5 rounded-sm mb-1">
+                                  {activity.discount_percent}% OFF
+                                </div>
+                              )}
+                              <h4 className="text-sm font-medium text-[#1C1917] group-hover:text-[#CA8A04] transition-colors duration-300">
+                                {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
+                              </h4>
+                              <p className="text-xs text-[#78716C]">
+                                {getLocalizedText(activity.description, activity.description_en, activity.description_ar)}
+                              </p>
+                            </div>
+                          </div>
+                        </a>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center space-x-3 flex-shrink-0 px-4 w-64">
+                    <div className="text-center py-8">
+                      <p className="text-sm text-[#78716C]">暂无活动</p>
+                    </div>
                   </div>
-                ))}
-                {guarantees.map((guarantee) => (
-                  <div key={`dup-${guarantee.id}`} className="flex items-center space-x-3 flex-shrink-0 px-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: '#CA8A04' }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-sm text-[#44403C] font-medium tracking-wide">
-                      {getLocalizedText(guarantee.text, guarantee.text_en, guarantee.text_ar)}
-                    </span>
-                  </div>
-                ))}
+                )}
               </div>
             </div>
           </div>

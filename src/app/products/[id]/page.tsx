@@ -158,14 +158,45 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
       || "Product";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+    <div className="min-h-screen bg-light">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* 面包屑导航 */}
+        <div className="mb-8">
+          <nav className="flex" aria-label="Breadcrumb">
+            <ol className="inline-flex items-center space-x-1 md:space-x-3">
+              <li className="inline-flex items-center">
+                <Link href="/" className="text-primary hover:text-accent transition-colors">
+                  {t("footer.links.home", "首页")}
+                </Link>
+              </li>
+              <li>
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-gray-400 mx-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <Link href="/products" className="text-primary hover:text-accent transition-colors">
+                    {t("products.title", "产品")}
+                  </Link>
+                </div>
+              </li>
+              <li aria-current="page">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-gray-400 mx-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-dark font-medium">{productName}</span>
+                </div>
+              </li>
+            </ol>
+          </nav>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-10">
           {/* 左侧图片区域 */}
           <div className="lg:w-1/2">
-            <div className="bg-white rounded-md shadow-sm overflow-hidden mb-4 relative">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6 relative">
               {/* 主媒体展示 */}
-              <div className="aspect-square relative bg-white">
+              <div className="aspect-square relative bg-white cursor-pointer" onClick={() => openModal(product.images || [product.image], activeMediaIndex > 0 ? activeMediaIndex - 1 : 0)}>
                 {/* 视频播放 */}
                 {activeMediaIndex === 0 && product.video ? (
                   <div className="w-full h-full relative">
@@ -173,7 +204,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       src={product.video}
                       controls
                       muted
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover rounded-lg"
                       poster={product.image}
                     />
                   </div>
@@ -184,25 +215,25 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       : product.image
                     }
                     alt={productName}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                   />
                 )}
               </div>
             </div>
             
             {/* 缩略图 */}
-            <div className="grid grid-cols-6 gap-2">
+            <div className="grid grid-cols-6 gap-3">
               {/* 视频缩略图 */}
               {product.video && (
                 <div 
                   key="video" 
-                  className={`aspect-square bg-white rounded-md shadow-sm overflow-hidden cursor-pointer relative ${activeMediaIndex === 0 ? 'ring-2 ring-amazon-orange' : ''}`}
+                  className={`aspect-square bg-white rounded-md shadow-sm overflow-hidden cursor-pointer relative transition-all duration-300 hover:shadow-md ${activeMediaIndex === 0 ? 'ring-2 ring-accent' : ''}`}
                   onClick={() => setActiveMediaIndex(0)}
                 >
                   <img
                     src={product.image}
                     alt="Video"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -219,13 +250,13 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
               {Array.isArray(product.images) && product.images.map((img: string, index: number) => (
                 <div 
                   key={index} 
-                  className={`aspect-square bg-white rounded-md shadow-sm overflow-hidden cursor-pointer ${activeMediaIndex === index + 1 ? 'ring-2 ring-amazon-orange' : ''}`}
+                  className={`aspect-square bg-white rounded-md shadow-sm overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-md ${activeMediaIndex === index + 1 ? 'ring-2 ring-accent' : ''}`}
                   onClick={() => setActiveMediaIndex(index + 1)}
                 >
                   <img
                     src={img}
                     alt={`${productName} ${index + 1}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                   />
                 </div>
               ))}
@@ -234,84 +265,84 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
 
           {/* 右侧产品信息 */}
           <div className="lg:w-1/2">
-            <div className="bg-white rounded-md shadow-sm p-6">
-              <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="bg-white rounded-lg shadow-md p-8">
+              <div className="flex flex-wrap items-center gap-3 mb-6">
                 {activities.length > 0 && activities.map((activity: any) => (
                   <span
                     key={activity.id}
-                    className="text-white text-xs font-bold px-2 py-1 rounded"
-                    style={{ backgroundColor: activity.id === 28 ? '#FF0000' : activity.color }}
+                    className="text-white text-xs font-bold px-3 py-1.5 rounded-full"
+                    style={{ backgroundColor: activity.id === 28 ? '#FF0000' : activity.color || '#CD853F' }}
                   >
                     {activity.icon} {activity.name}
                   </span>
                 ))}
                 {product.bestSeller && (
-                  <span className="bg-amazon-orange text-white text-xs font-bold px-2 py-1 rounded">
+                  <span className="bg-amazon-orange text-white text-xs font-bold px-3 py-1.5 rounded-full">
                     {t("products.limited_offer", "畅销")}
                   </span>
                 )}
                 {product.discount > 0 && !activities.find(a => a.id === 28) && (
-                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+                  <span className="bg-accent text-white text-xs font-bold px-3 py-1.5 rounded-full">
                     {t("products.limited_offer", "限时特惠")}
                   </span>
                 )}
                 {product.fastDelivery && (
-                  <span className="bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded">
+                  <span className="bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-full">
                     {t("products.free_shipping", "快速配送")}
                   </span>
                 )}
               </div>
 
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              <h1 className="text-3xl font-bold text-dark mb-6" style={{ fontFamily: 'Cormorant, serif' }}>
                 {productName}
               </h1>
 
-              <div className="flex items-center mb-4">
+              <div className="flex items-center mb-6">
                 {getStars(product.rating)}
-                <span className="text-sm text-gray-500 ml-2">
+                <span className="text-sm text-gray-600 ml-3">
                   {product.rating} ({product.reviewCount} {t("products.reviews", "评价")})
                 </span>
               </div>
 
-              <div className="mb-6">
+              <div className="mb-8">
                 <div className="flex items-baseline">
                   <span className="text-3xl font-bold text-amazon-orange">
                     ¥{product.price}
                   </span>
                   {product.originalPrice && (
-                    <span className="text-lg text-gray-500 line-through ml-3">
+                    <span className="text-lg text-gray-500 line-through ml-4">
                       ¥{product.originalPrice}
                     </span>
                   )}
                   {product.discount > 0 && product.original_price > 0 && product.original_price > product.price && (
-                    <span className="text-red-500 font-bold ml-3">
+                    <span className="text-accent font-bold ml-4">
                       {t("products.discount", "省")}¥{product.original_price - product.price}
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="mb-6">
-                <div className="flex items-center text-sm text-gray-600 mb-2">
-                  <span className="w-24">{t("products.stock", "库存状态")}:</span>
+              <div className="mb-8">
+                <div className="flex items-center text-sm text-gray-700 mb-3">
+                  <span className="w-28 font-medium">{t("products.stock", "库存状态")}:</span>
                   <span className="text-green-600 font-medium">
                     {product.inStock ? t("products.in_stock", "有货") : t("products.out_of_stock", "缺货")}
                   </span>
                 </div>
                 {product.fastDelivery && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <span className="w-24">{t("products.shipping_info", "配送")}:</span>
+                  <div className="flex items-center text-sm text-gray-700">
+                    <span className="w-28 font-medium">{t("products.shipping_info", "配送")}:</span>
                     <span className="font-medium">{t("products.free_shipping", "快速配送")}</span>
                   </div>
                 )}
               </div>
 
-              <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">{t("products.quantity", "数量")}</h3>
+              <div className="mb-8">
+                <h3 className="text-sm font-medium text-dark mb-3">{t("products.quantity", "数量")}</h3>
                 <div className="flex items-center">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded-l-md"
+                    className="bg-secondary hover:bg-accent text-dark px-4 py-2 rounded-l-md transition-colors duration-200"
                   >
                     -
                   </button>
@@ -320,44 +351,44 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                     value={quantity}
                     onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                     min="1"
-                    className="w-16 px-3 py-1 border-t border-b text-center"
+                    className="w-20 px-4 py-2 border-t border-b text-center border-secondary"
                   />
                   <button
                     onClick={() => setQuantity(quantity + 1)}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded-r-md"
+                    className="bg-secondary hover:bg-accent text-dark px-4 py-2 rounded-r-md transition-colors duration-200"
                   >
                     +
                   </button>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <button className="flex-1 bg-amazon-orange hover:bg-amazon-light-orange text-white font-medium py-3 px-4 rounded transition-colors duration-200">
+              <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                <button className="flex-1 bg-amazon-orange hover:bg-amazon-light-orange text-white font-medium py-4 px-6 rounded-md transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg">
                   {t("products.add_to_cart", "加入购物车")}
                 </button>
-                <button className="flex-1 bg-amazon-blue hover:bg-amazon-dark-blue text-white font-medium py-3 px-4 rounded transition-colors duration-200">
+                <button className="flex-1 bg-primary hover:bg-dark text-white font-medium py-4 px-6 rounded-md transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg">
                   {t("products.buy_now", "立即购买")}
                 </button>
               </div>
 
               {/* 配送信息 */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-md">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">{t("products.shipping_info", "配送信息")}</h3>
-                <div className="space-y-2 text-sm text-gray-600">
+              <div className="mb-8 p-5 bg-light rounded-lg">
+                <h3 className="text-sm font-medium text-dark mb-4">{t("products.shipping_info", "配送信息")}</h3>
+                <div className="space-y-3 text-sm text-gray-700">
                   <div className="flex items-start">
-                    <svg className="w-5 h-5 text-green-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-green-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>{t("products.free_shipping", "免费配送：订单满299元")}</span>
                   </div>
                   <div className="flex items-start">
-                    <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>{t("products.shipping_eta", "预计送达时间：3-5个工作日")}</span>
                   </div>
                   <div className="flex items-start">
-                    <svg className="w-5 h-5 text-orange-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-accent mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                     <span>{t("products.7day_return", "7天无理由退换")}</span>
@@ -365,42 +396,42 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-sm font-medium text-gray-900 mb-4">{t("products.specifications", "产品信息")}</h3>
-                <div className="space-y-2 text-sm text-gray-600">
+              <div className="border-t border-secondary/30 pt-6">
+                <h3 className="text-sm font-medium text-dark mb-4">{t("products.specifications", "产品信息")}</h3>
+                <div className="space-y-3 text-sm text-gray-700">
                   {product.brand && (
                     <div className="flex">
-                      <span className="w-24 font-medium">{t("products.brand", "品牌")}:</span>
+                      <span className="w-28 font-medium">{t("products.brand", "品牌")}:</span>
                       <span>{product.brand}</span>
                     </div>
                   )}
                   {product.material && (
                     <div className="flex">
-                      <span className="w-24 font-medium">{t("products.materials", "材质")}:</span>
+                      <span className="w-28 font-medium">{t("products.materials", "材质")}:</span>
                       <span>{product.material}</span>
                     </div>
                   )}
                   {product.capacity && (
                     <div className="flex">
-                      <span className="w-24 font-medium">{t("products.capacity", "容量")}:</span>
+                      <span className="w-28 font-medium">{t("products.capacity", "容量")}:</span>
                       <span>{product.capacity}</span>
                     </div>
                   )}
                   {product.origin && (
                     <div className="flex">
-                      <span className="w-24 font-medium">{t("products.origin", "产地")}:</span>
+                      <span className="w-28 font-medium">{t("products.origin", "产地")}:</span>
                       <span>{product.origin}</span>
                     </div>
                   )}
                   {product.weight && (
                     <div className="flex">
-                      <span className="w-24 font-medium">{t("products.weight", "重量")}:</span>
+                      <span className="w-28 font-medium">{t("products.weight", "重量")}:</span>
                       <span>{product.weight}</span>
                     </div>
                   )}
                   {product.size && (
                     <div className="flex">
-                      <span className="w-24 font-medium">{t("products.size", "尺寸")}:</span>
+                      <span className="w-28 font-medium">{t("products.size", "尺寸")}:</span>
                       <span>{product.size}</span>
                     </div>
                   )}
@@ -411,14 +442,14 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
         </div>
 
         {/* 产品描述 */}
-        <div className="mt-8 bg-white rounded-md shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">{t("products.description", "产品描述")}</h2>
-          <div className="text-gray-600 space-y-4">
+        <div className="mt-12 bg-white rounded-lg shadow-md p-8">
+          <h2 className="text-2xl font-bold text-dark mb-6" style={{ fontFamily: 'Cormorant, serif' }}>{t("products.description", "产品描述")}</h2>
+          <div className="text-gray-700 space-y-6 leading-relaxed">
             <p>{product.description}</p>
             {product.features && (
               <div>
-                <h3 className="font-medium mb-2">{t("products.features", "产品特点")}:</h3>
-                <ul className="list-disc pl-5 space-y-1">
+                <h3 className="font-medium text-dark mb-3">{t("products.features", "产品特点")}:</h3>
+                <ul className="list-disc pl-6 space-y-2">
                   {product.features.map((feature: string, index: number) => (
                     <li key={index}>{feature}</li>
                   ))}
@@ -429,37 +460,37 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
         </div>
 
         {/* 评价 */}
-        <div className="mt-8 bg-white rounded-md shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">{t("products.reviews", "顾客评价")}</h2>
-          <div className="space-y-6">
+        <div className="mt-12 bg-white rounded-lg shadow-md p-8">
+          <h2 className="text-2xl font-bold text-dark mb-6" style={{ fontFamily: 'Cormorant, serif' }}>{t("products.reviews", "顾客评价")}</h2>
+          <div className="space-y-8">
             {reviews.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">{t("products.no_reviews", "暂无评价")}</p>
+              <p className="text-gray-500 text-center py-8">{t("products.no_reviews", "暂无评价")}</p>
             ) : (
               reviews.map((review, index) => (
-                <div key={review.id || index} className="border-b border-gray-200 pb-4 last:border-0">
-                  <div className="flex items-center mb-2">
+                <div key={review.id || index} className="border-b border-secondary/20 pb-6 last:border-0">
+                  <div className="flex items-center mb-3">
                     {getStars(review.rating)}
-                    <span className="text-sm text-gray-500 ml-2">
+                    <span className="text-sm text-gray-500 ml-3">
                       {new Date(review.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-gray-600 text-sm mb-2">{review.comment}</p>
+                  <p className="text-gray-700 text-sm mb-4">{review.comment}</p>
                   {review.images && review.images.length > 0 && (
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-3 flex-wrap mb-4">
                       {review.images.map((img: string, imgIndex: number) => (
                         <div
                           key={imgIndex}
-                          className="relative w-16 h-16 cursor-pointer group"
+                          className="relative w-20 h-20 cursor-pointer group"
                           onClick={() => openModal(review.images, imgIndex)}
                         >
                           <img
                             src={img}
                             alt={`Review ${imgIndex + 1}`}
-                            className="w-full h-full object-cover rounded-md border border-gray-200 group-hover:border-amazon-orange transition-colors"
+                            className="w-full h-full object-cover rounded-md border border-secondary/30 group-hover:border-accent transition-colors"
                           />
                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all rounded-md flex items-center justify-center">
                             <svg
-                              className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -479,15 +510,15 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                   {review.product && (
                     <Link
                       href={`/products/${review.product.id}`}
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors mt-3"
+                      className="flex items-center gap-4 p-4 bg-light rounded-lg hover:bg-secondary/20 transition-colors mt-4"
                     >
                       <img
                         src={review.product.image}
                         alt={review.product.name}
-                        className="w-12 h-12 object-cover rounded-md"
+                        className="w-16 h-16 object-cover rounded-md"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{review.product.name}</p>
+                        <p className="text-sm font-medium text-dark truncate">{review.product.name}</p>
                         <p className="text-sm text-amazon-orange font-bold">¥{Number(review.product.price).toFixed(2)}</p>
                       </div>
                       <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -495,7 +526,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       </svg>
                     </Link>
                   )}
-                  <div className="text-xs text-gray-500 mt-2">
+                  <div className="text-xs text-gray-500 mt-3">
                     — {review.user_name || t("products.anonymous", "匿名用户")}
                   </div>
                 </div>
@@ -505,25 +536,25 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
         </div>
 
         {/* 相关产品推荐 */}
-        <div className="mt-8 bg-white rounded-md shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">{t("products.related", "你可能也喜欢")}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <div className="mt-12 bg-white rounded-lg shadow-md p-8">
+          <h2 className="text-2xl font-bold text-dark mb-6" style={{ fontFamily: 'Cormorant, serif' }}>{t("products.related", "你可能也喜欢")}</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             {relatedProducts.map((relatedProduct: any) => (
               <Link key={relatedProduct.id} href={`/products/${relatedProduct.id}`} className="group">
-                <div className="aspect-square bg-gray-100 rounded-md overflow-hidden mb-2">
+                <div className="aspect-square bg-light rounded-md overflow-hidden mb-3 shadow-sm transition-all duration-300 group-hover:shadow-md">
                   <img
                     src={relatedProduct.image}
                     alt={i18n.language === "zh" ? relatedProduct.name : i18n.language === "ar" ? relatedProduct.name_ar : relatedProduct.name_en || relatedProduct.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
                 </div>
-                <h3 className="text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-amazon-orange transition-colors">
+                <h3 className="text-sm font-medium text-dark line-clamp-2 group-hover:text-accent transition-colors">
                   {i18n.language === "zh" ? relatedProduct.name : i18n.language === "ar" ? relatedProduct.name_ar : relatedProduct.name_en || relatedProduct.name}
                 </h3>
-                <div className="mt-1 flex items-center">
+                <div className="mt-2 flex items-center">
                   <span className="text-amazon-orange font-medium text-sm">¥{relatedProduct.price}</span>
                   {relatedProduct.original_price && relatedProduct.original_price > relatedProduct.price && (
-                    <span className="text-xs text-gray-500 line-through ml-1">¥{relatedProduct.original_price}</span>
+                    <span className="text-xs text-gray-500 line-through ml-2">¥{relatedProduct.original_price}</span>
                   )}
                 </div>
               </Link>
