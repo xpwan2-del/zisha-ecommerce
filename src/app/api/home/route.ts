@@ -143,6 +143,13 @@ const categories: Category[] = [
 
 export async function GET(request: NextRequest) {
   try {
+    // 自动更新过期活动状态
+    await query(
+      `UPDATE product_promotions 
+       SET status = 'inactive' 
+       WHERE status = 'active' AND end_time < datetime('now')`
+    );
+
     // 按顺序排序
     const sortedModules = [...homeModules].sort((a, b) => a.order - b.order);
     const sortedCategories = [...categories].sort((a, b) => a.order - b.order);

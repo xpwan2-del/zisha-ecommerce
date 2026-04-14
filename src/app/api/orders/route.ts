@@ -111,7 +111,34 @@ export async function POST(request: NextRequest) {
 
     // Calculate order total
     let total_amount = 0;
+    
+    // 检查商品活动是否过期
     for (const item of items) {
+      const promoCheck = await query(
+        `SELECT pp.id, pr.name as promo_name, pp.end_time
+         FROM product_promotions pp
+         JOIN promotions pr ON pp.promotion_id = pr.id
+         WHERE pp.product_id = ? AND pp.status = 'active'`,
+        [item.product_id]
+      );
+      
+      if (promoCheck.rows && promoCheck.rows.length > 0) {
+        const now = new Date();
+        for (const promo of promoCheck.rows) {
+          if (promo.end_time && new Date(promo.end_time) < now) {
+            return NextResponse.json(
+              { 
+                success: false, 
+                error: '活动已结束',
+                message: `商品活动已结束，请返回商品页重新购买`,
+                expired_promo: promo.promo_name
+              },
+              { status: 400 }
+            );
+          }
+        }
+      }
+      
       const productResult = await query('SELECT price FROM products WHERE id = ?', [item.product_id]);
       if (productResult.rows.length === 0) {
         return NextResponse.json(

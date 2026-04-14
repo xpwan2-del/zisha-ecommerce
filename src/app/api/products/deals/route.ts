@@ -19,11 +19,20 @@ export async function GET(request: NextRequest) {
   const now = new Date().toISOString();
   
   try {
+    // 自动更新过期活动状态
+    await query(
+      `UPDATE product_promotions 
+       SET status = 'inactive' 
+       WHERE status = 'active' AND end_time < datetime('now')`
+    );
+
     let products: any[] = [];
     let total = 0;
     
     // Flash Sale: 查询 type='special' 的促销活动
     if (type === 'all' || type === 'flash_sale') {
+      const flashSaleOffset = type === 'flash_sale' ? (page - 1) * limit : 0;
+      const flashSaleLimit = type === 'flash_sale' ? limit : 100;
       const flashSaleResult = await query(
         `SELECT DISTINCT p.*, 
           COALESCE(p.category_id, 0) as category_id,
@@ -37,8 +46,9 @@ export async function GET(request: NextRequest) {
          WHERE pr.type = 'special' 
            AND pr.status = 'active' 
            AND pp.status = 'active'
-         ORDER BY pr.discount_percent DESC`,
-        []
+         ORDER BY pr.discount_percent DESC
+         LIMIT ? OFFSET ?`,
+        [flashSaleLimit, flashSaleOffset]
       );
       const flashSaleProducts = flashSaleResult.rows || [];
       
@@ -51,6 +61,8 @@ export async function GET(request: NextRequest) {
     
     // Daily Deals: 查询 type='daily' 的促销活动
     if (type === 'all' || type === 'daily_deals') {
+      const dailyOffset = type === 'daily_deals' ? (page - 1) * limit : 0;
+      const dailyLimit = type === 'daily_deals' ? limit : 100;
       const dailyDealsResult = await query(
         `SELECT DISTINCT p.*, 
           COALESCE(p.category_id, 0) as category_id,
@@ -64,8 +76,9 @@ export async function GET(request: NextRequest) {
          WHERE pr.type = 'daily' 
            AND pr.status = 'active' 
            AND pp.status = 'active'
-         ORDER BY pr.discount_percent DESC`,
-        []
+         ORDER BY pr.discount_percent DESC
+         LIMIT ? OFFSET ?`,
+        [dailyLimit, dailyOffset]
       );
       const dailyProducts = dailyDealsResult.rows || [];
       

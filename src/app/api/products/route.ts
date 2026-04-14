@@ -32,6 +32,13 @@ export async function GET(request: NextRequest) {
   const sort = url.searchParams.get('sort') || 'newest';
 
   try {
+    // 自动更新过期活动状态
+    await query(
+      `UPDATE product_promotions 
+       SET status = 'inactive' 
+       WHERE status = 'active' AND end_time < datetime('now')`
+    );
+
     let whereConditions: string[] = [];
     let params: any[] = [];
 

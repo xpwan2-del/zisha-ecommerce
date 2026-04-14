@@ -21,8 +21,16 @@ function parseJSON(value: any, defaultValue: any = []): any {
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const productId = parseInt(id, 10);
 
   try {
+    // 自动更新过期活动状态
+    await query(
+      `UPDATE product_promotions 
+       SET status = 'inactive' 
+       WHERE status = 'active' AND end_time < datetime('now')`
+    );
+
     // 查询产品基本信息
     const productResult = await query(
       `SELECT
@@ -33,7 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.id = ?`,
-      [id]
+      [productId]
     );
 
     if (!productResult.rows || productResult.rows.length === 0) {
@@ -58,7 +66,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        FROM product_activities pa
        JOIN activity_categories ac ON pa.activity_category_id = ac.id
        WHERE pa.product_id = ?`,
-      [id]
+      [productId]
     );
     const activities = activitiesResult.rows || [];
 
@@ -85,7 +93,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
        ORDER BY pp.priority DESC, pr.discount_percent DESC
        LIMIT 1`,
-      [id]
+      [productId]
     );
     const promotion = promotionResult.rows?.[0] || null;
 
@@ -107,7 +115,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        JOIN promotions pr ON pp.promotion_id = pr.id
        WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
        ORDER BY pp.priority DESC, pr.discount_percent DESC`,
-      [id]
+      [productId]
     );
     const allPromotions = (allPromotionsResult.rows || [])
       .filter((p: any) => p.promotion_name !== '今日特惠' && p.promotion_name !== '特惠商品')
@@ -129,7 +137,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       `SELECT COUNT(*) as count, AVG(rating) as avg_rating
        FROM reviews
        WHERE product_id = ?`,
-      [id]
+      [productId]
     );
     const reviewCount = parseInt(String(reviewResult.rows?.[0]?.count || 0));
     const avgRating = reviewResult.rows?.[0]?.avg_rating;
@@ -151,7 +159,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       JOIN feature_templates ft ON pf.template_id = ft.id
       WHERE pf.product_id = ?
       ORDER BY pf."order"`,
-      [id]
+      [productId]
     );
     const productFeatures = featuresResult.rows || [];
 
@@ -170,7 +178,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        WHERE product_id = ?
        ORDER BY created_at DESC
        LIMIT 10`,
-      [id]
+      [productId]
     );
     const inventoryHistory = inventoryHistoryResult.rows || [];
 
@@ -189,7 +197,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        WHERE product_id = ?
        ORDER BY created_at DESC
        LIMIT 10`,
-      [id]
+      [productId]
     );
     const operationLogs = operationLogsResult.rows || [];
 
@@ -300,6 +308,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const productId = parseInt(id, 10);
     const body = await request.json();
 
     const {
@@ -314,7 +323,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // 获取旧数据用于日志记录
     const oldProductResult = await query(
       'SELECT name, price, stock FROM products WHERE id = ?',
-      [id]
+      [productId]
     );
     const oldProduct = oldProductResult.rows?.[0];
 
@@ -400,6 +409,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const productId = parseInt(id, 10);
 
     // 记录删除日志
     await query(
@@ -411,7 +421,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const result = await query(
       'DELETE FROM products WHERE id = ?',
-      [id]
+      [productId]
     );
 
     if (!result.rows || result.rows.length === 0) {
