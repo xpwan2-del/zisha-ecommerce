@@ -151,7 +151,6 @@ export async function GET(request: NextRequest) {
           pp.id as product_promotion_id,
           pp.promotion_id,
           pp.original_price,
-          pp.promotion_price,
           pp.priority,
           pp.can_stack,
           pr.name as promotion_name,
@@ -304,7 +303,7 @@ export async function GET(request: NextRequest) {
           priority: promotion.priority,
           can_stack: promotion.can_stack,
           original_price: parseFloat(promotion.original_price || row.price),
-          promotion_price: Number(promotion.promotion_price)
+          promotion_price: promotion.promotion_price
         } : null,
         promotions: allPromotions.map((promo: any) => ({
           id: promo.id,

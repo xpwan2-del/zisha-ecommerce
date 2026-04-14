@@ -37,30 +37,35 @@ export async function GET(request: NextRequest) {
               pp.id as product_promotion_id,
               pp.product_id,
               pp.original_price,
-              pp.promotion_price,
               pp.status as bind_status,
               p.name as product_name,
               p.name_en as product_name_en,
               p.image,
-              p.stock
+              p.stock,
+              pr.discount_percent
             FROM product_promotions pp
             JOIN products p ON pp.product_id = p.id
+            JOIN promotions pr ON pp.promotion_id = pr.id
             WHERE pp.promotion_id = ? AND pp.status = 'active'
             ORDER BY pp.created_at DESC`,
             [promotion.id]
           );
 
-          const products = (productsResult.rows || []).map((prod: any) => ({
-            product_promotion_id: prod.product_promotion_id,
-            product_id: prod.product_id,
-            name: prod.product_name,
-            name_en: prod.product_name_en,
-            image: prod.image,
-            stock: prod.stock,
-            original_price: parseFloat(prod.original_price),
-            promotion_price: parseFloat(prod.promotion_price),
-            discount_amount: parseFloat(prod.original_price) - parseFloat(prod.promotion_price)
-          }));
+          const products = (productsResult.rows || []).map((prod: any) => {
+            const originalPrice = parseFloat(prod.original_price);
+            const promoPrice = originalPrice * (1 - prod.discount_percent / 100);
+            return {
+              product_promotion_id: prod.product_promotion_id,
+              product_id: prod.product_id,
+              name: prod.product_name,
+              name_en: prod.product_name_en,
+              image: prod.image,
+              stock: prod.stock,
+              original_price: originalPrice,
+              promotion_price: promoPrice,
+              discount_amount: originalPrice - promoPrice
+            };
+          });
 
           // 计算统计信息
           const stats = {

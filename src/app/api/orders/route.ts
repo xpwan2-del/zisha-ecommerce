@@ -111,24 +111,27 @@ export async function POST(request: NextRequest) {
 
     // Calculate order total
     let total_amount = 0;
-    
-    // 检查商品活动是否过期
+
+    // 存储每个商品的促销信息
+    const itemPromoInfo: Map<number, { originalPrice: number, promotionPrice: number, promotionIds: number[], discountAmount: number }> = new Map();
+
+    // 检查商品活动是否过期，并计算促销价格
     for (const item of items) {
       const promoCheck = await query(
-        `SELECT pp.id, pr.name as promo_name, pp.end_time
+        `SELECT pp.id, pp.promotion_id, pp.original_price, pr.name as promo_name, pr.discount_percent, pp.end_time, pp.can_stack, pp.priority
          FROM product_promotions pp
          JOIN promotions pr ON pp.promotion_id = pr.id
          WHERE pp.product_id = ? AND pp.status = 'active'`,
         [item.product_id]
       );
-      
+
       if (promoCheck.rows && promoCheck.rows.length > 0) {
         const now = new Date();
         for (const promo of promoCheck.rows) {
           if (promo.end_time && new Date(promo.end_time) < now) {
             return NextResponse.json(
-              { 
-                success: false, 
+              {
+                success: false,
                 error: '活动已结束',
                 message: `商品活动已结束，请返回商品页重新购买`,
                 expired_promo: promo.promo_name
@@ -137,17 +140,51 @@ export async function POST(request: NextRequest) {
             );
           }
         }
+
+        // 计算促销价格
+        const promos = promoCheck.rows;
+        const originalPrice = parseFloat(promos[0].original_price);
+
+        // 按新逻辑计算：独占优先 or 叠加计算
+        const exclusive = promos.find((p: any) => p.can_stack === 0 || p.can_stack === false);
+        let multiplier = 1;
+        if (exclusive) {
+          multiplier = 1 - exclusive.discount_percent / 100;
+        } else {
+          promos.forEach((p: any) => {
+            multiplier *= (1 - p.discount_percent / 100);
+          });
+        }
+        const promotionPrice = originalPrice * multiplier;
+        const promotionIds = promos.map((p: any) => p.id);
+        const discountAmount = originalPrice - promotionPrice;
+
+        itemPromoInfo.set(item.product_id, {
+          originalPrice,
+          promotionPrice,
+          promotionIds,
+          discountAmount
+        });
+
+        total_amount += promotionPrice * item.quantity;
+      } else {
+        // 没有促销，使用产品原价
+        const productResult = await query('SELECT price FROM products WHERE id = ?', [item.product_id]);
+        if (productResult.rows.length === 0) {
+          return NextResponse.json(
+            { success: false, error: `Product ${item.product_id} not found` },
+            { status: 404 }
+          );
+        }
+        const productPrice = parseFloat(productResult.rows[0].price);
+        itemPromoInfo.set(item.product_id, {
+          originalPrice: productPrice,
+          promotionPrice: productPrice,
+          promotionIds: [],
+          discountAmount: 0
+        });
+        total_amount += productPrice * item.quantity;
       }
-      
-      const productResult = await query('SELECT price FROM products WHERE id = ?', [item.product_id]);
-      if (productResult.rows.length === 0) {
-        return NextResponse.json(
-          { success: false, error: `Product ${item.product_id} not found` },
-          { status: 404 }
-        );
-      }
-      const product_price = parseFloat(productResult.rows[0].price);
-      total_amount += product_price * item.quantity;
     }
 
     // Handle coupon
@@ -202,14 +239,23 @@ export async function POST(request: NextRequest) {
 
       // Create order items
       for (const item of items) {
-        const productResult = await query('SELECT price FROM products WHERE id = ?', [item.product_id]);
-        const unit_price = parseFloat(productResult.rows[0].price);
+        const promoInfo = itemPromoInfo.get(item.product_id);
+        const unit_price = promoInfo ? promoInfo.promotionPrice : parseFloat((await query('SELECT price FROM products WHERE id = ?', [item.product_id])).rows[0].price);
         const item_total = unit_price * item.quantity;
 
         await query(
-          `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price)
-           VALUES (?, ?, ?, ?, ?)`,
-          [order_id, item.product_id, item.quantity, unit_price, item_total]
+          `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, original_price, promotion_ids, discount_amount)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            order_id,
+            item.product_id,
+            item.quantity,
+            unit_price,
+            item_total,
+            promoInfo ? promoInfo.originalPrice : unit_price,
+            promoInfo && promoInfo.promotionIds.length > 0 ? JSON.stringify(promoInfo.promotionIds) : null,
+            promoInfo ? promoInfo.discountAmount * item.quantity : 0
+          ]
         );
 
         // Update product stock

@@ -76,7 +76,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pp.id as product_promotion_id,
         pp.promotion_id,
         pp.original_price,
-        pp.promotion_price,
         pp.priority,
         pp.can_stack,
         pr.name as promotion_name,
@@ -274,7 +273,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         priority: promotion.priority,
         can_stack: promotion.can_stack,
         original_price: parseFloat(promotion.original_price || row.price),
-        promotion_price: parseFloat(promotion.promotion_price),
+        promotion_price: parseFloat(promotion.original_price || row.price) * (1 - promotion.discount_percent / 100),
         start_time: promotion.start_time,
         end_time: promotion.end_time
       } : null,
