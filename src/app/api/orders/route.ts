@@ -276,6 +276,13 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // 记录订单状态变更日志
+    await query(
+      `INSERT INTO order_status_logs (order_id, old_status, new_status, operator_name, created_at)
+       VALUES (?, ?, ?, ?, datetime('now'))`,
+      [orderId, result.rows[0].status, status, 'system']
+    );
+
     return NextResponse.json({
       success: true,
       data: result.rows[0]
