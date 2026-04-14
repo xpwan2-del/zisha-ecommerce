@@ -62,7 +62,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
     const activities = activitiesResult.rows || [];
 
-    // 查询产品的促销信息
+    // 查询产品的促销信息（单个最大折扣）
     const promotionResult = await query(
       `SELECT
         pp.id as product_promotion_id,
@@ -74,6 +74,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pr.name_ar as promotion_name_ar,
         pr.discount_percent,
         pr.type as promotion_type,
+        pr.icon as promotion_icon,
+        pr.color as promotion_color,
         pr.start_time,
         pr.end_time
        FROM product_promotions pp
@@ -85,6 +87,37 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
     const promotion = promotionResult.rows?.[0] || null;
 
+    // 查询所有促销信息（排除今日特惠和特惠商品）
+    const allPromotionsResult = await query(
+      `SELECT
+        pp.id as product_promotion_id,
+        pp.promotion_id,
+        pr.name as promotion_name,
+        pr.name_en as promotion_name_en,
+        pr.name_ar as promotion_name_ar,
+        pr.discount_percent,
+        pr.type as promotion_type,
+        pr.icon as promotion_icon,
+        pr.color as promotion_color
+       FROM product_promotions pp
+       JOIN promotions pr ON pp.promotion_id = pr.id
+       WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
+       ORDER BY pr.discount_percent DESC`,
+      [id]
+    );
+    const allPromotions = (allPromotionsResult.rows || [])
+      .filter((p: any) => p.promotion_name !== '今日特惠' && p.promotion_name !== '特惠商品')
+      .map((p: any) => ({
+        id: p.promotion_id,
+        name: p.promotion_name,
+        name_en: p.promotion_name_en,
+        name_ar: p.promotion_name_ar,
+        discount_percent: p.discount_percent,
+        type: p.promotion_type,
+        icon: p.promotion_icon,
+        color: p.promotion_color
+      }));
+
     // 查询评价统计
     const reviewResult = await query(
       `SELECT COUNT(*) as count, AVG(rating) as avg_rating
@@ -95,6 +128,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const reviewCount = parseInt(String(reviewResult.rows?.[0]?.count || 0));
     const avgRating = reviewResult.rows?.[0]?.avg_rating;
     const rating = avgRating ? parseFloat(String(avgRating)).toFixed(1) : '5.0';
+
+    // 查询产品规格
+    const featuresResult = await query(
+      `SELECT 
+        pf.id,
+        pf.template_id,
+        pf.value,
+        pf.value_en,
+        pf.value_ar,
+        ft.name as field_name,
+        ft.name_en as field_name_en,
+        ft.name_ar as field_name_ar,
+        ft.unit
+      FROM product_features pf
+      JOIN feature_templates ft ON pf.template_id = ft.id
+      WHERE pf.product_id = ?
+      ORDER BY pf."order"`,
+      [id]
+    );
+    const productFeatures = featuresResult.rows || [];
 
     // 查询库存变动历史（最近10条）
     const inventoryHistoryResult = await query(
@@ -197,17 +250,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       activities: activities,
       promotion: promotion ? {
         id: promotion.promotion_id,
-        product_promotion_id: promotion.product_promotion_id,
         name: promotion.promotion_name,
         name_en: promotion.promotion_name_en,
         name_ar: promotion.promotion_name_ar,
         type: promotion.promotion_type,
         discount_percent: promotion.discount_percent,
-        original_price: parseFloat(promotion.original_price),
+        icon: promotion.promotion_icon,
+        color: promotion.promotion_color,
+        original_price: parseFloat(promotion.original_price || row.price),
         promotion_price: parseFloat(promotion.promotion_price),
         start_time: promotion.start_time,
         end_time: promotion.end_time
       } : null,
+      promotions: allPromotions,
       review_count: reviewCount,
       rating: rating,
       created_at: row.created_at,
@@ -215,7 +270,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       // 扩展数据
       inventory_history: inventoryHistory,
       operation_logs: operationLogs,
-      related_products: relatedProducts
+      related_products: relatedProducts,
+      specifications_detail: productFeatures
     };
 
     return NextResponse.json({

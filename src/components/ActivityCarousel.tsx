@@ -84,7 +84,7 @@ export function ActivityCarousel() {
                     alt={activity.title}
                     className="w-full h-full object-contain"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#450A0A]/95 via-[#450A0A]/50 to-transparent flex flex-col justify-end">
+                  <div className="absolute inset-0 bg-gradient-to-t from-dark/95 via-dark/50 to-transparent flex flex-col justify-end">
                     <div className="p-3 sm:p-4 text-white w-full">
                       <h3 className="text-sm sm:text-base md:text-xl font-bold mb-1 font-['Noto_Serif_TC'] leading-tight">
                         {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
@@ -103,7 +103,7 @@ export function ActivityCarousel() {
                 <button
                   key={index}
                   onClick={() => setCurrentIndex(index)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentIndex ? 'bg-[#CA8A04] w-6' : 'bg-white/70'}`}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentIndex ? 'bg-accent w-6' : 'bg-white/70'}`}
                 ></button>
               ))}
             </div>
@@ -113,40 +113,40 @@ export function ActivityCarousel() {
             <div className="flex animate-scroll whitespace-nowrap">
               <div className="flex space-x-8 py-4">
                 <div className="flex items-center space-x-2 flex-shrink-0 px-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#CA8A04]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-[#450A0A] font-['Noto_Sans_TC']">Free shipping on orders over $50</span>
+                  <span className="text-sm text-dark font-['Noto_Sans_TC']">Free shipping on orders over $50</span>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0 px-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#CA8A04]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-[#450A0A] font-['Noto_Sans_TC']">30-day returns</span>
+                  <span className="text-sm text-dark font-['Noto_Sans_TC']">30-day returns</span>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0 px-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#CA8A04]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-[#450A0A] font-['Noto_Sans_TC']">Authentic guarantee</span>
+                  <span className="text-sm text-dark font-['Noto_Sans_TC']">Authentic guarantee</span>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0 px-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#CA8A04]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-[#450A0A] font-['Noto_Sans_TC']">Free shipping on orders over $50</span>
+                  <span className="text-sm text-dark font-['Noto_Sans_TC']">Free shipping on orders over $50</span>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0 px-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#CA8A04]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-[#450A0A] font-['Noto_Sans_TC']">30-day returns</span>
+                  <span className="text-sm text-dark font-['Noto_Sans_TC']">30-day returns</span>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0 px-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#CA8A04]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-[#450A0A] font-['Noto_Sans_TC']">Authentic guarantee</span>
+                  <span className="text-sm text-dark font-['Noto_Sans_TC']">Authentic guarantee</span>
                 </div>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,7 +9,7 @@ export async function POST(request: NextRequest) {
     const { email, password } = body;
     
     // 查找用户
-    const result = await query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await query('SELECT * FROM users WHERE email = ?', [email]);
     if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
@@ -21,8 +22,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
     
-    // 生成 session token (simplified for demo)
-    const sessionToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    // 使用 JWT 生成令牌
+    const accessToken = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '2h' }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '30d' }
+    );
     
     return NextResponse.json({
       user: {
@@ -37,7 +48,8 @@ export async function POST(request: NextRequest) {
         referral_code: user.referral_code,
         created_at: user.created_at
       },
-      token: sessionToken,
+      access_token: accessToken,
+      refresh_token: refreshToken,
       message: 'Login successful'
     });
   } catch (error) {

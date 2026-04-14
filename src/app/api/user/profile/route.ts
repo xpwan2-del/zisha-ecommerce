@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest) {
               field,
               String(oldValue),
               String(value),
-              request.ip || '',
+              request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '',
               request.headers.get('user-agent') || ''
             ]
           );

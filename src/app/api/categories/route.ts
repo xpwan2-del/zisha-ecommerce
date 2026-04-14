@@ -73,7 +73,7 @@ export async function PUT(request: NextRequest) {
       [name, slug, description, image, id]
     );
     
-    if (result.rowCount === 0) {
+    if (result.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Category not found' },
         { status: 404 }
@@ -111,9 +111,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
     
-    const result = await query('DELETE FROM categories WHERE id = ?', [id]);
+    const result = await query('DELETE FROM categories WHERE id = ? RETURNING id', [id]);
     
-    if (result.rowCount === 0) {
+    if (result.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Category not found' },
         { status: 404 }

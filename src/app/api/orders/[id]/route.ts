@@ -3,7 +3,7 @@ import { query } from '@/lib/db';
 import { requireAuth, requireAdmin } from '@/lib/auth';
 
 // GET /api/orders/[id] - Get order details
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     // 验证登录
     const authResult = requireAuth(request);
@@ -11,7 +11,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return authResult.response;
     }
 
-    const orderId = params.id;
+    const { id } = await params;
+    const orderId = id;
 
     // Get order basic info
     const orderResult = await query(

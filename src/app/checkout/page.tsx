@@ -22,6 +22,13 @@ export default function CheckoutPage() {
   const [checkoutData, setCheckoutData] = useState<any>(null);
   
   useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.push('/login?redirect=/checkout');
+      return;
+    }
+  }, [isAuthLoading, user, router]);
+
+  useEffect(() => {
     const fetchCheckoutData = async () => {
       try {
         const response = await fetch(`/api/checkout?cart=${encodeURIComponent(JSON.stringify(cart))}`);
@@ -84,15 +91,13 @@ export default function CheckoutPage() {
   const handlePayment = async () => {
     setIsLoading(true);
     setError('');
-    
+
+    if (!user) {
+      router.push('/login?redirect=/checkout');
+      return;
+    }
+
     try {
-      // First check if user is authenticated
-      const isAuth = await checkAuth();
-      if (!isAuth) {
-        router.push('/login?redirect=/checkout');
-        return;
-      }
-      
       const accessToken = localStorage.getItem('access_token');
       if (!accessToken) {
         router.push('/login?redirect=/checkout');

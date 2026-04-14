@@ -147,23 +147,49 @@ export async function GET(request: NextRequest) {
     const sortedModules = [...homeModules].sort((a, b) => a.order - b.order);
     const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
     
-    // 从数据库获取产品数据
-    const productsResult = await query('SELECT id, name, name_en, name_ar, description, price, original_price, stock, category_id, image, discount, daily_discount FROM products ORDER BY id LIMIT 9');
+    // 从数据库获取产品数据（关联促销活动，每个产品只取最大折扣的促销）
+    const productsResult = await query(`
+      SELECT 
+        p.id, p.name, p.name_en, p.name_ar, p.description, 
+        p.price, p.original_price, p.stock, p.category_id, p.image,
+        pr.id as promotion_id,
+        pr.name as promotion_name,
+        pr.discount_percent as promotion_discount,
+        pr.icon as promotion_icon,
+        pr.color as promotion_color
+      FROM products p
+      LEFT JOIN product_promotions pp ON p.id = pp.product_id
+      LEFT JOIN promotions pr ON pp.promotion_id = pr.id
+      WHERE (pp.status IS NULL OR (pp.status = 'active' AND pr.status = 'active'))
+      GROUP BY p.id
+      ORDER BY MAX(pr.discount_percent) DESC, p.id
+      LIMIT 9
+    `);
     
-    // 处理产品数据，添加活动标签和图标
+    // 处理产品数据，添加活动标签和图标（使用嵌套promotion结构，与/api/products一致）
     const products = productsResult.rows.map((product: any) => ({
       ...product,
       is_active: true,
-      material_id: 1, // 默认值
-      teapot_type_id: 1, // 默认值
-      description_en: product.name_en, // 使用name_en作为默认描述
-      description_ar: product.name_ar, // 使用name_ar作为默认描述
-      activity_tag: product.discount > 0 ? '特惠产品' : product.daily_discount > 0 ? '今日特惠' : undefined,
-      activity_icon: product.discount > 0 ? 'tag' : product.daily_discount > 0 ? 'fire' : undefined
+      material_id: 1,
+      teapot_type_id: 1,
+      description_en: product.name_en,
+      description_ar: product.name_ar,
+      // 使用嵌套promotion结构
+      promotion: product.promotion_name ? {
+        id: product.promotion_id || null,
+        name: product.promotion_name,
+        discount_percent: product.promotion_discount || 0,
+        icon: product.promotion_icon || 'tag',
+        color: product.promotion_color || '#CA8A04'
+      } : null,
+      // 同时保留扁平字段供其他组件使用
+      activity_tag: product.promotion_name || null,
+      activity_icon: product.promotion_icon || null,
+      activity_color: product.promotion_color || null
     }));
     
     // 从数据库获取促销活动数据
-    const promotionsResult = await query('SELECT id, name, name_en, name_ar, description, type, discount_percent, start_time, end_time, status FROM promotions ORDER BY id');
+    const promotionsResult = await query('SELECT id, name, name_en, name_ar, description, type, discount_percent, status FROM promotions ORDER BY id');
     
     // 构建活动数据
     const activities = promotionsResult.rows.map((promotion: any) => ({
@@ -193,6 +219,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(homeData);
   } catch (error) {
     console.error('Error fetching home data:', error);
-    return NextResponse.json({ error: 'Failed to fetch home data' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: 'Failed to fetch home data', details: errorMessage }, { status: 500 });
   }
 }

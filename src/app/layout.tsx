@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className="antialiased bg-[#FAFAF9] text-[#0C0A09]">
+      <body className="antialiased">
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>

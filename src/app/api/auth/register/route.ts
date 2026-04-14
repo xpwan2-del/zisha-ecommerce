@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const { name, email, phone, password, referral_code } = body;
     
     // 检查邮箱是否已存在
-    const existingUser = await query('SELECT * FROM users WHERE email = $1', [email]);
+    const existingUser = await query('SELECT * FROM users WHERE email = ?', [email]);
     if (existingUser.rows.length > 0) {
       return NextResponse.json({ error: 'Email already exists' }, { status: 400 });
     }
@@ -27,46 +27,46 @@ export async function POST(request: NextRequest) {
     // 检查推荐人
     let referrerId = null;
     if (referral_code) {
-      const referrer = await query('SELECT id FROM users WHERE referral_code = $1', [referral_code]);
+      const referrer = await query('SELECT id FROM users WHERE referral_code = ?', [referral_code]);
       if (referrer.rows.length > 0) {
         referrerId = referrer.rows[0].id;
       }
     }
-    
+
     // 创建用户
     const result = await query(
       `INSERT INTO users (name, email, phone, password, referral_code, referred_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       VALUES (?, ?, ?, ?, ?, ?)
        RETURNING id, name, email, phone, role, level, points, total_spent, referral_code, created_at`,
       [name, email, phone, hashedPassword, generatedReferralCode, referrerId]
     );
-    
+
     const user = result.rows[0];
-    
+
     // 如果有推荐人，创建推荐记录
     if (referrerId) {
       await query(
         `INSERT INTO recommendations (referrer_id, referee_id, status, reward_points, reward_amount)
-         VALUES ($1, $2, $3, $4, $5)`,
+         VALUES (?, ?, ?, ?, ?)`,
         [referrerId, user.id, 'pending', 100, 50]
       );
     }
-    
-    // 生成 access token (2 hours)
+
+    // 生成 access token (2 hours) - 统一使用 userId 字段
     const accessToken = jwt.sign(
       {
-        user_id: user.id,
+        userId: user.id,
         email: user.email,
         role: user.role
       },
       JWT_SECRET,
       { expiresIn: '2h' }
     );
-    
-    // 生成 refresh token (30 days)
+
+    // 生成 refresh token (30 days) - 统一使用 userId 字段
     const refreshToken = jwt.sign(
       {
-        user_id: user.id,
+        userId: user.id,
         email: user.email
       },
       REFRESH_TOKEN_SECRET,

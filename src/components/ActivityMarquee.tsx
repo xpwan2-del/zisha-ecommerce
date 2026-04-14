@@ -48,8 +48,8 @@ export function ActivityMarquee({ activities }: ActivityMarqueeProps) {
   };
 
   return (
-    <div className="overflow-hidden bg-white rounded-sm shadow-sm border border-[#E7E5E4] p-5 trae-browser-inspect-draggable">
-      <h3 className="text-lg font-medium text-[#1C1917] mb-4">平台活动</h3>
+    <div className="overflow-hidden bg-white rounded-sm shadow-sm border border-border p-5 trae-browser-inspect-draggable">
+      <h3 className="text-lg font-medium text-dark mb-4">平台活动</h3>
       <div className="flex animate-scroll whitespace-nowrap">
         <div className="flex space-x-10 py-2">
           {activities && activities.length > 0 ? (
@@ -76,15 +76,15 @@ export function ActivityMarquee({ activities }: ActivityMarqueeProps) {
                       </div>
                       {/* 折扣标签 */}
                       {activity.discount_percent && (
-                        <div className="absolute top-2 left-2 bg-[#CA8A04] text-white text-xs font-medium px-2 py-1 rounded-sm">
+                        <div className="absolute top-2 left-2 bg-accent text-white text-xs font-medium px-2 py-1 rounded-sm">
                           {activity.discount_percent}% OFF
                         </div>
                       )}
                     </div>
-                    <h4 className="text-sm font-medium text-[#1C1917] mb-1 text-center group-hover:text-[#CA8A04] transition-colors duration-300">
+                    <h4 className="text-sm font-medium text-dark mb-1 text-center group-hover:text-accent transition-colors duration-300">
                       {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
                     </h4>
-                    <p className="text-xs text-[#78716C] text-center">
+                    <p className="text-xs text-text-muted text-center">
                       {getLocalizedText(activity.description, activity.description_en, activity.description_ar)}
                     </p>
                   </a>
@@ -113,15 +113,15 @@ export function ActivityMarquee({ activities }: ActivityMarqueeProps) {
                       </div>
                       {/* 折扣标签 */}
                       {activity.discount_percent && (
-                        <div className="absolute top-2 left-2 bg-[#CA8A04] text-white text-xs font-medium px-2 py-1 rounded-sm">
+                        <div className="absolute top-2 left-2 bg-accent text-white text-xs font-medium px-2 py-1 rounded-sm">
                           {activity.discount_percent}% OFF
                         </div>
                       )}
                     </div>
-                    <h4 className="text-sm font-medium text-[#1C1917] mb-1 text-center group-hover:text-[#CA8A04] transition-colors duration-300">
+                    <h4 className="text-sm font-medium text-dark mb-1 text-center group-hover:text-accent transition-colors duration-300">
                       {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
                     </h4>
-                    <p className="text-xs text-[#78716C] text-center">
+                    <p className="text-xs text-text-muted text-center">
                       {getLocalizedText(activity.description, activity.description_en, activity.description_ar)}
                     </p>
                   </a>
@@ -131,7 +131,7 @@ export function ActivityMarquee({ activities }: ActivityMarqueeProps) {
           ) : (
             <div className="flex flex-col items-center space-x-3 flex-shrink-0 px-4 w-64">
               <div className="text-center py-8">
-                <p className="text-sm text-[#78716C]">暂无活动</p>
+                <p className="text-sm text-text-muted">暂无活动</p>
               </div>
             </div>
           )}

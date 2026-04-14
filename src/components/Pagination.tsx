@@ -72,7 +72,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         <button
           onClick={() => handlePageClick(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`px-4 py-2 rounded-md border ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-[#831843] hover:bg-[#FDF2F8] transition-colors'}`}
+          className={`px-4 py-2 rounded-md border ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-text hover:bg-background transition-colors'}`}
         >
           上一页
         </button>
@@ -82,7 +82,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
           <button
             key={page}
             onClick={() => handlePageClick(page)}
-            className={`px-4 py-2 rounded-md ${currentPage === page ? 'bg-[#CA8A04] text-white' : 'bg-white text-[#831843] hover:bg-[#FDF2F8] transition-colors'}`}
+            className={`px-4 py-2 rounded-md ${currentPage === page ? 'bg-accent text-white' : 'bg-white text-text hover:bg-background transition-colors'}`}
           >
             {page}
           </button>
@@ -92,26 +92,26 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         <button
           onClick={() => handlePageClick(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`px-4 py-2 rounded-md border ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-[#831843] hover:bg-[#FDF2F8] transition-colors'}`}
+          className={`px-4 py-2 rounded-md border ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-text hover:bg-background transition-colors'}`}
         >
           下一页
         </button>
 
         {/* Page input */}
         <form onSubmit={handleInputSubmit} className="flex items-center space-x-2">
-          <span className="text-sm text-[#831843]">跳转到：</span>
+          <span className="text-sm text-text">跳转到：</span>
           <input
             type="number"
             min="1"
             max={totalPages}
             value={inputPage}
             onChange={handleInputChange}
-            className="w-16 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#CA8A04]"
+            className="w-16 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder={`1-${totalPages}`}
           />
           <button
             type="submit"
-            className="px-3 py-2 bg-[#CA8A04] text-white rounded-md hover:bg-[#B47C03] transition-colors"
+            className="px-3 py-2 bg-accent text-white rounded-md hover:bg-accent transition-colors"
           >
             跳转
           </button>

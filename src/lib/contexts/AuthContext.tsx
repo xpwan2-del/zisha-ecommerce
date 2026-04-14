@@ -43,130 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   console.log('6. localStorage refresh_token:', !!localStorage.getItem('refresh_token'));
   console.log('7. localStorage user:', !!localStorage.getItem('user'));
 
-  // Load user from localStorage on mount
-  useEffect(() => {
-    console.log('========== [Mount Effect] ==========');
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user');
-      const accessToken = localStorage.getItem('access_token');
-      const refreshToken = localStorage.getItem('refresh_token');
-      
-      console.log('1. Stored user exists:', !!storedUser);
-      console.log('2. Access token exists:', !!accessToken);
-      console.log('3. Refresh token exists:', !!refreshToken);
-      
-      // First load user from localStorage to avoid redirects
-      if (storedUser && accessToken && refreshToken) {
-        console.log('4. Loading user from localStorage first...');
-        const userData = JSON.parse(storedUser);
-        // Set user immediately to avoid redirects
-        setUser(userData);
-        setIsLoading(false);
-        
-        // Then check auth status with server to verify validity
-        console.log('5. Checking auth status with server...');
-        checkAuthStatus().catch((error) => {
-          console.error('Error checking auth status:', error);
-          // Do not set user to null on error - keep using localStorage data
-        });
-      } else {
-        console.log('4. No token or user in localStorage');
-        setUser(null);
-        setIsLoading(false);
-      }
-    } else {
-      console.log('4. Server-side rendering - skipping localStorage access');
-      setIsLoading(false);
-    }
-    
-    console.log('========== [Mount Effect END] ==========');
-  }, []);
-
-  // Set user immediately when tokens are set in localStorage
-  useEffect(() => {
-    console.log('========== [Token Change Effect] ==========');
-    const checkTokens = () => {
-      const storedUser = localStorage.getItem('user');
-      const accessToken = localStorage.getItem('access_token');
-      const refreshToken = localStorage.getItem('refresh_token');
-      
-      console.log('1. Checking tokens in localStorage...');
-      console.log('2. Stored user exists:', !!storedUser);
-      console.log('3. Access token exists:', !!accessToken);
-      console.log('4. Refresh token exists:', !!refreshToken);
-      
-      if (storedUser && accessToken && refreshToken && !user) {
-        console.log('5. Tokens exist but user state is null, loading user from localStorage...');
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        setIsLoading(false);
-      }
-    };
-    
-    // Check immediately
-    checkTokens();
-    
-    // Set up storage event listener to detect changes from other tabs
-    window.addEventListener('storage', checkTokens);
-    
-    return () => {
-      window.removeEventListener('storage', checkTokens);
-    };
-  }, [user]);
-
-  // Save user to localStorage whenever it changes
-  useEffect(() => {
-    console.log('========== [Save User Effect] ==========');
-    console.log('1. User state changed:', user);
-    if (user) {
-      console.log('2. Saving user to localStorage');
-      localStorage.setItem('user', JSON.stringify(user));
-      console.log('3. User saved to localStorage:', localStorage.getItem('user'));
-    } else {
-      console.log('2. Removing user from localStorage');
-      localStorage.removeItem('user');
-      // Do not remove tokens here - they will be removed in logout function
-      console.log('3. User removed from localStorage');
-    }
-    console.log('4. Access token in localStorage:', localStorage.getItem('access_token'));
-    console.log('5. Refresh token in localStorage:', localStorage.getItem('refresh_token'));
-    console.log('========== [Save User Effect END] ==========');
-  }, [user]);
-
-  // Check auth status on route change to maintain login state
-  useEffect(() => {
-    console.log('========== [Route Change Effect] ==========');
-    console.log('1. Pathname changed:', pathname);
-    console.log('2. Current user:', user);
-    console.log('3. Access token in localStorage:', !!localStorage.getItem('access_token'));
-    console.log('4. Refresh token in localStorage:', !!localStorage.getItem('refresh_token'));
-    console.log('5. User in localStorage:', !!localStorage.getItem('user'));
-    
-    const accessToken = localStorage.getItem('access_token');
-    const refreshToken = localStorage.getItem('refresh_token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (accessToken && refreshToken && storedUser) {
-      console.log('6. Token and user exist, checking auth status...');
-      // Check auth status with server to verify validity
-      const checkAuth = async () => {
-        try {
-          const result = await checkAuthStatus();
-          console.log('7. checkAuthStatus result:', result);
-          console.log('8. User after checkAuthStatus:', user);
-        } catch (error) {
-          console.error('9. Error checking auth status:', error);
-        }
-      };
-      checkAuth();
-    } else {
-      console.log('6. No token or user in localStorage');
-      setUser(null);
-      setIsLoading(false);
-    }
-    console.log('========== [Route Change Effect END] ==========');
-  }, [pathname]);
-
   // Check auth status and refresh token if needed
   const checkAuthStatus = useCallback(async (): Promise<boolean> => {
     console.log('========== [checkAuthStatus] ==========');
@@ -177,9 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('1. Access token exists:', !!accessToken);
     console.log('2. Refresh token exists:', !!refreshToken);
     console.log('3. User in localStorage:', !!storedUser);
+    console.log('4. Current user state:', user);
     
     if (!accessToken || !refreshToken || !storedUser) {
-      console.log('4. [NO TOKEN] No access or refresh token found, user is not logged in');
+      console.log('5. [NO TOKEN] No access or refresh token found, user is not logged in');
       setUser(null);
       setIsLoading(false);
       console.log('========== [checkAuthStatus END - NOT LOGGED IN] ==========');
@@ -187,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      console.log('4. [HAS TOKENS] Checking if token is valid...');
+      console.log('5. [HAS TOKENS] Checking if token is valid...');
       // Check if token is valid
       const response = await fetch('/api/auth/me', {
         headers: {
@@ -195,14 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
 
-      console.log('5. /api/auth/me response status:', response.status);
+      console.log('6. /api/auth/me response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
-        console.log('6. Token is valid, response data:', data);
+        console.log('7. Token is valid, response data:', data);
         
         if (!data || !data.user) {
-          console.log('7. [ERROR] Invalid user data format');
+          console.log('8. [ERROR] Invalid user data format');
           setUser(null);
           setIsLoading(false);
           console.log('========== [checkAuthStatus END - LOGGED OUT] ==========');
@@ -224,13 +101,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
         setIsLoading(false);
-        console.log('7. User data set:', userData);
-        console.log('8. Login status: LOGGED IN');
+        console.log('8. User data set:', userData);
+        console.log('9. Login status: LOGGED IN');
         console.log('========== [checkAuthStatus END - LOGGED IN] ==========');
         return true;
       } else if (response.status === 401) {
-        console.log('6. Token is invalid, trying to refresh...');
-        // Try to refresh token
+        console.log('7. Token is invalid, trying to refresh...');
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST',
           headers: {
@@ -239,60 +115,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({ refresh_token: refreshToken }),
         });
 
-        console.log('7. /api/auth/refresh response status:', refreshResponse.status);
+        console.log('8. /api/auth/refresh response status:', refreshResponse.status);
 
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json();
-          console.log('8. Token refreshed successfully, response data:', refreshData);
-          
-          if (!refreshData || !refreshData.user || !refreshData.access_token || !refreshData.refresh_token) {
-            console.log('9. [ERROR] Invalid refresh data format');
-            setUser(null);
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            localStorage.removeItem('user');
+          console.log('9. Token refreshed successfully, response data:', refreshData);
+
+          if (!refreshData || !refreshData.access_token) {
+            console.log('10. [ERROR] Invalid refresh data format, but keeping user state');
             setIsLoading(false);
-            console.log('========== [checkAuthStatus END - LOGGED OUT] ==========');
+            const currentUser = localStorage.getItem('user');
+            console.log('========== [checkAuthStatus END - KEEPING STATE] ==========');
+            return !!currentUser;
+          }
+
+          const storedUser = localStorage.getItem('user');
+          if (!storedUser) {
+            console.log('10. [ERROR] No user data in localStorage, but keeping user state');
+            setIsLoading(false);
+            console.log('========== [checkAuthStatus END - KEEPING STATE] ==========');
             return false;
           }
-          
-          // Ensure user data matches User interface
-          const userData = {
-            id: String(refreshData.user.id),
-            name: refreshData.user.name,
-            email: refreshData.user.email,
-            phone: refreshData.user.phone,
-            role: refreshData.user.role,
-            level: refreshData.user.level || '普通',
-            points: refreshData.user.points || 0,
-            total_spent: refreshData.user.total_spent || 0,
-            referral_code: refreshData.user.referral_code || ''
-          };
+
+          const userData = JSON.parse(storedUser);
           localStorage.setItem('access_token', refreshData.access_token);
-          localStorage.setItem('refresh_token', refreshData.refresh_token);
-          localStorage.setItem('user', JSON.stringify(userData));
           setUser(userData);
           setIsLoading(false);
-          console.log('9. User data set:', userData);
-          console.log('10. Login status: LOGGED IN (token refreshed)');
+          console.log('10. User data set:', userData);
+          console.log('11. Login status: LOGGED IN (token refreshed)');
           console.log('========== [checkAuthStatus END - LOGGED IN] ==========');
           return true;
         } else {
-          console.log('8. [ERROR] Refresh token failed, user is logged out');
-          setUser(null);
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('user');
+          console.log('9. [ERROR] Refresh token failed, but keeping user state');
           setIsLoading(false);
-          console.log('9. Login status: LOGGED OUT (refresh failed)');
-          console.log('========== [checkAuthStatus END - LOGGED OUT] ==========');
-          return false;
+          const currentUser = localStorage.getItem('user');
+          console.log('10. Keeping current user state, login status:', !!currentUser ? 'LOGGED IN' : 'LOGGED OUT');
+          console.log('========== [checkAuthStatus END - KEEPING STATE] ==========');
+          return !!currentUser;
         }
       } else {
-        console.log('6. [ERROR] Unexpected response status:', response.status);
+        console.log('7. [ERROR] Unexpected response status:', response.status);
         // Don't clear user on unexpected status, keep current state
         setIsLoading(false);
-        console.log('7. Login status: UNKNOWN (keeping current state)');
+        console.log('8. Login status: UNKNOWN (keeping current state)');
         console.log('========== [checkAuthStatus END - KEEPING CURRENT STATE] ==========');
         return !!user || !!storedUser;
       }
@@ -305,18 +170,105 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         setUser(userData);
-        console.log('7. User data loaded from localStorage:', userData);
-        console.log('8. Login status: LOGGED IN (from localStorage)');
+        console.log('8. User data loaded from localStorage:', userData);
+        console.log('9. Login status: LOGGED IN (from localStorage)');
       } else {
-        console.log('7. No user data in localStorage');
-        console.log('8. Login status: LOGGED OUT');
+        console.log('8. No user data in localStorage');
+        console.log('9. Login status: LOGGED OUT');
       }
       const isLoggedIn = !!user || !!storedUser;
-      console.log('9. Final login status:', isLoggedIn ? 'LOGGED IN' : 'LOGGED OUT');
+      console.log('10. Final login status:', isLoggedIn ? 'LOGGED IN' : 'LOGGED OUT');
       console.log('========== [checkAuthStatus END - ERROR] ==========');
       return isLoggedIn;
     }
   }, []);
+
+  // Load user from localStorage on mount
+  useEffect(() => {
+    console.log('========== [Mount Effect] ==========');
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user');
+      const accessToken = localStorage.getItem('access_token');
+      const refreshToken = localStorage.getItem('refresh_token');
+
+      console.log('1. Stored user exists:', !!storedUser);
+      console.log('2. Access token exists:', !!accessToken);
+      console.log('3. Refresh token exists:', !!refreshToken);
+
+      if (storedUser && accessToken && refreshToken) {
+        console.log('4. Loading user from localStorage...');
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        setIsLoading(false);
+        console.log('5. User loaded, isLoading set to false');
+        // After loading user, check if token is still valid
+        console.log('6. Checking if token is still valid...');
+        checkAuthStatus();
+      } else {
+        console.log('4. No tokens in localStorage');
+        setUser(null);
+        setIsLoading(false);
+      }
+    } else {
+      console.log('4. Server-side rendering - skipping localStorage access');
+      setIsLoading(false);
+    }
+
+    console.log('========== [Mount Effect END] ==========');
+  }, []);
+
+  // Set user immediately when tokens are set in localStorage
+  useEffect(() => {
+    console.log('========== [Token Change Effect] ==========');
+    const checkTokens = () => {
+      if (typeof window === 'undefined') return;
+      
+      const storedUser = localStorage.getItem('user');
+      const accessToken = localStorage.getItem('access_token');
+      const refreshToken = localStorage.getItem('refresh_token');
+      
+      console.log('1. Checking tokens in localStorage...');
+      console.log('2. Stored user exists:', !!storedUser);
+      console.log('3. Access token exists:', !!accessToken);
+      console.log('4. Refresh token exists:', !!refreshToken);
+      
+      if (storedUser && accessToken && refreshToken) {
+        console.log('5. Tokens exist, loading user from localStorage...');
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        setIsLoading(false);
+      }
+    };
+    
+    // Check immediately
+    checkTokens();
+    
+    // Set up storage event listener to detect changes from other tabs
+    window.addEventListener('storage', checkTokens);
+    
+    return () => {
+      window.removeEventListener('storage', checkTokens);
+    };
+  }, []);
+
+  // Save user to localStorage whenever it changes
+  useEffect(() => {
+    console.log('========== [Save User Effect] ==========');
+    console.log('1. User state changed:', user);
+    if (user) {
+      console.log('2. Saving user to localStorage');
+      localStorage.setItem('user', JSON.stringify(user));
+      console.log('3. User saved to localStorage:', localStorage.getItem('user'));
+    } else {
+      console.log('2. Removing user from localStorage');
+      localStorage.removeItem('user');
+      // Do not remove tokens here - they will be removed in logout function
+      console.log('3. User removed from localStorage');
+    }
+    console.log('4. Access token in localStorage:', localStorage.getItem('access_token'));
+    console.log('5. Refresh token in localStorage:', localStorage.getItem('refresh_token'));
+    console.log('========== [Save User Effect END] ==========');
+  }, [user]);
 
   const checkAuth = useCallback(async (): Promise<boolean> => {
     console.log('========== [checkAuth] ==========');

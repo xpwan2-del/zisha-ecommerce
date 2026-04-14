@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { useCurrency } from '@/lib/contexts/CurrencyContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { convertCurrency, formatCurrency } from '@/lib/utils/currency';
 
 interface HomeData {
@@ -11,15 +13,25 @@ interface HomeData {
   guarantees: any[];
   categories: any[];
   products: any[];
+  pagination?: {
+    total: number;
+    totalPages: number;
+    total_pages: number;
+    page: number;
+    pageSize: number;
+  };
 }
 
 interface FeaturedProductsProps {
   category?: string;
   data?: HomeData;
+  pageType?: 'products' | 'deals';
 }
 
-export function FeaturedProducts({ category = "all", data }: FeaturedProductsProps) {
+export function FeaturedProducts({ category = "all", data, pageType = "products" }: FeaturedProductsProps) {
   const { currency } = useCurrency();
+  const { user, isAuthenticated } = useAuth();
+  const router = useRouter();
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +99,7 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
 
   useEffect(() => {
     fetchProducts();
-  }, [category, data, currentPage]);
+  }, [category, data, currentPage, pageType]);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -108,8 +120,8 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
           
           const filteredProducts = filterProductsByCategory(products, category);
           setAllProducts(filteredProducts);
-          // 直接使用API返回的总页数
-          setTotalPages(pagination.total_pages || 1);
+          // 直接使用API返回的总页数（API返回total_pages）
+          setTotalPages(pagination.total_pages || pagination.totalPages || 1);
           setCurrentPage(1); // Reset to first page
         }
         // 处理来自 /api/home API 的数据结构
@@ -131,7 +143,7 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
               id: product.id,
               name: product.activity_tag,
               icon: product.activity_icon || 'tag',
-              color: product.activity_tag === '今日特惠' ? '#EF4444' : product.activity_tag === '特惠产品' ? '#3B82F6' : '#8B5CF6'
+              color: product.activity_tag === '今日特惠' ? 'var(--accent)' : product.activity_tag === '特惠产品' ? 'var(--accent)' : 'var(--accent)'
             }] : [] // Include activity data
           }));
           console.log('Formatted products:', formattedProducts.length, 'products');
@@ -143,7 +155,10 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
         }
       } else {
         // Fetch from API if no data provided
-        const response = await fetch(`/api/products?category_id=${category}&page=${currentPage}&limit=12`);
+        const apiEndpoint = pageType === 'deals' 
+          ? `/api/products/deals?page=${currentPage}&limit=12`
+          : `/api/products?category_id=${category}&page=${currentPage}&limit=12`;
+        const response = await fetch(apiEndpoint);
         const apiData = await response.json();
         
         if (apiData.success && apiData.data && apiData.data.products) {
@@ -188,8 +203,16 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
 
   const filterProductsByCategory = (productList: any[], cat: string) => {
     if (cat === "all") return productList;
+    
+    // 处理deals页面的筛选
+    if (pageType === 'deals') {
+      if (cat === "flash_sale") return productList.filter(p => p.deal_type === "flash_sale");
+      if (cat === "daily_deals") return productList.filter(p => p.deal_type === "daily_deals");
+      return productList;
+    }
+    
+    // 处理普通商品页面的分类筛选
     return productList.filter(product => {
-      // 处理不同的数据结构
       if (typeof product.category === 'object' && product.category.id) {
         return product.category.id.toString() === cat;
       }
@@ -200,22 +223,16 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
   // 分类活动标签
   const getDiscountBadges = (product: any) => {
     const badges = [];
-    // 处理API返回的促销信息
+    
+    // 使用promotion的折扣（从promotions表获取）
     if (product.promotion && product.promotion.discount_percent) {
       badges.push({
         type: 'discount',
-        text: `特惠 ${product.promotion.discount_percent}%`,
-        color: '#EF4444'
+        text: `-${product.promotion.discount_percent}%`,
+        color: product.promotion.color || '#CA8A04'
       });
     }
-    // 检查是否有今日特惠活动
-    if (product.activities && product.activities.some((activity: any) => activity.name === '今日特惠')) {
-      badges.push({
-        type: 'daily',
-        text: '今日特惠',
-        color: '#F59E0B'
-      });
-    }
+    
     return badges;
   };
 
@@ -226,10 +243,10 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
       badges.push({
         type: 'bestSeller',
         text: '畅销',
-        color: '#CA8A04'
+        color: '#D4AF37'
       });
     }
-    if (product.new) {
+    if (product.isNew) {
       badges.push({
         type: 'new',
         text: '新品',
@@ -240,7 +257,7 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
       badges.push({
         type: 'limited',
         text: '库存有限',
-        color: '#6366F1'
+        color: '#EF4444'
       });
     }
     return badges;
@@ -248,26 +265,48 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
 
   // 获取普通活动标签
   const getActivityTags = (product: any) => {
-    // 处理不同的数据结构
-    if (product.activities && Array.isArray(product.activities)) {
-      return product.activities.filter((activity: any) => 
-        !['今日特惠', '特惠产品'].includes(activity.name)
-      ).map((activity: any) => ({
-        ...activity,
-        color: activity.color || '#8B5CF6', // 确保每个活动都有一个颜色属性
-        icon: activity.icon || activity.icon_url || 'tag' // 确保每个活动都有一个图标属性
-      }));
+    const tags = [];
+    const addedNames = new Set();
+    
+    // 处理promotion字段（单个活动）
+    if (product.promotion && typeof product.promotion === 'object') {
+      if (!['今日特惠', '特惠商品'].includes(product.promotion.name)) {
+        tags.push({
+          id: product.promotion.id || product.id,
+          name: product.promotion.name || '活动',
+          icon: product.promotion.icon || 'tag',
+          color: product.promotion.color || '#CA8A04'
+        });
+        addedNames.add(product.promotion.name);
+      }
     }
-    // 处理单独的活动标签字段
-    else if (product.activity_tag) {
-      return [{
+    
+    // 处理promotions字段（多个活动数组）
+    if (product.promotions && Array.isArray(product.promotions)) {
+      product.promotions.forEach((promo: any) => {
+        if (promo.name && !addedNames.has(promo.name) && !['今日特惠', '特惠商品'].includes(promo.name)) {
+          tags.push({
+            id: promo.id || product.id,
+            name: promo.name || '活动',
+            icon: promo.icon || 'tag',
+            color: promo.color || '#CA8A04'
+          });
+          addedNames.add(promo.name);
+        }
+      });
+    }
+    
+    // 处理activity_tag字段（单独标签）
+    if (product.activity_tag && !tags.find((t: any) => t.name === product.activity_tag)) {
+      tags.push({
         id: product.id,
         name: product.activity_tag,
-        icon: product.activity_icon || product.icon_url || 'tag',
-        color: product.activity_tag === '今日特惠' ? '#EF4444' : product.activity_tag === '特惠产品' ? '#3B82F6' : '#8B5CF6'
-      }];
+        icon: product.activity_icon || 'tag',
+        color: product.activity_color || (product.activity_tag === '今日特惠' ? '#EF4444' : '#CA8A04')
+      });
     }
-    return [];
+    
+    return tags;
   };
 
   const getStars = (rating: number) => {
@@ -281,6 +320,54 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
       </svg>
     ));
+  };
+
+  const handleAddToCart = async (product: any) => {
+    if (!product) return;
+    
+    try {
+      if (isAuthenticated && user) {
+        const accessToken = localStorage.getItem('access_token');
+        const response = await fetch('/api/cart', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            product_id: product.id,
+            quantity: 1
+          })
+        });
+        
+        if (response.ok) {
+          alert('已添加到购物车');
+        } else {
+          alert('添加失败');
+        }
+      } else {
+        const guestCart = JSON.parse(localStorage.getItem('cart_guest') || '[]');
+        const existingIndex = guestCart.findIndex((item: any) => item.id === product.id);
+        
+        if (existingIndex >= 0) {
+          guestCart[existingIndex].quantity += 1;
+        } else {
+          guestCart.push({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            image: product.image,
+            quantity: 1
+          });
+        }
+        
+        localStorage.setItem('cart_guest', JSON.stringify(guestCart));
+        alert('已添加到购物车（未登录）');
+      }
+    } catch (error) {
+      console.error('添加购物车失败:', error);
+      alert('添加失败');
+    }
   };
 
   // Get activity icon
@@ -320,7 +407,7 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
               const activityTags = getActivityTags(product);
               
               return (
-                <div key={product.id} className="bg-white rounded-md shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                <div key={product.id} className="bg-white rounded-md border overflow-hidden hover:shadow-md transition-shadow" style={{ borderColor: 'var(--border)' }}>
                   <div className="aspect-square relative">
                     <img
                       src={product.image}
@@ -397,12 +484,12 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
 
                     <div className="mb-3">
                       <div className="flex items-baseline">
-                        <span className="text-lg font-bold text-amazon-orange">
-                          {formatCurrency(convertCurrency(product.price, 'CNY', currency), currency)}
+                        <span className="text-lg font-bold" style={{ color: 'var(--accent)' }}>
+                          {formatCurrency(product.price, currency)}
                         </span>
-                        {product.originalPrice > 0 && (
+                        {product.originalPrice > 0 && product.originalPrice > product.price && (
                           <span className="text-sm text-gray-500 line-through ml-2">
-                            {formatCurrency(convertCurrency(product.originalPrice, 'CNY', currency), currency)}
+                            {formatCurrency(product.originalPrice, currency)}
                           </span>
                         )}
                       </div>
@@ -417,12 +504,26 @@ export function FeaturedProducts({ category = "all", data }: FeaturedProductsPro
                       )}
                     </div>
 
-                    <Link
-                      href={`/products/${product.id}`}
-                      className="block w-full bg-amazon-orange hover:bg-amazon-light-orange text-white text-sm font-medium py-2 px-4 rounded transition-colors duration-200 text-center hover:shadow-md"
-                    >
-                      查看详情
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/products/${product.id}`}
+                        className="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all duration-300 hover:opacity-90"
+                        style={{ 
+                          backgroundColor: 'var(--card)', 
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)'
+                        }}
+                      >
+                        查看详情
+                      </Link>
+                      <button
+                        onClick={() => handleAddToCart(product)}
+                        className="flex-1 text-center py-2 rounded-md text-sm font-medium text-white transition-all duration-300 hover:opacity-90"
+                        style={{ backgroundColor: 'var(--accent)' }}
+                      >
+                        加入购物车
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

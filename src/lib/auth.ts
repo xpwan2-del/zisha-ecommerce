@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '48h';
@@ -8,6 +8,9 @@ const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 // 用户JWT Payload类型
 export interface UserJWTPayload {
   userId: number;
+  id?: number;
+  name?: string;
+  phone?: string;
   email: string;
   role: string;
   iat?: number;
@@ -16,12 +19,12 @@ export interface UserJWTPayload {
 
 // 生成访问Token
 export function generateAccessToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_ACCESS_EXPIRES_IN });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '48h' });
 }
 
 // 生成刷新Token
 export function generateRefreshToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
 
 // 验证Token

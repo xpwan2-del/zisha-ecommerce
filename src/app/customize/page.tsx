@@ -101,7 +101,7 @@ export default function CustomizePage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-800">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amazon-orange"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-accent"></div>
       </div>
     );
   }
@@ -109,24 +109,24 @@ export default function CustomizePage() {
   return (
     <div className="py-12 px-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 min-h-screen">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-4xl font-bold mb-12 text-center text-amazon-dark dark:text-white tracking-tight">{t('customize.title')}</h1>
+        <h1 className="text-4xl font-bold mb-12 text-center text-dark dark:text-white tracking-tight">{t('customize.title')}</h1>
         
         {/* 进度条 */}
         <div className="mb-12 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-100 dark:border-gray-700">
           <div className="flex justify-between items-center mb-6">
             {[...Array(7)].map((_, index) => (
               <div key={index} className="flex flex-col items-center">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold mb-3 transition-all duration-300 ease-in-out ${step > index + 1 ? 'bg-amazon-orange text-white shadow-lg shadow-amazon-orange/20' : step === index + 1 ? 'bg-amazon-orange text-white shadow-lg shadow-amazon-orange/20 scale-110' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold mb-3 transition-all duration-300 ease-in-out ${step > index + 1 ? 'bg-accent text-white shadow-lg shadow-accent/20' : step === index + 1 ? 'bg-accent text-white shadow-lg shadow-accent/20 scale-110' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
                   {index + 1}
                 </div>
-                <span className={`text-xs font-medium transition-all duration-300 ${step > index + 1 ? 'text-amazon-orange' : step === index + 1 ? 'text-amazon-orange font-semibold' : 'text-gray-500'}`}>
+                <span className={`text-xs font-medium transition-all duration-300 ${step > index + 1 ? 'text-accent' : step === index + 1 ? 'text-accent font-semibold' : 'text-gray-500'}`}>
                   {t(`customize.step${index + 1}`)}
                 </span>
               </div>
             ))}
           </div>
           <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-            <div className="bg-amazon-orange h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${((step - 1) / 6) * 100}%` }}></div>
+            <div className="bg-accent h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${((step - 1) / 6) * 100}%` }}></div>
           </div>
         </div>
         
@@ -135,13 +135,13 @@ export default function CustomizePage() {
           {/* 步骤1：选择壶型 */}
           {step === 1 && (
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step1')}</h2>
+              <h2 className="text-3xl font-bold mb-8 text-dark dark:text-white tracking-tight">{t('customize.step1')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {teapotTypes.map((type) => (
                   <div
                     key={type.id}
                     onClick={() => setCustomData({ ...customData, teapotType: type })}
-                    className={`cursor-pointer border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl ${customData.teapotType?.id === type.id ? 'border-amazon-orange bg-amazon-orange/5 shadow-md shadow-amazon-orange/10' : 'border-gray-100 dark:border-gray-700 hover:border-amazon-orange hover:shadow-lg'}`}
+                    className={`cursor-pointer border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl ${customData.teapotType?.id === type.id ? 'border-accent bg-accent/5 shadow-md shadow-accent/10' : 'border-gray-100 dark:border-gray-700 hover:border-accent hover:shadow-lg'}`}
                   >
                     <div className="aspect-square overflow-hidden relative group">
                       <img 
@@ -150,19 +150,19 @@ export default function CustomizePage() {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       {customData.teapotType?.id === type.id && (
-                        <div className="absolute inset-0 bg-amazon-orange/20 flex items-center justify-center">
-                          <div className="bg-white text-amazon-orange px-3 py-1 rounded-full text-sm font-medium">
+                        <div className="absolute inset-0 bg-accent/20 flex items-center justify-center">
+                          <div className="bg-white text-accent px-3 py-1 rounded-full text-sm font-medium">
                             已选择
                           </div>
                         </div>
                       )}
                     </div>
                     <div className="p-5">
-                      <h3 className="font-semibold mb-1 text-amazon-dark dark:text-white">{type.name}</h3>
+                      <h3 className="font-semibold mb-1 text-dark dark:text-white">{type.name}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{type.name_en}</p>
                       <div className="flex justify-between items-center">
                         <p className="text-xs text-gray-500">{type.min_capacity}-{type.max_capacity}ml</p>
-                        <p className="text-sm font-bold text-amazon-orange">${type.base_price.toFixed(2)}</p>
+                        <p className="text-sm font-bold text-accent">${type.base_price.toFixed(2)}</p>
                       </div>
                     </div>
                   </div>
@@ -174,13 +174,13 @@ export default function CustomizePage() {
           {/* 步骤2：选择泥料 */}
           {step === 2 && (
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step2')}</h2>
+              <h2 className="text-3xl font-bold mb-8 text-dark dark:text-white tracking-tight">{t('customize.step2')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {materials.map((material) => (
                   <div
                     key={material.id}
                     onClick={() => setCustomData({ ...customData, material })}
-                    className={`cursor-pointer border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl ${customData.material?.id === material.id ? 'border-amazon-orange bg-amazon-orange/5 shadow-md shadow-amazon-orange/10' : 'border-gray-100 dark:border-gray-700 hover:border-amazon-orange hover:shadow-lg'}`}
+                    className={`cursor-pointer border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl ${customData.material?.id === material.id ? 'border-accent bg-accent/5 shadow-md shadow-accent/10' : 'border-gray-100 dark:border-gray-700 hover:border-accent hover:shadow-lg'}`}
                   >
                     <div className="aspect-square relative group">
                       <div 
@@ -188,18 +188,18 @@ export default function CustomizePage() {
                         style={{ backgroundColor: material.color }}
                       ></div>
                       {customData.material?.id === material.id && (
-                        <div className="absolute inset-0 bg-amazon-orange/20 flex items-center justify-center">
-                          <div className="bg-white text-amazon-orange px-3 py-1 rounded-full text-sm font-medium">
+                        <div className="absolute inset-0 bg-accent/20 flex items-center justify-center">
+                          <div className="bg-white text-accent px-3 py-1 rounded-full text-sm font-medium">
                             已选择
                           </div>
                         </div>
                       )}
                     </div>
                     <div className="p-5">
-                      <h3 className="font-semibold mb-1 text-amazon-dark dark:text-white">{material.name}</h3>
+                      <h3 className="font-semibold mb-1 text-dark dark:text-white">{material.name}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{material.description}</p>
                       {material.price_modifier > 0 && (
-                        <p className="text-sm font-bold text-amazon-orange">+${material.price_modifier.toFixed(2)}</p>
+                        <p className="text-sm font-bold text-accent">+${material.price_modifier.toFixed(2)}</p>
                       )}
                     </div>
                   </div>
@@ -211,7 +211,7 @@ export default function CustomizePage() {
           {/* 步骤3：选择容量 */}
           {step === 3 && (
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step3')}</h2>
+              <h2 className="text-3xl font-bold mb-8 text-dark dark:text-white tracking-tight">{t('customize.step3')}</h2>
               <div className="mb-10">
                 <div className="mb-6">
                   <input
@@ -226,13 +226,13 @@ export default function CustomizePage() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">{customData.teapotType?.min_capacity || 100}ml</span>
                   <div className="text-center">
-                    <span className="text-3xl font-bold text-amazon-orange">{customData.capacity}</span>
+                    <span className="text-3xl font-bold text-accent">{customData.capacity}</span>
                     <span className="text-lg text-gray-600 dark:text-gray-300 ml-1">ml</span>
                   </div>
                   <span className="text-sm text-gray-500">{customData.teapotType?.max_capacity || 500}ml</span>
                 </div>
               </div>
-              <div className="bg-gradient-to-r from-amazon-orange/5 to-amazon-orange/10 dark:from-amazon-orange/10 dark:to-amazon-orange/20 p-6 rounded-xl border border-amazon-orange/20">
+              <div className="bg-gradient-to-r from-accent/5 to-accent/10 dark:from-accent/10 dark:to-accent/20 p-6 rounded-xl border border-accent/20">
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                   {customData.capacity < 150 ? t('customize.capacity_small') : 
                    customData.capacity < 250 ? t('customize.capacity_medium') : 
@@ -245,7 +245,7 @@ export default function CustomizePage() {
           {/* 步骤4：刻字服务 */}
           {step === 4 && (
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step4')}</h2>
+              <h2 className="text-3xl font-bold mb-8 text-dark dark:text-white tracking-tight">{t('customize.step4')}</h2>
               <div className="flex items-center gap-4 mb-8">
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -257,16 +257,16 @@ export default function CustomizePage() {
                     })}
                     className="sr-only peer"
                   />
-                  <div className="w-12 h-6 bg-gray-100 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amazon-orange"></div>
-                  <span className="ml-3 text-sm font-medium text-amazon-dark dark:text-white">{t('customize.engraving_enable')}</span>
+                  <div className="w-12 h-6 bg-gray-100 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                  <span className="ml-3 text-sm font-medium text-dark dark:text-white">{t('customize.engraving_enable')}</span>
                 </label>
-                <span className="text-sm font-bold text-amazon-orange">+50 AED</span>
+                <span className="text-sm font-bold text-accent">+50 AED</span>
               </div>
               
               {customData.engraving.enabled && (
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium mb-3 text-amazon-dark dark:text-white">{t('customize.engraving_text')}</label>
+                    <label className="block text-sm font-medium mb-3 text-dark dark:text-white">{t('customize.engraving_text')}</label>
                     <input
                       type="text"
                       value={customData.engraving.text}
@@ -275,7 +275,7 @@ export default function CustomizePage() {
                         engraving: { ...customData.engraving, text: e.target.value } 
                       })}
                       maxLength={20}
-                      className="w-full px-5 py-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-amazon-orange focus:border-transparent transition-all duration-200"
+                      className="w-full px-5 py-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200"
                       placeholder={t('customize.engraving_placeholder')}
                     />
                     <div className="flex justify-between items-center mt-2">
@@ -327,7 +327,7 @@ export default function CustomizePage() {
           {/* 步骤5：图案定制 */}
           {step === 5 && (
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step5')}</h2>
+              <h2 className="text-3xl font-bold mb-8 text-dark dark:text-white tracking-tight">{t('customize.step5')}</h2>
               <div className="flex items-center gap-4 mb-8">
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -430,7 +430,7 @@ export default function CustomizePage() {
           {/* 步骤6：预览效果 */}
           {step === 6 && (
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step6')}</h2>
+              <h2 className="text-3xl font-bold mb-8 text-dark dark:text-white tracking-tight">{t('customize.step6')}</h2>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl p-8 flex items-center justify-center shadow-sm">
                   <div className="text-center">
@@ -487,31 +487,31 @@ export default function CustomizePage() {
           {/* 步骤7：下单 */}
           {step === 7 && (
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-amazon-dark dark:text-white tracking-tight">{t('customize.step7')}</h2>
+              <h2 className="text-3xl font-bold mb-8 text-dark dark:text-white tracking-tight">{t('customize.step7')}</h2>
               <div className="space-y-8">
-                <div className="bg-gradient-to-br from-amazon-orange/5 to-amazon-orange/10 dark:from-amazon-orange/10 dark:to-amazon-orange/20 p-6 rounded-xl border border-amazon-orange/20 shadow-sm">
-                  <h3 className="text-xl font-semibold mb-6 text-amazon-dark dark:text-white">{t('customize.order_summary')}</h3>
+                <div className="bg-gradient-to-br from-accent/5 to-accent/10 dark:from-accent/10 dark:to-accent/20 p-6 rounded-xl border border-accent/20 shadow-sm">
+                  <h3 className="text-xl font-semibold mb-6 text-dark dark:text-white">{t('customize.order_summary')}</h3>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center py-2 border-b border-amazon-orange/10">
+                    <div className="flex justify-between items-center py-2 border-b border-accent/10">
                       <span className="text-gray-600 dark:text-gray-300">{t('customize.teapot_type')}:</span>
                       <span className="font-medium text-amazon-dark dark:text-white">{customData.teapotType?.name}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-amazon-orange/10">
+                    <div className="flex justify-between items-center py-2 border-b border-accent/10">
                       <span className="text-gray-600 dark:text-gray-300">{t('customize.material')}:</span>
                       <span className="font-medium text-amazon-dark dark:text-white">{customData.material?.name}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-amazon-orange/10">
+                    <div className="flex justify-between items-center py-2 border-b border-accent/10">
                       <span className="text-gray-600 dark:text-gray-300">{t('customize.capacity')}:</span>
                       <span className="font-medium text-amazon-dark dark:text-white">{customData.capacity}ml</span>
                     </div>
                     {customData.engraving.enabled && (
-                      <div className="flex justify-between items-center py-2 border-b border-amazon-orange/10">
+                      <div className="flex justify-between items-center py-2 border-b border-accent/10">
                         <span className="text-gray-600 dark:text-gray-300">{t('customize.engraving')}:</span>
                         <span className="font-medium text-amazon-orange">+50 AED</span>
                       </div>
                     )}
                     {customData.pattern.enabled && (
-                      <div className="flex justify-between items-center py-2 border-b border-amazon-orange/10">
+                      <div className="flex justify-between items-center py-2 border-b border-accent/10">
                         <span className="text-gray-600 dark:text-gray-300">{t('customize.pattern')}:</span>
                         <span className="font-medium text-amazon-orange">+30 AED</span>
                       </div>

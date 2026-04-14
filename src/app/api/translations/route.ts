@@ -69,12 +69,13 @@ export async function POST(request: NextRequest) {
 
     // 先尝试更新
     const updateResult = await query(
-      `UPDATE translations SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? AND language = ?`,
+      `UPDATE translations SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? AND language = ?
+       RETURNING *`,
       [value, key, language]
     );
-    
+
     // 如果没有更新任何行，则插入新记录
-    if (updateResult.rowCount === 0) {
+    if (updateResult.rows.length === 0) {
       await query(
         `INSERT INTO translations (key, language, value) VALUES (?, ?, ?)`,
         [key, language, value]
@@ -104,13 +105,14 @@ export async function PUT(request: NextRequest) {
     }
 
     const result = await query(
-      `UPDATE translations 
-       SET key = ?, language = ?, value = ?, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?`,
+      `UPDATE translations
+       SET key = ?, language = ?, value = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?
+       RETURNING *`,
       [key, language, value, id]
     );
 
-    if (result.rowCount === 0) {
+    if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Translation not found' }, { status: 404 });
     }
 
@@ -137,11 +139,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     const result = await query(
-      'DELETE FROM translations WHERE id = ?',
+      'DELETE FROM translations WHERE id = ? RETURNING id',
       [id]
     );
 
-    if (result.rowCount === 0) {
+    if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Translation not found' }, { status: 404 });
     }
 

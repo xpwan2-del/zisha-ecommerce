@@ -163,7 +163,8 @@ export async function POST(request: NextRequest) {
       `INSERT INTO inventory_logs (
         product_id, change_type, quantity,
         before_stock, after_stock, reason, operator_name, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      RETURNING id`,
       [
         product_id,
         change_type,
@@ -175,45 +176,10 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    // 记录产品操作日志
-    await query(
-      `INSERT INTO product_logs (
-        product_id, action, field_name, old_value, new_value, operator_name, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [
-        product_id,
-        'inventory_adjust',
-        'stock',
-        String(currentStock),
-        String(newStock),
-        operator_name
-      ]
-    );
-
-    // 记录活动日志
-    await query(
-      `INSERT INTO activity_logs (activity_type, action, target_id, target_name, details, operator_name, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [
-        'inventory',
-        change_type,
-        product_id,
-        productName,
-        JSON.stringify({
-          change_type,
-          quantity: actualQuantity,
-          before_stock: currentStock,
-          after_stock: newStock,
-          reason
-        }),
-        operator_name
-      ]
-    );
-
     return NextResponse.json({
       success: true,
       data: {
-        log_id: logResult.lastID,
+        log_id: logResult.rows[0]?.id,
         product_id,
         product_name: productName,
         change_type,

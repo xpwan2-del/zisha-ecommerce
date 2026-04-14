@@ -149,11 +149,12 @@ export async function POST(request: NextRequest) {
     const result = await query(
       `INSERT INTO addresses (
         user_id, name, phone, country, city, address, postal_code, is_default, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      RETURNING id`,
       [user_id, name, phone, country, city, address, postal_code || '', is_default ? 1 : 0]
     );
 
-    const addressId = result.lastID;
+    const addressId = result.rows[0]?.id;
 
     // 记录操作日志
     await logUserAction(

@@ -30,6 +30,7 @@ interface HomeData {
   modules: HomeModule[];
   guarantees: any[];
   categories: any[];
+  activities?: any[];
   products: {
     products: any[];
     total: number;
@@ -73,7 +74,7 @@ export function HomeModules({ data }: HomeModulesProps) {
     const allSlides = [heroModule, ...activityModules].filter(Boolean);
     
     return (
-      <section className="relative bg-[#FAFAF9] overflow-hidden">
+      <section className="relative bg-background overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
           {/* Combined Carousel - Luxury Style */}
           <div className="relative rounded-sm overflow-hidden shadow-2xl h-[400px] md:h-[500px] mb-8 bg-white">
@@ -87,18 +88,18 @@ export function HomeModules({ data }: HomeModulesProps) {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center h-full p-6 sm:p-10">
                       <div className="space-y-6 order-2 lg:order-1">
                         <div className="space-y-4">
-                          <p className="text-sm text-[#CA8A04] tracking-widest uppercase font-medium">
+                          <p className="text-sm text-accent tracking-widest uppercase font-medium">
                             源自中国的顶级茶具
                           </p>
                           <h1 
-                            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-[#1C1917] leading-tight"
+                            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-text leading-tight"
                             style={{ fontFamily: 'Cormorant, serif' }}
                           >
                             {getLocalizedText(slide.title, slide.title_en, slide.title_ar)}
                           </h1>
                         </div>
                         
-                        <p className="text-base text-[#78716C] leading-relaxed max-w-lg">
+                        <p className="text-base text-text-muted leading-relaxed max-w-lg">
                           {getLocalizedText(slide.description, slide.description_en, slide.description_ar)}
                         </p>
                         
@@ -106,7 +107,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                           {slide.button_text && slide.button_link && (
                             <a 
                               href={slide.button_link} 
-                              className="bg-[#CA8A04] hover:bg-[#B47C03] text-white font-medium py-3 px-8 rounded-sm transition-all duration-300 flex items-center justify-center text-sm tracking-wide"
+                              className="bg-accent hover:bg-accent text-white font-medium py-3 px-8 rounded-sm transition-all duration-300 flex items-center justify-center text-sm tracking-wide"
                               style={{ boxShadow: '0 4px 14px rgba(202, 138, 4, 0.3)' }}
                             >
                               {getLocalizedText(slide.button_text, slide.button_text_en || '', slide.button_text_ar || '')}
@@ -115,7 +116,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                           {slide.secondary_button_text && slide.secondary_button_link && (
                             <a 
                               href={slide.secondary_button_link} 
-                              className="border-2 border-[#1C1917] hover:bg-[#1C1917] hover:text-white text-[#1C1917] py-3 px-8 rounded-sm font-medium transition-all duration-300 flex items-center justify-center text-sm tracking-wide"
+                              className="border-2 border-text hover:bg-text hover:text-white text-text py-3 px-8 rounded-sm font-medium transition-all duration-300 flex items-center justify-center text-sm tracking-wide"
                             >
                               {getLocalizedText(slide.secondary_button_text, slide.secondary_button_text_en || '', slide.secondary_button_text_ar || '')}
                             </a>
@@ -133,7 +134,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                         </div>
                         {slide.button_text && (
                           <div 
-                            className="absolute -bottom-4 -right-4 bg-[#CA8A04] text-white px-5 py-2 rounded-sm shadow-lg font-medium text-sm tracking-wide"
+                            className="absolute -bottom-4 -right-4 bg-accent text-white px-5 py-2 rounded-sm shadow-lg font-medium text-sm tracking-wide"
                             style={{ fontFamily: 'Cormorant, serif' }}
                           >
                             {getLocalizedText(slide.button_text, slide.button_text_en || '', slide.button_text_ar || '')}
@@ -149,7 +150,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                       alt={slide.title}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1C1917]/90 to-transparent flex items-end">
+                    <div className="absolute inset-0 bg-gradient-to-t from-dark/90 to-transparent flex items-end">
                       <div className="p-8 text-white">
                         <h3 
                           className="text-2xl md:text-3xl font-bold mb-2"
@@ -157,7 +158,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                         >
                           {getLocalizedText(slide.title, slide.title_en, slide.title_ar)}
                         </h3>
-                        <p className="text-base text-[#A8A29E]">
+                        <p className="text-base text-text-muted">
                           {getLocalizedText(slide.description, slide.description_en, slide.description_ar)}
                         </p>
                       </div>
@@ -173,15 +174,15 @@ export function HomeModules({ data }: HomeModulesProps) {
                 <button
                   key={`indicator-${slide.id}-${index}`}
                   onClick={() => setCurrentActivityIndex(index)}
-                  className={`h-1 rounded-full transition-all duration-300 ${index === currentActivityIndex ? 'bg-[#CA8A04] w-10' : 'bg-[#E7E5E4] w-6 hover:bg-[#CA8A04]/50'}`}
+                  className={`h-1 rounded-full transition-all duration-300 ${index === currentActivityIndex ? 'bg-accent w-10' : 'bg-border w-6 hover:bg-accent/50'}`}
                 ></button>
               ))}
             </div>
           </div>
           
           {/* Scrolling promotions - Luxury Style */}
-          <div className="overflow-hidden bg-white rounded-sm shadow-sm border border-[#E7E5E4] p-5">
-            <h3 className="text-lg font-medium text-[#1C1917] mb-4">平台活动</h3>
+          <div className="overflow-hidden bg-white rounded-sm shadow-sm border border-border p-5">
+            <h3 className="text-lg font-medium text-text mb-4">平台活动</h3>
             <div className="flex animate-scroll whitespace-nowrap">
               <div className="flex space-x-6 py-2">
                 {data.activities && data.activities.length > 0 ? (
@@ -192,15 +193,15 @@ export function HomeModules({ data }: HomeModulesProps) {
                         className="flex flex-col items-center space-x-3 flex-shrink-0 px-4 w-72"
                       >
                         <a href={activity.link || '#'} className="block w-full group">
-                          <div className="flex items-center space-x-4 p-4 border border-[#E7E5E4] rounded-sm shadow-sm hover:shadow-md transition-shadow duration-300 bg-white">
+                          <div className="flex items-center space-x-4 p-4 border border-border rounded-sm shadow-sm hover:shadow-md transition-shadow duration-300 bg-white">
                             {/* 活动图标 */}
                             <div className="flex-shrink-0">
                               <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all duration-300 hover:scale-105 ${
-                                activity.type === 'daily' ? 'bg-[#CA8A04]' :
-                                activity.type === 'special' ? 'bg-[#DB2777]' :
-                                activity.type === 'category' ? 'bg-[#F472B6]' :
-                                activity.type === 'product' ? 'bg-[#D4A520]' :
-                                'bg-[#CA8A04]'
+                                activity.type === 'daily' ? 'bg-accent' :
+                                activity.type === 'special' ? 'bg-accent' :
+                                activity.type === 'category' ? 'bg-accent' :
+                                activity.type === 'product' ? 'bg-accent' :
+                                'bg-accent'
                               }`}>
                                 {activity.type === 'daily' && (
                                   <img src="/images/icons/promotion-daily.svg" alt="Daily promotion" className="w-6 h-6 text-white" />
@@ -223,14 +224,14 @@ export function HomeModules({ data }: HomeModulesProps) {
                             <div className="flex-grow">
                               {/* 折扣标签 */}
                               {activity.discount_percent && (
-                                <div className="inline-block bg-[#CA8A04] text-white text-xs font-medium px-2 py-0.5 rounded-sm mb-1">
+                                <div className="inline-block bg-accent text-white text-xs font-medium px-2 py-0.5 rounded-sm mb-1">
                                   {activity.discount_percent}% OFF
                                 </div>
                               )}
-                              <h4 className="text-sm font-medium text-[#1C1917] group-hover:text-[#CA8A04] transition-colors duration-300">
+                              <h4 className="text-sm font-medium text-text group-hover:text-accent transition-colors duration-300">
                                 {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
                               </h4>
-                              <p className="text-xs text-[#78716C]">
+                              <p className="text-xs text-text-muted">
                                 {getLocalizedText(activity.description, activity.description_en, activity.description_ar)}
                               </p>
                             </div>
@@ -245,15 +246,15 @@ export function HomeModules({ data }: HomeModulesProps) {
                         className="flex flex-col items-center space-x-3 flex-shrink-0 px-4 w-64"
                       >
                         <a href={activity.link || '#'} className="block w-full group">
-                          <div className="flex items-center space-x-4 p-4 border border-[#E7E5E4] rounded-sm shadow-sm hover:shadow-md transition-shadow duration-300 bg-white">
+                          <div className="flex items-center space-x-4 p-4 border border-border rounded-sm shadow-sm hover:shadow-md transition-shadow duration-300 bg-white">
                             {/* 活动图标 */}
                             <div className="flex-shrink-0">
                               <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all duration-300 hover:scale-105 ${
-                                activity.type === 'daily' ? 'bg-[#CA8A04]' :
-                                activity.type === 'special' ? 'bg-[#DB2777]' :
-                                activity.type === 'category' ? 'bg-[#F472B6]' :
-                                activity.type === 'product' ? 'bg-[#D4A520]' :
-                                'bg-[#CA8A04]'
+                                activity.type === 'daily' ? 'bg-accent' :
+                                activity.type === 'special' ? 'bg-accent' :
+                                activity.type === 'category' ? 'bg-accent' :
+                                activity.type === 'product' ? 'bg-accent' :
+                                'bg-accent'
                               }`}>
                                 {activity.type === 'daily' && (
                                   <img src="/images/icons/promotion-daily.svg" alt="Daily promotion" className="w-6 h-6 text-white" />
@@ -276,14 +277,14 @@ export function HomeModules({ data }: HomeModulesProps) {
                             <div className="flex-grow">
                               {/* 折扣标签 */}
                               {activity.discount_percent && (
-                                <div className="inline-block bg-[#CA8A04] text-white text-xs font-medium px-2 py-0.5 rounded-sm mb-1">
+                                <div className="inline-block bg-accent text-white text-xs font-medium px-2 py-0.5 rounded-sm mb-1">
                                   {activity.discount_percent}% OFF
                                 </div>
                               )}
-                              <h4 className="text-sm font-medium text-[#1C1917] group-hover:text-[#CA8A04] transition-colors duration-300">
+                              <h4 className="text-sm font-medium text-text group-hover:text-accent transition-colors duration-300">
                                 {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
                               </h4>
-                              <p className="text-xs text-[#78716C]">
+                              <p className="text-xs text-text-muted">
                                 {getLocalizedText(activity.description, activity.description_en, activity.description_ar)}
                               </p>
                             </div>
@@ -295,7 +296,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                 ) : (
                   <div className="flex flex-col items-center space-x-3 flex-shrink-0 px-4 w-64">
                     <div className="text-center py-8">
-                      <p className="text-sm text-[#78716C]">暂无活动</p>
+                      <p className="text-sm text-text-muted">暂无活动</p>
                     </div>
                   </div>
                 )}
@@ -327,7 +328,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                       alt={activity.title}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1C1917]/90 to-transparent flex items-end">
+                    <div className="absolute inset-0 bg-gradient-to-t from-dark/90 to-transparent flex items-end">
                       <div className="p-8 text-white">
                         <h3 
                           className="text-2xl md:text-3xl font-bold mb-2"
@@ -335,7 +336,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                         >
                           {getLocalizedText(activity.title, activity.title_en, activity.title_ar)}
                         </h3>
-                        <p className="text-base text-[#A8A29E]">
+                        <p className="text-base text-text-muted">
                           {getLocalizedText(activity.description, activity.description_en, activity.description_ar)}
                         </p>
                       </div>
@@ -349,7 +350,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                   <button
                     key={`activity-indicator-${activity.id}-${index}`}
                     onClick={() => setCurrentActivityIndex(index)}
-                    className={`h-1 rounded-full transition-all duration-300 ${index === currentActivityIndex ? 'bg-[#CA8A04] w-10' : 'bg-[#E7E5E4] w-6'}`}
+                    className={`h-1 rounded-full transition-all duration-300 ${index === currentActivityIndex ? 'bg-accent w-10' : 'bg-border w-6'}`}
                   ></button>
                 ))}
               </div>

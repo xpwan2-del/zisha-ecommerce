@@ -4,8 +4,8 @@ import { query } from '@/lib/db';
 // GET /api/about - Get about information
 export async function GET() {
   try {
-    const result = await query('SELECT * FROM about LIMIT 1');
-    
+    const result = await query('SELECT * FROM about LIMIT 1') as { rows: any[] };
+
     let about = result.rows[0];
     
     if (!about) {
@@ -23,7 +23,7 @@ export async function GET() {
       };
       
       const insertResult = await query(
-        'INSERT INTO about (title, description, images, video_url, content) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO about (title, description, images, video_url, content) VALUES ($1, $2, $3, $4, $5)',
         [
           defaultAbout.title,
           defaultAbout.description,
@@ -32,8 +32,8 @@ export async function GET() {
           defaultAbout.content
         ]
       );
-      
-      about = insertResult.rows[0];
+
+      about = { id: 1, ...defaultAbout };
     }
     
     return NextResponse.json(about);
@@ -54,13 +54,12 @@ export async function POST(request: NextRequest) {
       INSERT INTO about (title, description, images, video_url, content)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT DO UPDATE
-      SET 
+      SET
         title = $1,
         description = $2,
         images = $3,
         video_url = $4,
         content = $5
-      RETURNING *
     `, [
       title,
       description,
@@ -68,8 +67,8 @@ export async function POST(request: NextRequest) {
       videoUrl,
       content
     ]);
-    
-    return NextResponse.json(result.rows[0]);
+
+    return NextResponse.json({ id: 1, title, description, images, video_url: videoUrl, content });
   } catch (error) {
     console.error('Error updating about information:', error);
     return NextResponse.json({ error: 'Failed to update about information' }, { status: 500 });

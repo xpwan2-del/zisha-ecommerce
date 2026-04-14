@@ -73,9 +73,12 @@ export async function POST(request: NextRequest) {
 
     const result = await query(
       `INSERT INTO activity_categories (name, name_en, name_ar, icon_url, color, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+       RETURNING id`,
       [name, name_en, name_ar, icon_url, color, status]
     );
+
+    const categoryId = result.rows[0]?.id || 1;
 
     // 记录活动日志
     await query(
@@ -84,7 +87,7 @@ export async function POST(request: NextRequest) {
       [
         'activity_category',
         'create',
-        result.lastID,
+        categoryId,
         name,
         JSON.stringify({ name, name_en, icon_url }),
         'system'
@@ -94,7 +97,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        id: result.lastID,
+        id: categoryId,
         name,
         name_en,
         name_ar,
@@ -133,13 +136,13 @@ export async function PUT(request: NextRequest) {
     const oldName = oldCategoryResult.rows?.[0]?.name;
 
     const updateResult = await query(
-      `UPDATE activity_categories
-       SET name = ?, name_en = ?, name_ar = ?, icon_url = ?, color = ?, status = ?, updated_at = datetime('now')
-       WHERE id = ?`,
+      `UPDATE activity_categories SET name = ?, name_en = ?, name_ar = ?, icon_url = ?, color = ?, status = ?, updated_at = datetime('now')
+       WHERE id = ?
+       RETURNING id`,
       [name, name_en, name_ar, icon_url, color, status, id]
     );
 
-    if (updateResult.rowCount === 0) {
+    if (updateResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Activity category not found' },
         { status: 404 }
@@ -211,9 +214,9 @@ export async function DELETE(request: NextRequest) {
       ]
     );
 
-    const deleteResult = await query('DELETE FROM activity_categories WHERE id = ?', [id]);
+    const deleteResult = await query('DELETE FROM activity_categories WHERE id = ? RETURNING id', [id]);
 
-    if (deleteResult.rowCount === 0) {
+    if (deleteResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Activity category not found' },
         { status: 404 }

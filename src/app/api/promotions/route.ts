@@ -117,7 +117,8 @@ export async function POST(request: NextRequest) {
         start_time, end_time,
         description, status,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      RETURNING id`,
       [
         name, name_en, name_ar,
         type, discount_percent,
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    const promotionId = result.lastID;
+    const promotionId = result.rows[0]?.id;
 
     // 记录活动日志
     await query(
@@ -193,7 +194,8 @@ export async function PUT(request: NextRequest) {
         start_time = ?, end_time = ?,
         description = ?, status = ?,
         updated_at = datetime('now')
-       WHERE id = ?`,
+       WHERE id = ?
+       RETURNING id`,
       [
         name, name_en, name_ar,
         type, discount_percent,
@@ -202,7 +204,7 @@ export async function PUT(request: NextRequest) {
       ]
     );
 
-    if (updateResult.rowCount === 0) {
+    if (updateResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Promotion not found' },
         { status: 404 }
@@ -279,9 +281,9 @@ export async function DELETE(request: NextRequest) {
       ]
     );
 
-    const deleteResult = await query('DELETE FROM promotions WHERE id = ?', [id]);
+    const deleteResult = await query('DELETE FROM promotions WHERE id = ? RETURNING id', [id]);
 
-    if (deleteResult.rowCount === 0) {
+    if (deleteResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Promotion not found' },
         { status: 404 }

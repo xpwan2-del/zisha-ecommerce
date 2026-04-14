@@ -114,12 +114,13 @@ export async function POST(request: NextRequest) {
       try {
         // 先尝试更新
         const updateResult = await query(
-          `UPDATE translations SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? AND language = ?`,
+          `UPDATE translations SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? AND language = ?
+           RETURNING *`,
           [translation.value, translation.key, translation.language]
         );
-        
+
         // 如果没有更新任何行，则插入新记录
-        if (updateResult.rowCount === 0) {
+        if (updateResult.rows.length === 0) {
           await query(
             `INSERT INTO translations (key, language, value) VALUES (?, ?, ?)`,
             [translation.key, translation.language, translation.value]

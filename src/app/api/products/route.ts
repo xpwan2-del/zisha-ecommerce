@@ -149,17 +149,44 @@ export async function GET(request: NextRequest) {
           pr.name_en as promotion_name_en,
           pr.name_ar as promotion_name_ar,
           pr.discount_percent,
-          pr.type as promotion_type
+          pr.type as promotion_type,
+          pr.icon as promotion_icon,
+          pr.color as promotion_color
          FROM product_promotions pp
          JOIN promotions pr ON pp.promotion_id = pr.id
-         WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
+         WHERE pp.product_id = ? 
+           AND pp.status = 'active' 
+           AND pr.status = 'active'
          ORDER BY pr.discount_percent DESC`,
         [productId]
       );
       const promotions = promotionsResult.rows || [];
 
       // 选择最大折扣的促销作为主促销
-      const promotion = promotions.length > 0 ? promotions[0] : null;
+      const promotion = promotions.length > 0 ? {
+        id: promotions[0].promotion_id,
+        name: promotions[0].promotion_name,
+        name_en: promotions[0].promotion_name_en,
+        name_ar: promotions[0].promotion_name_ar,
+        discount_percent: promotions[0].discount_percent,
+        type: promotions[0].promotion_type,
+        icon: promotions[0].promotion_icon,
+        color: promotions[0].promotion_color,
+        promotion_price: promotions[0].promotion_price,
+        original_price: promotions[0].original_price || row.price
+      } : null;
+
+      // 返回所有促销（排除"今日特惠"和"特惠商品"）
+      const allPromotions = promotions.map(p => ({
+        id: p.promotion_id,
+        name: p.promotion_name,
+        name_en: p.promotion_name_en,
+        name_ar: p.promotion_name_ar,
+        discount_percent: p.discount_percent,
+        type: p.promotion_type,
+        icon: p.promotion_icon,
+        color: p.promotion_color
+      })).filter(p => p.name !== '今日特惠' && p.name !== '特惠商品');
 
       // 查询商品特性
       const featuresResult = await query(
@@ -232,26 +259,26 @@ export async function GET(request: NextRequest) {
           color: activity.color
         })),
         promotion: promotion ? {
-          id: promotion.promotion_id,
-          product_promotion_id: promotion.product_promotion_id,
-          name: promotion.promotion_name,
-          name_en: promotion.promotion_name_en,
-          name_ar: promotion.promotion_name_ar,
-          type: promotion.promotion_type,
+          id: promotion.id,
+          name: promotion.name,
+          name_en: promotion.name_en,
+          name_ar: promotion.name_ar,
+          type: promotion.type,
           discount_percent: promotion.discount_percent,
-          original_price: parseFloat(promotion.original_price),
+          icon: promotion.icon,
+          color: promotion.color,
+          original_price: parseFloat(promotion.original_price || row.price),
           promotion_price: parseFloat(promotion.promotion_price)
         } : null,
-        promotions: promotions.map((promo: any) => ({
-          id: promo.promotion_id,
-          product_promotion_id: promo.product_promotion_id,
-          name: promo.promotion_name,
-          name_en: promo.promotion_name_en,
-          name_ar: promo.promotion_name_ar,
-          type: promo.promotion_type,
+        promotions: allPromotions.map((promo: any) => ({
+          id: promo.id,
+          name: promo.name,
+          name_en: promo.name_en,
+          name_ar: promo.name_ar,
+          type: promo.type,
           discount_percent: promo.discount_percent,
-          original_price: parseFloat(promo.original_price),
-          promotion_price: parseFloat(promo.promotion_price)
+          icon: promo.icon,
+          color: promo.color
         })),
         review_count: reviewCount,
         rating: rating,
@@ -302,7 +329,8 @@ export async function POST(request: NextRequest) {
         price, original_price, stock,
         category_id, image, images,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      RETURNING id`,
       [
         name, name_en, name_ar,
         description, description_en, description_ar,
@@ -311,8 +339,9 @@ export async function POST(request: NextRequest) {
       ]
     );
 
+    const productId = result.rows[0]?.id;
+
     // 记录库存初始化日志
-    const productId = result.lastID;
     await query(
       `INSERT INTO inventory_logs (
         product_id, change_type, quantity,
