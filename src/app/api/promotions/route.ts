@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
             `SELECT
               pp.id as product_promotion_id,
               pp.product_id,
-              pp.original_price,
+              p.price as original_price,
               pp.status as bind_status,
               p.name as product_name,
               p.name_en as product_name_en,

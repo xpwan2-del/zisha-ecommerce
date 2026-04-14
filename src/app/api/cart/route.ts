@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
         p.name_en,
         p.name_ar,
         p.price,
-        p.original_price,
         p.image,
         p.stock
       FROM cart_items c
@@ -44,7 +43,7 @@ export async function GET(request: NextRequest) {
       return {
         ...item,
         price: parseFloat(item.price),
-        original_price: parseFloat(item.original_price),
+        original_price: parseFloat(item.price),
         subtotal: item_total
       };
     });

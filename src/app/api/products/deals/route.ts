@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         price: parseFloat(row.price),
         price_usd: parseFloat(row.price_usd || 0),
         price_ae: parseFloat(row.price_ae || 0),
-        original_price: parseFloat(row.original_price || row.price || 0),
+        original_price: parseFloat(row.price || 0),
         discount: row.discount_percent || 0,
         is_limited: row.is_limited || false,
         stock: row.stock || 0,

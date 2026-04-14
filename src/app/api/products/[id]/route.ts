@@ -204,7 +204,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const relatedProductsResult = await query(
       `SELECT
         p.id, p.name, p.name_en, p.name_ar,
-        p.price, p.original_price, p.image,
+        p.price, p.image,
         c.name as category_name
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       name_en: p.name_en,
       name_ar: p.name_ar,
       price: parseFloat(p.price) || 0,
-      original_price: parseFloat(p.original_price) || 0,
+      original_price: parseFloat(p.price) || 0,
       image: p.image,
       category: { name: p.category_name }
     }));
@@ -234,7 +234,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       description_en: row.description_en,
       description_ar: row.description_ar,
       price: parseFloat(row.price) || 0,
-      original_price: parseFloat(row.original_price) || parseFloat(row.price) || 0,
+      original_price: parseFloat(row.price) || 0,
       stock: parseInt(row.stock) || 0,
       stock_status: getStockStatus(parseInt(row.stock) || 0),
       image: row.image || (images.length > 0 ? images[0] : ''),
@@ -272,8 +272,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         color: promotion.promotion_color,
         priority: promotion.priority,
         can_stack: promotion.can_stack,
-        original_price: parseFloat(promotion.original_price || row.price),
-        promotion_price: parseFloat(promotion.original_price || row.price) * (1 - promotion.discount_percent / 100),
+        original_price: parseFloat(row.price),
+        promotion_price: parseFloat(row.price) * (1 - promotion.discount_percent / 100),
         start_time: promotion.start_time,
         end_time: promotion.end_time
       } : null,
@@ -330,7 +330,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       `UPDATE products SET
        name = ?, name_en = ?, name_ar = ?,
        description = ?, description_en = ?, description_ar = ?,
-       price = ?, original_price = ?, stock = ?,
+       price = ?, stock = ?,
        category_id = ?, image = ?, images = ?, video = ?,
        features = ?, specifications = ?, shipping = ?, after_sale = ?,
        is_limited = ?, discount = ?,
@@ -340,7 +340,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       [
         name, name_en, name_ar,
         description, description_en, description_ar,
-        price, original_price || price, stock,
+        price, price, stock,
         category_id, image, JSON.stringify(images || []), video || '',
         JSON.stringify(features || []), JSON.stringify(specifications || {}),
         JSON.stringify(shipping || {}), JSON.stringify(after_sale || {}),

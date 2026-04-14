@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         p.id, p.name, p.name_en, p.name_ar,
         p.description, p.description_en, p.description_ar,
-        p.price, p.original_price, p.stock,
+        p.price, p.stock,
         p.image, p.images,
         p.category_id, p.created_at,
         c.name as category_name,
@@ -255,7 +255,7 @@ export async function GET(request: NextRequest) {
         description_en: row.description_en,
         description_ar: row.description_ar,
         price: parseFloat(row.price) || 0,
-        original_price: parseFloat(row.original_price) || parseFloat(row.price) || 0,
+        original_price: parseFloat(row.price) || 0,
         stock: parseInt(row.stock) || 0,
         stock_status: getStockStatus(parseInt(row.stock) || 0),
         image: row.image || (images.length > 0 ? images[0] : ''),
@@ -302,8 +302,8 @@ export async function GET(request: NextRequest) {
           color: promotion.color,
           priority: promotion.priority,
           can_stack: promotion.can_stack,
-          original_price: parseFloat(promotion.original_price || row.price),
-          promotion_price: promotion.promotion_price
+          original_price: parseFloat(row.price),
+          promotion_price: parseFloat(row.price) * (1 - promotion.discount_percent / 100)
         } : null,
         promotions: allPromotions.map((promo: any) => ({
           id: promo.id,
@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
     const {
       name, name_en, name_ar,
       description, description_en, description_ar,
-      price, original_price, stock,
+      price, stock,
       category_id, image, images,
       features = []
     } = body;
@@ -371,7 +371,7 @@ export async function POST(request: NextRequest) {
       [
         name, name_en, name_ar,
         description, description_en, description_ar,
-        price, original_price || price, stock || 0,
+        price, price, stock || 0,
         category_id, image, JSON.stringify(images || [])
       ]
     );

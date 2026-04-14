@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
     const productsResult = await query(`
       SELECT 
         p.id, p.name, p.name_en, p.name_ar, p.description, 
-        p.price, p.original_price, p.stock, p.category_id, p.image,
+        p.price, p.stock, p.category_id, p.image,
         pr.id as promotion_id,
         pr.name as promotion_name,
         pr.discount_percent as promotion_discount,
