@@ -69,6 +69,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pp.promotion_id,
         pp.original_price,
         pp.promotion_price,
+        pp.priority,
+        pp.can_stack,
         pr.name as promotion_name,
         pr.name_en as promotion_name_en,
         pr.name_ar as promotion_name_ar,
@@ -76,12 +78,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pr.type as promotion_type,
         pr.icon as promotion_icon,
         pr.color as promotion_color,
-        pr.start_time,
-        pr.end_time
+        pp.start_time,
+        pp.end_time
        FROM product_promotions pp
        JOIN promotions pr ON pp.promotion_id = pr.id
        WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
-       ORDER BY pr.discount_percent DESC
+       ORDER BY pp.priority DESC, pr.discount_percent DESC
        LIMIT 1`,
       [id]
     );
@@ -92,6 +94,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       `SELECT
         pp.id as product_promotion_id,
         pp.promotion_id,
+        pp.priority,
+        pp.can_stack,
         pr.name as promotion_name,
         pr.name_en as promotion_name_en,
         pr.name_ar as promotion_name_ar,
@@ -102,7 +106,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        FROM product_promotions pp
        JOIN promotions pr ON pp.promotion_id = pr.id
        WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
-       ORDER BY pr.discount_percent DESC`,
+       ORDER BY pp.priority DESC, pr.discount_percent DESC`,
       [id]
     );
     const allPromotions = (allPromotionsResult.rows || [])
@@ -115,7 +119,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         discount_percent: p.discount_percent,
         type: p.promotion_type,
         icon: p.promotion_icon,
-        color: p.promotion_color
+        color: p.promotion_color,
+        priority: p.priority,
+        can_stack: p.can_stack
       }));
 
     // 查询评价统计
@@ -257,6 +263,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         discount_percent: promotion.discount_percent,
         icon: promotion.promotion_icon,
         color: promotion.promotion_color,
+        priority: promotion.priority,
+        can_stack: promotion.can_stack,
         original_price: parseFloat(promotion.original_price || row.price),
         promotion_price: parseFloat(promotion.promotion_price),
         start_time: promotion.start_time,
@@ -281,8 +289,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   } catch (error) {
     console.error('Error fetching product:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch product' },
+      { success: false, error: 'Failed to fetch product', details: errorMessage },
       { status: 500 }
     );
   }

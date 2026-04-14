@@ -138,13 +138,15 @@ export async function GET(request: NextRequest) {
       );
       const activities = activitiesResult.rows || [];
 
-      // 查询产品的所有促销信息
+      // 查询产品的所有促销信息（包含priority和can_stack）
       const promotionsResult = await query(
         `SELECT 
           pp.id as product_promotion_id,
           pp.promotion_id,
           pp.original_price,
           pp.promotion_price,
+          pp.priority,
+          pp.can_stack,
           pr.name as promotion_name,
           pr.name_en as promotion_name_en,
           pr.name_ar as promotion_name_ar,
@@ -157,23 +159,46 @@ export async function GET(request: NextRequest) {
          WHERE pp.product_id = ? 
            AND pp.status = 'active' 
            AND pr.status = 'active'
-         ORDER BY pr.discount_percent DESC`,
+         ORDER BY pp.priority DESC, pr.discount_percent DESC`,
         [productId]
       );
       const promotions = promotionsResult.rows || [];
 
-      // 选择最大折扣的促销作为主促销
-      const promotion = promotions.length > 0 ? {
-        id: promotions[0].promotion_id,
-        name: promotions[0].promotion_name,
-        name_en: promotions[0].promotion_name_en,
-        name_ar: promotions[0].promotion_name_ar,
-        discount_percent: promotions[0].discount_percent,
-        type: promotions[0].promotion_type,
-        icon: promotions[0].promotion_icon,
-        color: promotions[0].promotion_color,
-        promotion_price: promotions[0].promotion_price,
-        original_price: promotions[0].original_price || row.price
+      // 计算最终价格（按新逻辑：独占优先 or 叠加计算）
+      const calculateFinalPrice = (originalPrice: number, promos: any[]) => {
+        if (promos.length === 0) return originalPrice;
+        
+        // 检查是否有独占活动（can_stack=false）
+        const exclusive = promos.find(p => p.can_stack === 0 || p.can_stack === false);
+        if (exclusive) {
+          return originalPrice * (1 - exclusive.discount_percent / 100);
+        }
+        
+        // 没有独占，使用可叠加活动相乘
+        let multiplier = 1;
+        promos.forEach(p => {
+          multiplier *= (1 - p.discount_percent / 100);
+        });
+        return originalPrice * multiplier;
+      };
+
+      // 选择优先级最高的促销作为主促销
+      const mainPromo = promotions.length > 0 ? promotions[0] : null;
+      const finalPrice = mainPromo ? calculateFinalPrice(parseFloat(row.price), promotions) : parseFloat(row.price);
+
+      const promotion = mainPromo ? {
+        id: mainPromo.promotion_id,
+        name: mainPromo.promotion_name,
+        name_en: mainPromo.promotion_name_en,
+        name_ar: mainPromo.promotion_name_ar,
+        discount_percent: mainPromo.discount_percent,
+        type: mainPromo.promotion_type,
+        icon: mainPromo.promotion_icon,
+        color: mainPromo.promotion_color,
+        priority: mainPromo.priority,
+        can_stack: mainPromo.can_stack,
+        promotion_price: finalPrice,
+        original_price: mainPromo.original_price || row.price
       } : null;
 
       // 返回所有促销（排除"今日特惠"和"特惠商品"）
@@ -185,7 +210,9 @@ export async function GET(request: NextRequest) {
         discount_percent: p.discount_percent,
         type: p.promotion_type,
         icon: p.promotion_icon,
-        color: p.promotion_color
+        color: p.promotion_color,
+        priority: p.priority,
+        can_stack: p.can_stack
       })).filter(p => p.name !== '今日特惠' && p.name !== '特惠商品');
 
       // 查询商品特性
@@ -267,8 +294,10 @@ export async function GET(request: NextRequest) {
           discount_percent: promotion.discount_percent,
           icon: promotion.icon,
           color: promotion.color,
+          priority: promotion.priority,
+          can_stack: promotion.can_stack,
           original_price: parseFloat(promotion.original_price || row.price),
-          promotion_price: parseFloat(promotion.promotion_price)
+          promotion_price: Number(promotion.promotion_price)
         } : null,
         promotions: allPromotions.map((promo: any) => ({
           id: promo.id,
@@ -278,7 +307,9 @@ export async function GET(request: NextRequest) {
           type: promo.type,
           discount_percent: promo.discount_percent,
           icon: promo.icon,
-          color: promo.color
+          color: promo.color,
+          priority: promo.priority,
+          can_stack: promo.can_stack
         })),
         review_count: reviewCount,
         rating: rating,
