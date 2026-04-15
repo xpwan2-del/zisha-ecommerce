@@ -253,7 +253,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
 
       badges.push({
         type: 'discount',
-        text: `${totalDiscount}% OFF`,
+        text: `最终折扣 ${totalDiscount}% OFF SALE`,
         color: '#EF4444' // 红色
       });
     }
@@ -474,7 +474,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                     </div>
                   </div>
 
-                  <div className="p-4">
+                  <div className="p-4 flex flex-col h-full">
                     <div className="flex items-center mb-2">
                       {getStars(product.rating)}
                       <span className="text-xs text-gray-500 ml-1">
@@ -510,17 +510,19 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                     <div className="mb-3">
                       <div className="flex items-baseline">
                         <span className="text-lg font-bold" style={{ color: 'var(--accent)' }}>
-                          {formatCurrency(product.price, currency)}
+                          {product.promotion && product.promotion.promotion_price
+                            ? formatCurrency(product.promotion.promotion_price, currency)
+                            : formatCurrency(product.price, currency)}
                         </span>
-                        {product.originalPrice > 0 && product.originalPrice > product.price && (
+                        {product.promotion && product.promotion.discount_percent > 0 && (
                           <span className="text-sm text-gray-500 line-through ml-2">
-                            {formatCurrency(product.originalPrice, currency)}
+                            {formatCurrency(product.price, currency)}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center text-xs text-gray-500 mb-3">
+                    <div className="flex items-center text-xs text-gray-500 mb-3 min-h-[20px]">
                       {product.inStock && (
                         <span className="text-green-600 mr-2">有货</span>
                       )}
@@ -529,7 +531,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                       )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mt-auto">
                       <Link
                         href={`/products/${product.id}`}
                         className="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all duration-300 hover:opacity-90"
