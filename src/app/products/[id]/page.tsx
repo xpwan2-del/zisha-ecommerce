@@ -336,6 +336,43 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                 )}
               </div>
 
+              {/* 折扣计算过程 - 红字显示 */}
+              {product.promotions && product.promotions.length > 1 && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <div className="text-sm font-medium text-red-600">
+                    促销叠加计算：
+                    {(() => {
+                      const promos = product.promotions || [];
+                      const exclusive = promos.find((p: any) => p.can_stack === 0 || p.can_stack === false);
+                      let formula = '';
+                      let totalDiscount = 0;
+
+                      if (exclusive) {
+                        formula = `${exclusive.discount_percent}%`;
+                        totalDiscount = exclusive.discount_percent;
+                      } else {
+                        let multiplier = 1;
+                        const parts: string[] = [];
+                        promos.forEach((p: any) => {
+                          const rate = p.discount_percent / 100;
+                          parts.push(`(1-${p.discount_percent}%)`);
+                          multiplier *= (1 - rate);
+                        });
+                        totalDiscount = Math.round((1 - multiplier) * 100);
+                        formula = parts.join(' × ') + ` = ${totalDiscount}%`;
+                      }
+
+                      return (
+                        <>
+                          <div className="font-bold">最终折扣：{totalDiscount}% OFF</div>
+                          <div className="text-xs text-red-500 mt-1">{formula}</div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {/* 库存和配送 */}
               <div className="mb-6 space-y-2 text-sm">
                 <div className="flex items-center gap-2">

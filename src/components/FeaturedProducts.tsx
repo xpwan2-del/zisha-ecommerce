@@ -220,19 +220,36 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     });
   };
 
-  // 分类活动标签
+  // 分类活动标签 - 计算所有促销的总折扣
   const getDiscountBadges = (product: any) => {
     const badges = [];
-    
-    // 使用promotion的折扣（从promotions表获取）
-    if (product.promotion && product.promotion.discount_percent) {
+    const promos = product.promotions || [];
+
+    if (promos.length > 0) {
+      // 检查是否有独占促销（can_stack=false 或 can_stack=0）
+      const exclusive = promos.find((p: any) => p.can_stack === 0 || p.can_stack === false);
+      let totalDiscount;
+
+      if (exclusive) {
+        // 有独占促销，只用独占的折扣
+        totalDiscount = exclusive.discount_percent;
+      } else {
+        // 可叠加促销，计算总体折扣
+        // 公式：1 - (1-d1/100) × (1-d2/100) × (1-d3/100)...
+        let multiplier = 1;
+        promos.forEach((p: any) => {
+          multiplier *= (1 - p.discount_percent / 100);
+        });
+        totalDiscount = Math.round((1 - multiplier) * 100);
+      }
+
       badges.push({
         type: 'discount',
-        text: `-${product.promotion.discount_percent}%`,
-        color: product.promotion.color || '#CA8A04'
+        text: `${totalDiscount}% OFF`,
+        color: '#EF4444' // 红色
       });
     }
-    
+
     return badges;
   };
 
