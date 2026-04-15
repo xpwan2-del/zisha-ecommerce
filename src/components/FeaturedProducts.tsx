@@ -226,21 +226,29 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     const promos = product.promotions || [];
 
     if (promos.length > 0) {
-      // 检查是否有独占促销（can_stack=false 或 can_stack=0）
-      const exclusive = promos.find((p: any) => p.can_stack === 0 || p.can_stack === false);
+      // 检查是否有独占促销（can_stack=1）
+      const exclusive = promos.find((p: any) => p.can_stack === 1);
       let totalDiscount;
+      let formula = '';
 
       if (exclusive) {
-        // 有独占促销，只用独占的折扣
-        totalDiscount = exclusive.discount_percent;
+        // 有独占促销，只用priority最小的（优先级最高）的那个
+        // 按priority排序，选择最小的
+        const sortedExclusives = promos.filter((p: any) => p.can_stack === 1).sort((a: any, b: any) => a.priority - b.priority);
+        const topExclusive = sortedExclusives[0];
+        totalDiscount = topExclusive.discount_percent;
+        formula = `${topExclusive.discount_percent}%`;
       } else {
         // 可叠加促销，计算总体折扣
         // 公式：1 - (1-d1/100) × (1-d2/100) × (1-d3/100)...
         let multiplier = 1;
+        const parts: string[] = [];
         promos.forEach((p: any) => {
           multiplier *= (1 - p.discount_percent / 100);
+          parts.push(`(1-${p.discount_percent}%)`);
         });
         totalDiscount = Math.round((1 - multiplier) * 100);
+        formula = parts.join(' × ') + ` = ${totalDiscount}%`;
       }
 
       badges.push({
