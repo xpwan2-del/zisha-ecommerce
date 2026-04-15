@@ -1,49 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAdmin } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const code = request.nextUrl.searchParams.get('code');
+    const userId = request.headers.get('x-user-id');
     
-    if (!code) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, error: 'Coupon code is required' },
-        { status: 400 }
+        { success: false, error: 'User not authenticated' },
+        { status: 401 }
       );
     }
-    
-    const result = await query(
-      'SELECT * FROM coupons WHERE code = ? AND is_active = true AND (expires_at IS NULL OR expires_at > datetime("now"))',
-      [code]
-    );
-    
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid or expired coupon' },
-        { status: 404 }
-      );
-    }
-    
-    const coupon = result.rows[0];
-    
+
+    const result = await query(`
+      SELECT 
+        uc.id as user_coupon_id,
+        c.id as coupon_id,
+        c.code,
+        c.name,
+        c.type,
+        c.discount_type,
+        c.value,
+        c.min_spend,
+        c.max_discount,
+        c.start_date,
+        c.end_date,
+        c.description,
+        uc.status as user_coupon_status,
+        uc.received_at,
+        uc.expires_at
+      FROM user_coupons uc
+      JOIN coupons c ON uc.coupon_id = c.id
+      WHERE uc.user_id = ?
+        AND uc.status = 'active'
+        AND datetime('now') < uc.expires_at
+        AND datetime('now') > c.start_date
+        AND datetime('now') < c.end_date
+        AND c.is_active = 1
+      ORDER BY uc.received_at DESC
+    `, [userId]);
+
     return NextResponse.json({
       success: true,
       data: {
-        id: coupon.id,
-        code: coupon.code,
-        discount_type: coupon.discount_type,
-        discount_value: coupon.discount_value,
-        minimum_spend: coupon.minimum_spend,
-        max_discount: coupon.max_discount,
-        is_active: coupon.is_active,
-        expires_at: coupon.expires_at
+        coupons: result.rows || []
       }
     });
   } catch (error) {
-    console.error('Error fetching coupon:', error);
+    console.error('Error fetching user coupons:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch coupon' },
+      { success: false, error: 'Failed to fetch coupons' },
       { status: 500 }
     );
   }
@@ -51,30 +57,97 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 验证管理员权限
-    const adminResult = requireAdmin(request);
-    if (adminResult.response) {
-      return adminResult.response;
+    const userId = request.headers.get('x-user-id');
+    const body = await request.json();
+    const { coupon_id } = body;
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: 'User not authenticated' },
+        { status: 401 }
+      );
     }
 
-    const body = await request.json();
-    const { code, discount_type, discount_value, minimum_spend, max_discount, expires_at } = body;
-    
-    const result = await query(
-      `INSERT INTO coupons (code, discount_type, discount_value, minimum_spend, max_discount, is_active, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       RETURNING id, code, discount_type, discount_value, minimum_spend, max_discount, is_active, expires_at`,
-      [code, discount_type, discount_value, minimum_spend, max_discount, true, expires_at]
-    );
-    
+    if (!coupon_id) {
+      return NextResponse.json(
+        { success: false, error: 'Coupon ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const couponResult = await query(`
+      SELECT * FROM coupons 
+      WHERE id = ? AND is_active = 1
+        AND datetime('now') > start_date 
+        AND datetime('now') < end_date
+    `, [coupon_id]);
+
+    if (couponResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Coupon not available or expired' },
+        { status: 400 }
+      );
+    }
+
+    const coupon = couponResult.rows[0];
+
+    const userCouponResult = await query(`
+      SELECT * FROM user_coupons 
+      WHERE user_id = ? AND coupon_id = ?
+    `, [userId, coupon_id]);
+
+    if (userCouponResult.rows.length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'You already have this coupon' },
+        { status: 400 }
+      );
+    }
+
+    const userCountResult = await query(`
+      SELECT COUNT(*) as count FROM user_coupons 
+      WHERE user_id = ? AND coupon_id = ?
+    `, [userId, coupon_id]);
+
+    if (userCountResult.rows[0].count >= coupon.user_limit) {
+      return NextResponse.json(
+        { success: false, error: 'You have reached the limit for this coupon' },
+        { status: 400 }
+      );
+    }
+
+    const globalCountResult = await query(`
+      SELECT COUNT(*) as count FROM user_coupons WHERE coupon_id = ?
+    `, [coupon_id]);
+
+    if (coupon.usage_limit && globalCountResult.rows[0].count >= coupon.usage_limit) {
+      return NextResponse.json(
+        { success: false, error: 'Coupon has been fully claimed' },
+        { status: 400 }
+      );
+    }
+
+    await query(`
+      INSERT INTO user_coupons (user_id, coupon_id, status, expires_at)
+      VALUES (?, ?, 'active', ?)
+    `, [userId, coupon_id, coupon.end_date]);
+
     return NextResponse.json({
       success: true,
-      data: result.rows[0]
-    }, { status: 201 });
+      message: 'Coupon received successfully',
+      data: {
+        coupon_id: coupon.id,
+        code: coupon.code,
+        name: coupon.name,
+        type: coupon.type,
+        value: coupon.value,
+        min_spend: coupon.min_spend,
+        expires_at: coupon.end_date
+      }
+    });
   } catch (error) {
-    console.error('Error creating coupon:', error);
+    console.error('Error receiving coupon:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to create coupon' },
+      { success: false, error: 'Failed to receive coupon' },
       { status: 500 }
     );
   }
