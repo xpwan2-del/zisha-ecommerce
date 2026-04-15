@@ -363,10 +363,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       }
 
                       return (
-                        <>
-                          <div className="font-bold">最终折扣：{totalDiscount}% OFF</div>
-                          <div className="text-xs text-red-500 mt-1">{formula}</div>
-                        </>
+                        <div className="font-bold">最终折扣：{totalDiscount}% OFF ({formula})</div>
                       );
                     })()}
                   </div>
