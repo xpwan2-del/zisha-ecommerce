@@ -397,33 +397,28 @@ created_at：TIMESTAMP DEFAULT CURRENT_TIMESTAMP - 创建时间
 2. products 表
 作用：存储商品信息 字段说明：
 
-id：INTEGER PRIMARY KEY AUTOINCREMENT - 商品ID，自增主键
-name：VARCHAR(255) NOT NULL - 商品名称（中文）
-name_en：VARCHAR(255) NOT NULL - 商品名称（英文）
-name_ar：VARCHAR(255) NOT NULL - 商品名称（阿拉伯文）
-price：DECIMAL(10,2) NOT NULL - 商品价格
-price_usd：DECIMAL(10,2) DEFAULT 0 - 商品价格（美元）
-price_ae：DECIMAL(10,2) DEFAULT 0 - 商品价格（阿联酋迪拉姆）
-original_price：DECIMAL(10,2) DEFAULT 0 - 商品原价
-stock：INTEGER NOT NULL - 商品库存
-category_id：INTEGER REFERENCES categories(id) - 商品分类ID，外键关联分类表
-image：VARCHAR(255) NOT NULL - 商品主图
-images：TEXT DEFAULT '[]' - 商品多图，JSON格式
-video：VARCHAR(255) DEFAULT '' - 商品视频
-description：TEXT NOT NULL - 商品描述（中文）
+id：INTEGER PRIMARY KEY - 商品ID，自增主键
+name：TEXT - 商品名称（中文）
+name_en：TEXT - 商品名称（英文）
+name_ar：TEXT - 商品名称（阿拉伯文）
+price：NUM - 商品价格（人民币）
+price_usd：NUM - 商品价格（美元）
+price_ae：NUM - 商品价格（阿联酋迪拉姆）
+stock：INT - 商品库存
+category_id：INT - 商品分类ID
+image：TEXT - 商品主图
+images：TEXT - 商品多图，JSON格式
+video：TEXT - 商品视频
+description：TEXT - 商品描述（中文）
 description_en：TEXT - 商品描述（英文）
 description_ar：TEXT - 商品描述（阿拉伯文）
-specifications：TEXT DEFAULT '{}' - 商品规格，JSON格式
-shipping：TEXT DEFAULT '{}' - 物流信息，JSON格式
-after_sale：TEXT DEFAULT '{}' - 售后服务，JSON格式
-is_limited：BOOLEAN DEFAULT false - 是否限量
-discount：INTEGER DEFAULT 0 - 折扣
-daily_discount：INTEGER DEFAULT 0 - 每日折扣
-daily_discount_start_time：TIMESTAMP - 每日折扣开始时间
-daily_discount_end_time：TIMESTAMP - 每日折扣结束时间
-display_mode：VARCHAR(20) DEFAULT 'double' - 显示模式
-created_at：TIMESTAMP DEFAULT CURRENT_TIMESTAMP - 创建时间
-updated_at：TIMESTAMP DEFAULT CURRENT_TIMESTAMP - 更新时间
+specifications：TEXT - 商品规格，JSON格式
+shipping：TEXT - 物流信息，JSON格式
+after_sale：TEXT - 售后服务，JSON格式
+is_limited：NUM - 是否限量
+display_mode：TEXT - 显示模式
+created_at：NUM - 创建时间
+updated_at：NUM - 更新时间
 关联关系：
 
 与 categories 表：多对一（多个商品属于一个分类）
@@ -502,6 +497,8 @@ shipping_address_id：INTEGER REFERENCES addresses(id) - 收货地址ID，外键
 coupon_code：VARCHAR(50) - 优惠券代码
 notes：TEXT - 订单备注
 created_at：TIMESTAMP DEFAULT CURRENT_TIMESTAMP - 创建时间
+discount_details：TEXT - 折扣详情（JSON格式）
+final_amount：DECIMAL DEFAULT 0 - 最终金额
 关联关系：
 
 与 users 表：多对一（多个订单属于一个用户）
@@ -520,8 +517,11 @@ id：INTEGER PRIMARY KEY AUTOINCREMENT - 订单商品ID，自增主键
 order_id：INTEGER REFERENCES orders(id) - 订单ID，外键关联订单表
 product_id：INTEGER REFERENCES products(id) - 商品ID，外键关联商品表
 quantity：INTEGER NOT NULL - 商品数量
-price：DECIMAL(10,2) NOT NULL - 商品价格
+price：DECIMAL(10,2) NOT NULL - 商品价格（成交价）
 specifications：TEXT DEFAULT '{}' - 商品规格，JSON格式
+original_price：DECIMAL - 商品原价（购买时的原价）
+promotion_ids：TEXT - 使用的product_promotions表IDs（JSON数组）
+discount_amount：DECIMAL DEFAULT 0 - 折扣金额
 关联关系：
 
 与 orders 表：多对一（多个订单商品属于一个订单）
@@ -538,8 +538,6 @@ name_en：VARCHAR(255) NOT NULL - 活动名称（英文）
 name_ar：VARCHAR(255) NOT NULL - 活动名称（阿拉伯文）
 type：VARCHAR(50) NOT NULL - 活动类型
 discount_percent：INTEGER NOT NULL - 折扣百分比
-start_time：TIMESTAMP NOT NULL - 开始时间
-end_time：TIMESTAMP NOT NULL - 结束时间
 status：VARCHAR(20) DEFAULT 'active' - 活动状态，默认为活跃
 description：TEXT - 活动描述
 created_at：TIMESTAMP DEFAULT CURRENT_TIMESTAMP - 创建时间
@@ -549,6 +547,8 @@ max_discount：DECIMAL(10,2) - 最大折扣
 usage_limit：INTEGER - 使用限制
 product_ids：TEXT - 关联商品ID，JSON格式
 category_ids：TEXT - 关联分类ID，JSON格式
+icon：VARCHAR(255) - 活动图标
+color：VARCHAR(50) - 活动颜色
 关联关系：
 
 与 product_promotions 表：一对多（一个促销活动可以包含多个商品）
@@ -557,12 +557,16 @@ category_ids：TEXT - 关联分类ID，JSON格式
 作用：存储商品与促销活动的关联信息 字段说明：
 
 id：INTEGER PRIMARY KEY AUTOINCREMENT - 关联ID，自增主键
-product_id：INTEGER NOT NULL REFERENCES products(id) - 商品ID，外键关联商品表
-promotion_id：INTEGER NOT NULL REFERENCES promotions(id) - 促销活动ID，外键关联促销活动表
-original_price：DECIMAL(10,2) NOT NULL - 商品原价
-promotion_price：DECIMAL(10,2) NOT NULL - 促销价格
+product_id：INTEGER NOT NULL - 商品ID，外键关联商品表
+promotion_id：INTEGER NOT NULL - 促销活动ID，外键关联促销活动表
+original_price：DECIMAL(10,2) NOT NULL - 商品原价（从products.price初始化）
 status：VARCHAR(20) DEFAULT 'active' - 状态，默认为活跃
 created_at：TIMESTAMP DEFAULT CURRENT_TIMESTAMP - 创建时间
+start_time：TIMESTAMP - 促销开始时间
+end_time：TIMESTAMP - 促销结束时间
+priority：INTEGER DEFAULT 2 - 优先级（1最高，2次之，3最低）
+can_stack：BOOLEAN DEFAULT 1 - 是否可叠加（1=可叠加，0=独占）
+source_type：VARCHAR DEFAULT 'product' - 来源类型
 关联关系：
 
 与 products 表：多对一（多个关联记录对应一个商品）
