@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
     // 排序逻辑
-    let orderBy = 'ORDER BY p.id DESC';
+    let orderBy = 'ORDER BY p.id ASC';
     switch (sort) {
       case 'price_asc':
         orderBy = 'ORDER BY p.price ASC';
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
         orderBy = 'ORDER BY p.stock DESC';
         break;
       case 'newest':
-        orderBy = 'ORDER BY p.id DESC';
+        orderBy = 'ORDER BY p.id ASC';
         break;
     }
 
