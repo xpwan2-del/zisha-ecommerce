@@ -87,6 +87,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--btn-primary-hover-transform", themeConfig.components.buttons.primary.hover.transform);
     root.style.setProperty("--btn-primary-hover-shadow", themeConfig.components.buttons.primary.hover.boxShadow);
     root.style.setProperty("--loading-color", themeConfig.components.loading.color);
+    root.style.setProperty("--color-red", themeConfig.colors.colorRed);
+    root.style.setProperty("--color-green", themeConfig.colors.colorGreen);
+    root.style.setProperty("--color-blue", themeConfig.colors.colorBlue);
+    root.style.setProperty("--color-yellow", themeConfig.colors.colorYellow);
+    root.style.setProperty("--color-orange", themeConfig.colors.colorOrange);
   };
 
   // 加载时显示旋转圆圈

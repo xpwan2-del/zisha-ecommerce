@@ -314,7 +314,7 @@ export function HomeModules({ data }: HomeModulesProps) {
   if (!heroModule) {
     if (activityModules.length > 0) {
       return (
-        <section className="bg-[#FAFAF9] py-8 px-4">
+        <section className="bg-[var(--background)] py-8 px-4">
           <div className="max-w-7xl mx-auto">
             <div className="relative rounded-sm overflow-hidden shadow-xl h-[350px] md:h-[450px] mb-8 bg-white">
               {activityModules.map((activity, index) => (

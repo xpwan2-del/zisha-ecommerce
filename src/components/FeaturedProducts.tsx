@@ -254,7 +254,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
       badges.push({
         type: 'discount',
         text: `最终折扣 ${totalDiscount}% OFF SALE`,
-        color: '#EF4444' // 红色
+        color: 'var(--color-red)' // 红色
       });
     }
 
@@ -268,21 +268,21 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
       badges.push({
         type: 'bestSeller',
         text: '畅销',
-        color: '#D4AF37'
+        color: 'var(--secondary)'
       });
     }
     if (product.isNew) {
       badges.push({
         type: 'new',
         text: '新品',
-        color: '#10B981'
+        color: 'var(--color-green)'
       });
     }
     if (product.stock < 10 && product.stock > 0) {
       badges.push({
         type: 'limited',
         text: '库存有限',
-        color: '#EF4444'
+        color: 'var(--color-red)'
       });
     }
     return badges;
@@ -300,7 +300,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
           id: product.promotion.id || product.id,
           name: product.promotion.name || '活动',
           icon: product.promotion.icon || 'tag',
-          color: product.promotion.color || '#CA8A04'
+          color: product.promotion.color || 'var(--accent)'
         });
         addedNames.add(product.promotion.name);
       }
@@ -314,7 +314,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
             id: promo.id || product.id,
             name: promo.name || '活动',
             icon: promo.icon || 'tag',
-            color: promo.color || '#CA8A04'
+            color: 'var(--color-red)'
           });
           addedNames.add(promo.name);
         }
@@ -327,7 +327,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
         id: product.id,
         name: product.activity_tag,
         icon: product.activity_icon || 'tag',
-        color: product.activity_color || (product.activity_tag === '今日特惠' ? '#EF4444' : '#CA8A04')
+        color: product.activity_color || (product.activity_tag === '今日特惠' ? 'var(--color-red)' : 'var(--accent)')
       });
     }
     
@@ -408,7 +408,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
   return (
     <section className="py-12 px-4">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-8 font-['Noto_Naskh_Arabic'] text-[#831843]">热门产品</h2>
+        <h2 className="text-3xl font-bold text-center mb-8 font-['Noto_Naskh_Arabic'] text-[var(--primary)]">热门产品</h2>
         
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
@@ -492,7 +492,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                         {activityTags.slice(0, 4).map((activity: any) => (
                           <div
                             key={activity.id}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[#DB2777]/20 rounded-md shadow-sm hover:shadow-md transition-all duration-300"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[var(--accent)]/20 rounded-md shadow-sm hover:shadow-md transition-all duration-300"
                             style={{ 
                               background: `linear-gradient(135deg, ${activity.color}20, ${activity.color}10)`,
                               borderColor: `${activity.color}40`
