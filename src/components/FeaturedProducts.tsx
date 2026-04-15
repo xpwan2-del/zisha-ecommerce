@@ -254,7 +254,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
       badges.push({
         type: 'discount',
         text: `最终折扣 ${totalDiscount}% OFF SALE`,
-        color: 'var(--color-red)' // 红色
+        color: '#EF4444' // 固定红色
       });
     }
 
