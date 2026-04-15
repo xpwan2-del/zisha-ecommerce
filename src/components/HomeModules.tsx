@@ -197,11 +197,11 @@ export function HomeModules({ data }: HomeModulesProps) {
                             {/* 活动图标 */}
                             <div className="flex-shrink-0">
                               <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all duration-300 hover:scale-105 ${
-                                activity.type === 'daily' ? 'bg-[#EB987F]' :
-                                activity.type === 'special' ? 'bg-[#EB987F]' :
-                                activity.type === 'category' ? 'bg-[#EB987F]' :
-                                activity.type === 'product' ? 'bg-[#EB987F]' :
-                                'bg-[#EB987F]'
+                                activity.type === 'daily' ? 'bg-[#ff511c]' :
+                                activity.type === 'special' ? 'bg-[#ff511c]' :
+                                activity.type === 'category' ? 'bg-[#ff511c]' :
+                                activity.type === 'product' ? 'bg-[#ff511c]' :
+                                'bg-[#ff511c]'
                               }`}>
                                 {activity.type === 'daily' && (
                                   <img src="/images/icons/promotion-daily.svg" alt="Daily promotion" className="w-6 h-6 text-white" />
@@ -224,7 +224,7 @@ export function HomeModules({ data }: HomeModulesProps) {
                             <div className="flex-grow">
                               {/* 折扣标签 */}
                               {activity.discount_percent && (
-                                <div className="inline-block bg-[#EB987F] text-white text-xs font-medium px-2 py-0.5 rounded-sm mb-1">
+                                <div className="inline-block bg-[#ff511c] text-white text-xs font-medium px-2 py-0.5 rounded-sm mb-1">
                                   {activity.discount_percent}% OFF
                                 </div>
                               )}
@@ -250,11 +250,11 @@ export function HomeModules({ data }: HomeModulesProps) {
                             {/* 活动图标 */}
                             <div className="flex-shrink-0">
                               <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all duration-300 hover:scale-105 ${
-                                activity.type === 'daily' ? 'bg-[#EB987F]' :
-                                activity.type === 'special' ? 'bg-[#EB987F]' :
-                                activity.type === 'category' ? 'bg-[#EB987F]' :
-                                activity.type === 'product' ? 'bg-[#EB987F]' :
-                                'bg-[#EB987F]'
+                                activity.type === 'daily' ? 'bg-[#ff511c]' :
+                                activity.type === 'special' ? 'bg-[#ff511c]' :
+                                activity.type === 'category' ? 'bg-[#ff511c]' :
+                                activity.type === 'product' ? 'bg-[#ff511c]' :
+                                'bg-[#ff511c]'
                               }`}>
                                 {activity.type === 'daily' && (
                                   <img src="/images/icons/promotion-daily.svg" alt="Daily promotion" className="w-6 h-6 text-white" />
