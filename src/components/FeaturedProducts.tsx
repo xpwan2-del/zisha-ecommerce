@@ -474,7 +474,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                     </div>
                   </div>
 
-                  <div className="p-4 flex flex-col h-full">
+                  <div className="p-4 flex flex-col flex-1">
                     <div className="flex items-center mb-2">
                       {getStars(product.rating)}
                       <span className="text-xs text-gray-500 ml-1">
