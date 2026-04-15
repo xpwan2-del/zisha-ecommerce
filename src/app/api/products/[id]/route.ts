@@ -128,8 +128,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         icon: p.promotion_icon,
         color: p.promotion_color,
         priority: p.priority,
-        can_stack: p.can_stack
+        can_stack: p.can_stack,
+        end_time: p.end_time
       }));
+
+    // 计算总折扣和公式
+    const calculateDiscount = (promos: any[]) => {
+      if (promos.length === 0) return { discount: 0, formula: '' };
+
+      const exclusive = promos.find(p => p.can_stack === 1);
+      if (exclusive) {
+        return {
+          discount: exclusive.discount_percent,
+          formula: `${exclusive.discount_percent}% (独占)`
+        };
+      }
+
+      const sortedPromos = [...promos].sort((a, b) => a.priority - b.priority);
+      const parts: string[] = [];
+      sortedPromos.forEach(p => {
+        parts.push(`(1-${p.discount_percent}%)`);
+      });
+      const totalDiscount = Math.round((1 - sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1)) * 100);
+      return {
+        discount: totalDiscount,
+        formula: parts.join(' × ') + ` = ${totalDiscount}%`
+      };
+    };
+
+    const discountInfo = calculateDiscount(allPromotions);
 
     // 查询评价统计
     const reviewResult = await query(
@@ -261,19 +288,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         name_ar: row.category_name_ar
       },
       activities: activities,
-      promotion: promotion ? {
+      promotion: promotion && allPromotions.length > 0 ? {
         id: promotion.promotion_id,
         name: promotion.promotion_name,
         name_en: promotion.promotion_name_en,
         name_ar: promotion.promotion_name_ar,
         type: promotion.promotion_type,
-        discount_percent: promotion.discount_percent,
+        discount_percent: discountInfo.discount,
+        calculation: discountInfo.formula,
         icon: promotion.promotion_icon,
         color: promotion.promotion_color,
         priority: promotion.priority,
         can_stack: promotion.can_stack,
         original_price: parseFloat(row.price),
-        promotion_price: parseFloat(row.price) * (1 - promotion.discount_percent / 100),
+        promotion_price: parseFloat(row.price) * (1 - discountInfo.discount / 100),
         start_time: promotion.start_time,
         end_time: promotion.end_time
       } : null,

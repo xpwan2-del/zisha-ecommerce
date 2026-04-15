@@ -337,27 +337,27 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
               </div>
 
               {/* 折扣计算过程 - 红字显示 */}
-              {product.promotions && product.promotions.length > 1 && (
+              {product.promotions && product.promotions.length > 0 && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <div className="text-sm font-medium text-red-600">
                     促销叠加计算：
                     {(() => {
                       const promos = product.promotions || [];
-                      const exclusive = promos.find((p: any) => p.can_stack === 0 || p.can_stack === false);
+                      const exclusive = promos.find((p: any) => p.can_stack === 1);
                       let formula = '';
                       let totalDiscount = 0;
 
                       if (exclusive) {
-                        formula = `${exclusive.discount_percent}%`;
+                        formula = `${exclusive.discount_percent}% (独占)`;
                         totalDiscount = exclusive.discount_percent;
                       } else {
-                        let multiplier = 1;
+                        // 按priority从小到大排序后叠加
+                        const sortedPromos = [...promos].sort((a: any, b: any) => a.priority - b.priority);
                         const parts: string[] = [];
-                        promos.forEach((p: any) => {
-                          const rate = p.discount_percent / 100;
+                        sortedPromos.forEach((p: any) => {
                           parts.push(`(1-${p.discount_percent}%)`);
-                          multiplier *= (1 - rate);
                         });
+                        const multiplier = sortedPromos.reduce((acc: number, p: any) => acc * (1 - p.discount_percent / 100), 1);
                         totalDiscount = Math.round((1 - multiplier) * 100);
                         formula = parts.join(' × ') + ` = ${totalDiscount}%`;
                       }

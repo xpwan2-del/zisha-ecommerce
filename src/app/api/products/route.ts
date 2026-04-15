@@ -170,26 +170,54 @@ export async function GET(request: NextRequest) {
       );
       const promotions = promotionsResult.rows || [];
 
-      // 计算最终价格（按新逻辑：独占优先 or 叠加计算）
+      // 计算最终价格（按新逻辑：独占can_stack=1优先 or 叠加计算can_stack=0）
       const calculateFinalPrice = (originalPrice: number, promos: any[]) => {
         if (promos.length === 0) return originalPrice;
-        
-        // 检查是否有独占活动（can_stack=false）
-        const exclusive = promos.find(p => p.can_stack === 0 || p.can_stack === false);
+
+        // 检查是否有独占活动（can_stack=1）
+        const exclusive = promos.find(p => p.can_stack === 1);
         if (exclusive) {
+          // 有独占促销 → 直接使用独占促销折扣
           return originalPrice * (1 - exclusive.discount_percent / 100);
         }
-        
-        // 没有独占，使用可叠加活动相乘
+
+        // 没有独占促销，按priority从小到大叠加
+        const sortedPromos = [...promos].sort((a, b) => a.priority - b.priority);
         let multiplier = 1;
-        promos.forEach(p => {
+        sortedPromos.forEach(p => {
           multiplier *= (1 - p.discount_percent / 100);
         });
         return originalPrice * multiplier;
       };
 
-      // 选择优先级最高的促销作为主促销
-      const mainPromo = promotions.length > 0 ? promotions[0] : null;
+      // 计算总折扣和公式
+      const calculateDiscount = (promos: any[]) => {
+        if (promos.length === 0) return { discount: 0, formula: '' };
+
+        const exclusive = promos.find(p => p.can_stack === 1);
+        if (exclusive) {
+          return {
+            discount: exclusive.discount_percent,
+            formula: `${exclusive.discount_percent}% (独占)`
+          };
+        }
+
+        const sortedPromos = [...promos].sort((a, b) => a.priority - b.priority);
+        const parts: string[] = [];
+        sortedPromos.forEach(p => {
+          parts.push(`(1-${p.discount_percent}%)`);
+        });
+        const totalDiscount = Math.round((1 - sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1)) * 100);
+        return {
+          discount: totalDiscount,
+          formula: parts.join(' × ') + ` = ${totalDiscount}%`
+        };
+      };
+
+      const discountInfo = calculateDiscount(promotions);
+
+      // 选择priority最小的作为主促销
+      const mainPromo = promotions.length > 0 ? [...promotions].sort((a, b) => a.priority - b.priority)[0] : null;
       const finalPrice = mainPromo ? calculateFinalPrice(parseFloat(row.price), promotions) : parseFloat(row.price);
 
       const promotion = mainPromo ? {
@@ -197,7 +225,8 @@ export async function GET(request: NextRequest) {
         name: mainPromo.promotion_name,
         name_en: mainPromo.promotion_name_en,
         name_ar: mainPromo.promotion_name_ar,
-        discount_percent: mainPromo.discount_percent,
+        discount_percent: discountInfo.discount,
+        calculation: discountInfo.formula,
         type: mainPromo.promotion_type,
         icon: mainPromo.promotion_icon,
         color: mainPromo.promotion_color,
