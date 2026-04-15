@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
     }
 
     const placeholders = productIds.map(() => '?').join(',');
+    const caseWhen = productIds.map((id, index) => `WHEN ${id} THEN ${index + 1}`).join(' ');
     const baseQuery = `
       SELECT 
         p.id, p.name, p.name_en, p.name_ar,
@@ -88,9 +89,9 @@ export async function GET(request: NextRequest) {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.id IN (${placeholders})
-      ORDER BY FIELD(p.id, ${placeholders})
+      ORDER BY CASE p.id ${caseWhen} END
     `;
-    const baseParams = [...productIds, ...productIds];
+    const baseParams = [...productIds];
     const baseResult = await query(baseQuery, baseParams);
 
     const products = await Promise.all((baseResult.rows || []).map(async (row: any) => {
