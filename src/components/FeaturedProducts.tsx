@@ -406,10 +406,8 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
   };
 
   return (
-    <section className="py-12 px-4">
+    <section className="py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-8 font-['Noto_Naskh_Arabic'] text-[var(--primary)]">热门产品</h2>
-        
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
             {Array.from({ length: 12 }).map((_, index) => (

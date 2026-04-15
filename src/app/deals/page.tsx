@@ -9,7 +9,7 @@ export default function DealsPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--background, #fafaf9)' }}>
-      <div className="bg-gradient-to-r from-[var(--accent)] to-[var(--secondary)] text-white pt-24 pb-12">
+      <div className="bg-gradient-to-r from-[var(--accent)] to-[var(--secondary)] text-white pt-20 pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'var(--heading-font)' }}>
             {t("nav.deals", "今日特惠")}
