@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN promotions pr ON pp.promotion_id = pr.id
       WHERE (pp.status IS NULL OR (pp.status = 'active' AND pr.status = 'active'))
       GROUP BY p.id
-      ORDER BY MAX(COALESCE(pp.priority, 0)) DESC, MAX(pr.discount_percent) DESC, p.id
+      ORDER BY p.id ASC
       LIMIT 9
     `);
     
