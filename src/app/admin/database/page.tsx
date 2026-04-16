@@ -19,7 +19,7 @@ interface ColumnInfo {
 export default function DatabaseManager() {
   const { t } = useTranslation();
   const [tables, setTables] = useState<TableInfo[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string>("users");
+  const [selectedTable, setSelectedTable] = useState<string>("");
   const [tableData, setTableData] = useState<any[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,16 +30,7 @@ export default function DatabaseManager() {
   const [editingRow, setEditingRow] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState<Record<string, string>>({});
-
-  const tableGroups = [
-    { name: "用户管理", tables: ["users", "addresses", "user_coupons", "user_favorites", "user_browse_history", "user_logs"] },
-    { name: "商品管理", tables: ["products", "categories", "product_features", "product_promotions", "product_activities", "materials", "teapot_types", "feature_templates"] },
-    { name: "订单管理", tables: ["orders", "order_items", "order_payments", "order_status_logs", "order_logistics", "order_coupons", "cart_items"] },
-    { name: "促销管理", tables: ["promotions", "coupons", "product_activity_logs", "promotion_stats"] },
-    { name: "评价管理", tables: ["reviews", "review_replies", "review_helpful"] },
-    { name: "系统配置", tables: ["system_configs", "translations", "activity_categories"] },
-    { name: "其他", tables: ["about", "contact", "lucky_draws", "lucky_draw_orders", "recommendations"] },
-  ];
+  const [searchTable, setSearchTable] = useState("");
 
   useEffect(() => {
     fetchTables();
@@ -57,6 +48,9 @@ export default function DatabaseManager() {
       const data = await res.json();
       if (data.success) {
         setTables(data.data);
+        if (data.data.length > 0 && !selectedTable) {
+          setSelectedTable(data.data[0].name);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch tables:", err);
@@ -66,6 +60,8 @@ export default function DatabaseManager() {
   const fetchTableData = async () => {
     setLoading(true);
     setError(null);
+    setEditingRow(null);
+    setIsCreating(false);
     try {
       const res = await fetch(`/api/db/table/${selectedTable}?page=${page}&limit=${pageSize}`);
       const data = await res.json();
@@ -86,7 +82,11 @@ export default function DatabaseManager() {
 
   const handleEdit = (row: any) => {
     setEditingRow(row);
-    setFormData(row);
+    const rowData: Record<string, string> = {};
+    columns.forEach((col) => {
+      rowData[col.name] = row[col.name] !== null ? String(row[col.name]) : "";
+    });
+    setFormData(rowData);
     setIsCreating(false);
   };
 
@@ -154,6 +154,10 @@ export default function DatabaseManager() {
 
   const totalPages = Math.ceil(total / pageSize);
 
+  const filteredTables = tables.filter((table) =>
+    table.name.toLowerCase().includes(searchTable.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "var(--background)" }}>
       <div className="bg-gradient-to-r from-[var(--accent)] to-[var(--secondary)] text-white py-8">
@@ -166,36 +170,37 @@ export default function DatabaseManager() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-6">
           {/* 左侧导航 */}
-          <div className="w-64 flex-shrink-0">
+          <div className="w-72 flex-shrink-0">
             <div className="bg-white rounded-lg shadow-md p-4 sticky top-4">
-              <h2 className="text-lg font-bold mb-4 text-[var(--text)]">数据表</h2>
-              {tableGroups.map((group) => (
-                <div key={group.name} className="mb-4">
-                  <h3 className="text-sm font-semibold text-[var(--text-muted)] mb-2">
-                    {group.name}
-                  </h3>
-                  <div className="space-y-1">
-                    {group.tables.map((table) => (
-                      <button
-                        key={table}
-                        onClick={() => {
-                          setSelectedTable(table);
-                          setPage(1);
-                          setEditingRow(null);
-                          setIsCreating(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                          selectedTable === table
-                            ? "bg-[var(--accent)] text-white"
-                            : "hover:bg-[var(--background)] text-[var(--text)]"
-                        }`}
-                      >
-                        {table}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <h2 className="text-lg font-bold mb-4 text-[var(--text)]">数据表 ({tables.length})</h2>
+              <input
+                type="text"
+                placeholder="搜索表名..."
+                value={searchTable}
+                onChange={(e) => setSearchTable(e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md mb-4 text-[var(--text)]"
+              />
+              <div className="max-h-[calc(100vh-300px)] overflow-y-auto space-y-1">
+                {filteredTables.map((table) => (
+                  <button
+                    key={table.name}
+                    onClick={() => {
+                      setSelectedTable(table.name);
+                      setPage(1);
+                      setEditingRow(null);
+                      setIsCreating(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex justify-between items-center ${
+                      selectedTable === table.name
+                        ? "bg-[var(--accent)] text-white"
+                        : "hover:bg-[var(--background)] text-[var(--text)]"
+                    }`}
+                  >
+                    <span className="truncate">{table.name}</span>
+                    <span className="text-xs opacity-70">{table.count}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -248,7 +253,7 @@ export default function DatabaseManager() {
                             <div key={col.name}>
                               <label className="block text-sm font-medium text-[var(--text)] mb-1">
                                 {col.name}
-                                {col.pk === 1 && <span className="text-red-500 ml-1">*</span>}
+                                {col.pk === 1 && <span className="text-red-500 ml-1">*PK</span>}
                               </label>
                               <input
                                 type="text"
@@ -290,6 +295,7 @@ export default function DatabaseManager() {
                               className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider"
                             >
                               {col.name}
+                              {col.pk === 1 && <span className="ml-1 text-[var(--color-red)]">PK</span>}
                             </th>
                           ))}
                           <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
@@ -298,33 +304,41 @@ export default function DatabaseManager() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-[var(--border)]">
-                        {tableData.map((row, idx) => (
-                          <tr key={idx} className="hover:bg-[var(--background)]">
-                            {columns.map((col) => (
-                              <td
-                                key={col.name}
-                                className="px-4 py-3 text-sm text-[var(--text)] max-w-xs truncate"
-                                title={String(row[col.name] ?? "")}
-                              >
-                                {String(row[col.name] ?? "-")}
-                              </td>
-                            ))}
-                            <td className="px-4 py-3 text-right text-sm">
-                              <button
-                                onClick={() => handleEdit(row)}
-                                className="text-[var(--color-blue)] hover:underline mr-2"
-                              >
-                                编辑
-                              </button>
-                              <button
-                                onClick={() => handleDelete(row.id)}
-                                className="text-[var(--color-red)] hover:underline"
-                              >
-                                删除
-                              </button>
+                        {tableData.length === 0 ? (
+                          <tr>
+                            <td colSpan={columns.length + 1} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                              暂无数据
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          tableData.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-[var(--background)]">
+                              {columns.map((col) => (
+                                <td
+                                  key={col.name}
+                                  className="px-4 py-3 text-sm text-[var(--text)] max-w-xs truncate"
+                                  title={String(row[col.name] ?? "-")}
+                                >
+                                  {String(row[col.name] ?? "-")}
+                                </td>
+                              ))}
+                              <td className="px-4 py-3 text-right text-sm">
+                                <button
+                                  onClick={() => handleEdit(row)}
+                                  className="text-[var(--color-blue)] hover:underline mr-2"
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(row.id)}
+                                  className="text-[var(--color-red)] hover:underline"
+                                >
+                                  删除
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -350,6 +364,13 @@ export default function DatabaseManager() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => setPage(1)}
+                        disabled={page <= 1}
+                        className="px-2 py-1 border border-[var(--border)] rounded-md disabled:opacity-50"
+                      >
+                        首页
+                      </button>
+                      <button
                         onClick={() => setPage(Math.max(1, page - 1))}
                         disabled={page <= 1}
                         className="px-3 py-1 border border-[var(--border)] rounded-md disabled:opacity-50"
@@ -357,14 +378,21 @@ export default function DatabaseManager() {
                         上一页
                       </button>
                       <span className="text-sm text-[var(--text)]">
-                        第 {page} / {totalPages} 页
+                        第 {page} / {totalPages || 1} 页
                       </span>
                       <button
-                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                        onClick={() => setPage(Math.min(totalPages || 1, page + 1))}
                         disabled={page >= totalPages}
                         className="px-3 py-1 border border-[var(--border)] rounded-md disabled:opacity-50"
                       >
                         下一页
+                      </button>
+                      <button
+                        onClick={() => setPage(totalPages || 1)}
+                        disabled={page >= totalPages}
+                        className="px-2 py-1 border border-[var(--border)] rounded-md disabled:opacity-50"
+                      >
+                        末页
                       </button>
                     </div>
                   </div>

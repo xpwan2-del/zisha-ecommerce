@@ -363,18 +363,18 @@ WHERE uc.user_id = ?
 ## 一、核心问题
 ### 问题场景
 ```
-用户加入购物车时 → 商品有促销活动（促销价200元，原价300元）
-用户结算时 → 促销活动已结束（end_time < 当前时间）
+用户加入购物车时 → 商品有促销活动（促销价200元，原价300元）
+用户结算时 → 促销活动已结束（end_time < 当前时间）
 结算时应该怎么处理？
 ```
 ## 二、两种方案对比
 ### 方案A：结算时重新计算（推荐）
 ```
 结算时：
-1. 查询商品的当前促销状态
-2. 如果有有效促销 → 使用促销价
-3. 如果促销已过期 → 使用商品原价
-4. 不需要存储加入时的促销信息
+1. 查询商品的当前促销状态
+2. 如果有有效促销 → 使用促销价
+3. 如果促销已过期 → 使用商品原价
+4. 不需要存储加入时的促销信息
 ```
 优点 ：
 
@@ -385,11 +385,11 @@ WHERE uc.user_id = ?
 - 用户加入时看到的价格和结算时可能不同
 ### 方案B：存储加入时的促销信息
 ```
-加入时：存储 price_at_add, promotion_id_at_add
+加入时：存储 price_at_add, promotion_id_at_add
 结算时：
-1. 检查存储的促销是否仍然有效
-2. 如果有效 → 使用当时的促销价
-3. 如果过期 → 提示用户选择
+1. 检查存储的促销是否仍然有效
+2. 如果有效 → 使用当时的促销价
+3. 如果过期 → 提示用户选择
 ```
 优点 ：
 
@@ -402,199 +402,199 @@ WHERE uc.user_id = ?
 ### 3.1 流程图
 ```
 用户打开购物车/结算页
-        ↓
+        ↓
 服务端获取购物车商品
-        ↓
+        ↓
 查询每个商品的促销状态
-（检查 product_promotions.end_time > now）
-        ↓
-         ↓
-    ┌────┴────┐
-    ↓         ↓
-促销有效    促销已过期
-    ↓         ↓
-显示促销价   显示过期提示
-         ↓
-    ┌────┴────┐
-    ↓         ↓
-继续结算    提示用户选择
-    ↓         ↓
-    ↓    ┌────┼────┐
-    ↓    ↓    ↓    ↓
-    ↓  去商品页  删除商品  取消
-    ↓
+（检查 product_promotions.end_time > now）
+        ↓
+         ↓
+    ┌────┴────┐
+    ↓         ↓
+促销有效    促销已过期
+    ↓         ↓
+显示促销价   显示过期提示
+         ↓
+    ┌────┴────┐
+    ↓         ↓
+继续结算    提示用户选择
+    ↓         ↓
+    ↓    ┌────┼────┐
+    ↓    ↓    ↓    ↓
+    ↓  去商品页  删除商品  取消
+    ↓
 结算
 ```
 ### 3.2 数据库修改 cart_items 表（不需要修改）
 ```
--- 不需要添加额外字段
--- 只需要在查询时关联 product_promotions 检查有效期
+-- 不需要添加额外字段
+-- 只需要在查询时关联 product_promotions 检查有效期
 
 现有字段：
-id, user_id, product_id, quantity, created_at, updated_at
+id, user_id, product_id, quantity, created_at, updated_at
 ``` product_promotions 表（已有）
 ```
--- 已有字段：
-id, product_id, promotion_id, original_price, promotion_price,
-status, start_time, end_time, priority, can_stack, source_type
+-- 已有字段：
+id, product_id, promotion_id, original_price, promotion_price,
+status, start_time, end_time, priority, can_stack, source_type
 
--- 核心判断：
--- WHERE end_time > datetime('now')
+-- 核心判断：
+-- WHERE end_time > datetime('now')
 ```
 ## 四、API 设计
 ### 4.1 获取购物车（带促销状态）
 ```
-// GET /api/cart/detail
+// GET /api/cart/detail
 
 Response:
 {
-  success: true,
-  data: {
-    items: [
-      {
-        id: number,
-        product_id: number,
-        name: string,
-        price: number,              // 当前价格
-        original_price: number,     // 原价
-        quantity: number,
-        image: string,
-        
-        // 促销信息
-        promotion: {
-          id: number,
-          name: string,
-          discount_percent: number,
-          end_time: string,
-          is_expired: boolean,    // 是否已过期
-          promotion_price: number,  // 促销价（过期后不显示）
-        } | null,
-        
-        // 过期提示（需要用户确认）
-        promotion_expired: boolean,
-      }
-    ],
-    summary: {
-      subtotal: number,
-      total: number
-    }
-  }
+  success: true,
+  data: {
+    items: [
+      {
+        id: number,
+        product_id: number,
+        name: string,
+        price: number,              // 当前价格
+        original_price: number,     // 原价
+        quantity: number,
+        image: string,
+
+        // 促销信息
+        promotion: {
+          id: number,
+          name: string,
+          discount_percent: number,
+          end_time: string,
+          is_expired: boolean,    // 是否已过期
+          promotion_price: number,  // 促销价（过期后不显示）
+        } | null,
+
+        // 过期提示（需要用户确认）
+        promotion_expired: boolean,
+      }
+    ],
+    summary: {
+      subtotal: number,
+      total: number
+    }
+  }
 }
 ```
 ### 4.2 结算前检查
 ```
-// POST /api/cart/check
+// POST /api/cart/check
 
 Request:
 {
-  item_ids: number[]  // 要结算的商品ID
+  item_ids: number[]  // 要结算的商品ID
 }
 
 Response:
 {
-  success: true,
-  data: {
-    can_checkout: boolean,
-    expired_items: [
-      {
-        item_id: number,
-        product_id: number,
-        name: string,
-        image: string,
-        original_promotion: {
-          name: string,
-          end_time: string
-        }
-      }
-    ],
-    valid_items: [...],
-    summary: {...}
-  }
+  success: true,
+  data: {
+    can_checkout: boolean,
+    expired_items: [
+      {
+        item_id: number,
+        product_id: number,
+        name: string,
+        image: string,
+        original_promotion: {
+          name: string,
+          end_time: string
+        }
+      }
+    ],
+    valid_items: [...],
+    summary: {...}
+  }
 }
 ```
 ## 五、过期商品处理流程
 ### 5.1 前端处理
 ```
-// 结算前检查
-const checkResult = await fetch('/api/cart/check');
+// 结算前检查
+const checkResult = await fetch('/api/cart/check');
 
-// 如果有过期商品
-if (checkResult.expired_items.length > 0) {
-  // 弹窗让用户选择
-  showExpiredPromotionModal(checkResult.expired_items);
+// 如果有过期商品
+if (checkResult.expired_items.length > 0) {
+  // 弹窗让用户选择
+  showExpiredPromotionModal(checkResult.expired_items);
 }
 
-// 用户选择后的处理
-const handleExpiredItem = (item, action) => {
-  switch (action) {
-    case 'view_product':
-      // 跳转到商品详情页
-      router.push(`/products/${item.product_id}`);
-      break;
-    case 'remove':
-      // 从购物车删除
-      await removeFromCart(item.id);
-      // 重新检查
-      await checkCart();
-      break;
-    case 'continue':
-      // 不在乎促销过期，继续结算
-      // 商品使用原价
-      proceedToCheckout();
-      break;
-  }
+// 用户选择后的处理
+const handleExpiredItem = (item, action) => {
+  switch (action) {
+    case 'view_product':
+      // 跳转到商品详情页
+      router.push(`/products/${item.product_id}`);
+      break;
+    case 'remove':
+      // 从购物车删除
+      await removeFromCart(item.id);
+      // 重新检查
+      await checkCart();
+      break;
+    case 'continue':
+      // 不在乎促销过期，继续结算
+      // 商品使用原价
+      proceedToCheckout();
+      break;
+  }
 };
 ```
 ### 5.2 过期商品显示
 ```
 ┌────────────────────────────────────┐
-│ ⚠️ 商品 [石瓢紫砂壶] 促销已结束    │
-│                                    │
-│ 原促销：今日特惠 20%OFF            │
-│ 结束时间：2025-01-15 23:59        │
-│                                    │
-│ [查看新促销] [删除商品] [继续结算]  │
+│ ⚠️ 商品 [石瓢紫砂壶] 促销已结束    │
+│                                    │
+│ 原促销：今日特惠 20%OFF            │
+│ 结束时间：2025-01-15 23:59        │
+│                                    │
+│ [查看新促销] [删除商品] [继续结算]  │
 └────────────────────────────────────┘
 ```
 ## 六、数据库查询
 ### 6.1 获取购物车商品及促销状态
 ```
-SELECT 
-  ci.id,
-  ci.product_id,
-  ci.quantity,
-  p.name,
-  p.price as original_price,
-  p.image,
-  pp.promotion_price,
-  pp.end_time,
-  pr.name as promotion_name,
-  pr.discount_percent,
-  CASE 
-    WHEN pp.end_time > datetime('now') THEN 0 
-    ELSE 1 
-  END as is_expired
-FROM cart_items ci
-JOIN products p ON ci.product_id = p.id
-LEFT JOIN product_promotions pp ON p.id = pp.product_id
-LEFT JOIN promotions pr ON pp.promotion_id = pr.id
-WHERE ci.user_id = ?
-ORDER BY ci.created_at DESC
+SELECT
+  ci.id,
+  ci.product_id,
+  ci.quantity,
+  p.name,
+  p.price as original_price,
+  p.image,
+  pp.promotion_price,
+  pp.end_time,
+  pr.name as promotion_name,
+  pr.discount_percent,
+  CASE
+    WHEN pp.end_time > datetime('now') THEN 0
+    ELSE 1
+  END as is_expired
+FROM cart_items ci
+JOIN products p ON ci.product_id = p.id
+LEFT JOIN product_promotions pp ON p.id = pp.product_id
+LEFT JOIN promotions pr ON pp.promotion_id = pr.id
+WHERE ci.user_id = ?
+ORDER BY ci.created_at DESC
 ```
 ### 6.2 查询有效促销
 ```
--- 检查商品的促销是否有效
-SELECT 
-  p.id,
-  p.price as original_price,
-  pp.promotion_price,
-  pp.end_time,
-  pr.name as promotion_name
-FROM products p
-LEFT JOIN product_promotions pp ON p.id = pp.product_id
-LEFT JOIN promotions pr ON pp.promotion_id = pr.id
-WHERE p.id = ?
-  AND pp.end_time > datetime('now')
+-- 检查商品的促销是否有效
+SELECT
+  p.id,
+  p.price as original_price,
+  pp.promotion_price,
+  pp.end_time,
+  pr.name as promotion_name
+FROM products p
+LEFT JOIN product_promotions pp ON p.id = pp.product_id
+LEFT JOIN promotions pr ON pp.promotion_id = pr.id
+WHERE p.id = ?
+  AND pp.end_time > datetime('now')
 ```
 ## 七、总结
 ### 数据库修改
@@ -620,103 +620,96 @@ PlainText
 ### 2.1 游客登录时
 ```
 游客登录成功
-        ↓
-CartContext 检测到登录状态变化
-        ↓
-1. 获取 localStorage.cart_guest 的商品
-        ↓
-2. 调用 /api/cart/merge 合并购物车
-        ↓
-3. 删除 localStorage.cart_guest
-        ↓
-4. 从服务器刷新购物车数据
-        ↓
-5. 更新 localStorage.cart_userId
+        ↓
+CartContext 检测到登录状态变化
+        ↓
+1. 获取 localStorage.cart_guest 的商品
+        ↓
+2. 调用 /api/cart/merge 合并购物车
+        ↓
+3. 删除 localStorage.cart_guest
+        ↓
+4. 从服务器刷新购物车数据
+        ↓
+5. 更新 localStorage.cart_userId
 ```
 ### 2.2 合并冲突处理
 ```
-localStorage.cart_guest = [
-  { product_id: 1, quantity: 2 },
-  { product_id: 3, quantity: 1 }
+localStorage.cart_guest = [
+  { product_id: 1, quantity: 2 },
+  { product_id: 3, quantity: 1 }
 ]
 
-数据库 cart_items (user_id=5):
-  { product_id: 1, quantity: 1 }  // 已存
-  在
-  { product_id: 2, quantity: 1 }
+数据库 cart_items (user_id=5):
+  { product_id: 1, quantity: 1 }  // 已存在
+  { product_id: 2, quantity: 1 }
 
 合并后应该是:
-  product_id: 1 → quantity: 2+1=3 (叠加)
-  product_id: 2 → quantity: 1 (不变)
-  product_id: 3 → quantity: 1 (新增)
+  product_id: 1 → quantity: 2+1=3 (叠加)
+  product_id: 2 → quantity: 1 (不变)
+  product_id: 3 → quantity: 1 (新增)
 ```
 ## 三、合并 API
 ```
-// POST /api/cart/merge
+// POST /api/cart/merge
 
 Request:
 {
-  guest_cart: [
-    { product_id: 1, quantity: 2 },
-    { product_id: 3, quantity: 1 }
-  ]
+  guest_cart: [
+    { product_id: 1, quantity: 2 },
+    { product_id: 3, quantity: 1 }
+  ]
 }
 
 合并逻辑:
-1. 遍历 guest_cart
-2. 检查商品是否存在
-3. 检查库存是否足够
-4. 如果已存在 → 数量叠加
-5. 如果不存在 → 新增
-6. 返回合并后的购物车
+1. 遍历 guest_cart
+2. 检查商品是否存在
+3. 检查库存是否足够
+4. 如果已存在 → 数量叠加
+5. 如果不存在 → 新增
+6. 返回合并后的购物车
 ```
 ## 四、数据库操作
 ```
--- 合并购物车
-FOR EACH item IN guest_cart:
-  -- 检查商品是否存在且有库存
-  SELECT stock FROM products WHERE id = 
-  item.product_id
-  
-  IF stock >= item.quantity:
-    -- 检查是否已在购物车
-    SELECT quantity FROM cart_items 
-    WHERE user_id = ? AND product_id = 
-    item.product_id
-    
-    IF exists:
-      -- 叠加数量
-      UPDATE cart_items 
-      SET quantity = quantity + item.
-      quantity
-      WHERE user_id = ? AND product_id = 
-      item.product_id
-    ELSE:
-      -- 新增
-      INSERT INTO cart_items (user_id, 
-      product_id, quantity)
-      VALUES (?, item.product_id, item.
-      quantity)
+-- 合并购物车
+FOR EACH item IN guest_cart:
+  -- 检查商品是否存在且有库存
+  SELECT stock FROM products WHERE id = item.product_id
+
+  IF stock >= item.quantity:
+    -- 检查是否已在购物车
+    SELECT quantity FROM cart_items
+    WHERE user_id = ? AND product_id = item.product_id
+
+    IF exists:
+      -- 叠加数量
+      UPDATE cart_items
+      SET quantity = quantity + item.quantity
+      WHERE user_id = ? AND product_id = item.product_id
+    ELSE:
+      -- 新增
+      INSERT INTO cart_items (user_id, product_id, quantity)
+      VALUES (?, item.product_id, item.quantity)
 ```
 ## 五、库存检查
 ### 5.1 合并时库存不足
 ```
 商品A库存只有5件
 游客购物车有10件
-        ↓
+        ↓
 合并时检查库存
-        ↓
+        ↓
 库存不足！
-        ↓
+        ↓
 选项：
-1. 只加入5件
-2. 不加入（提示库存不足）
+1. 只加入5件
+2. 不加入（提示库存不足）
 ```
 ### 5.2 推荐处理
 ```
-如果叠加后数量 > 库存:
-  → 取库存数量
-  → 提示用户"库存不足，已调整数量"
+如果叠加后数量 > 库存:
+  → 取库存数量
+  → 提示用户"库存不足，已调整数量"
 ```
 ## 六、总结
 ### 合并规则
@@ -733,9 +726,11 @@ PlainText
 
 
 
+
 商品总价（原价或促销价）        ↓促销折扣（独占促销优先）        ↓可叠加促销（如果有）        ↓= 促销后小计        ↓运费（根据地址计算）        ↓优惠券折扣（如果有）        ↓= 最终应付金额
 2.2 促销计算规则
 TypeScript
+
 
 
 
@@ -746,15 +741,18 @@ SQL
 
 
 
+
 -- 检查每个商品的库存SELECT id, stock, name FROM products WHERE id IN (1, 2, 3)
 3.2 库存不足处理
 PlainText
 
 
 
+
 库存检查结果：商品A：库存5件，要买10件 ❌商品B：库存10件，要买5件 ✅        ↓处理：1. 提示用户"商品A库存不足"2. 只能购买有库存的商品3. 或者取消订单
 3.3 下单后扣减库存
 SQL
+
 
 
 
@@ -765,9 +763,11 @@ SQL
 
 
 
+
 CREATE TABLE orders (  id INTEGER PRIMARY KEY,  order_number VARCHAR(50) UNIQUE NOT NULL,  -- 订单号  user_id INTEGER REFERENCES users(id),    -- 金额  total_amount DECIMAL(10,2) NOT NULL,       -- 总金额  shipping_fee DECIMAL(10,2) DEFAULT 0,       -- 运费  discount_amount DECIMAL(10,2) DEFAULT 0,    -- 折扣金额  final_amount DECIMAL(10,2) NOT NULL,       -- 最终金额    -- 地址  shipping_address_id INTEGER REFERENCES addresses(id),    -- 支付  payment_method VARCHAR(50),  payment_status VARCHAR(20) DEFAULT 'pending',    -- 状态  order_status VARCHAR(20) DEFAULT 'pending',    -- 优惠券  coupon_id INTEGER,    created_at TIMESTAMP,  updated_at TIMESTAMP);
 4.2 订单商品表
 SQL
+
 
 
 
@@ -778,9 +778,11 @@ TypeScript
 
 
 
+
 // POST /api/cart/checkout/validateRequest:{  items: [    { product_id: 1, quantity: 2 },    { product_id: 3, quantity: 1 }  ],  address_id: 5,  coupon_code: "SAVE10"}Response:{  success: true,  data: {    valid: boolean,    errors: [      { type: "stock", product_id: 1, message: "库存不足" },      { type: "promotion", product_id: 2, message: "促销已过期" }    ],    price: {      subtotal: 1000,      promotion_discount: 100,      shipping_fee: 20,      coupon_discount: 50,      final_amount: 870    },    available_coupons: [...]  }}
 5.2 创建订单
 TypeScript
+
 
 
 
@@ -791,9 +793,11 @@ PlainText
 
 
 
+
 创建订单 + 扣减库存 + 更新优惠券        ↓如果中途出错：- 订单创建成功，库存扣减失败 → 数据不一致- 需要回滚！
 6.2 事务流程
 SQL
+
 
 
 
@@ -801,6 +805,7 @@ BEGIN TRANSACTION;-- 1. 创建订单INSERT INTO orders (...) VALUES (...);SET @o
 七、总结
 结算流程
 PlainText
+
 
 
 
@@ -813,6 +818,8 @@ POST /api/cart/checkout	创建订单
 orders 表（已有）
 order_items 表（已有）
 需要确保事务支持
+
+
 
 
 库存处理
@@ -828,15 +835,18 @@ PlainText
 
 
 
+
 商品A库存：1件用户A和用户B同时下单：各买1件        ↓都通过了库存检查        ↓都创建了订单        ↓库存变成 -1 件 ❌ 超卖！
 2.2 解决方案：乐观锁
 SQL
 
 
 
+
 -- 扣减库存时加条件UPDATE products SET stock = stock - 1 WHERE id = ?   AND stock >= 1  -- 必须库存足够才能扣减  AND stock - 1 >= 0-- 检查影响行数-- 如果影响行数 = 0，说明库存不足-- 需要回滚订单
 2.3 代码实现
 TypeScript
+
 
 
 
@@ -847,9 +857,11 @@ PlainText
 
 
 
+
 用户点击"加入购物车"        ↓检查商品库存        ↓库存 >= 购买数量        ↓可以加入        ↓库存 < 购买数量        ↓提示用户"库存不足，仅剩X件"
 3.2 结算时检查
 PlainText
+
 
 
 
@@ -860,9 +872,11 @@ SQL
 
 
 
+
 -- 库存低于10件时提醒SELECT id, name, stock FROM products WHERE stock > 0 AND stock <= 10
 4.2 自动下架
 SQL
+
 
 
 
@@ -873,9 +887,11 @@ PlainText
 
 
 
+
 多端销售（App、小程序、Web）        ↓各端库存独立        ↓可能出现超卖
 5.2 解决方案
 PlainText
+
 
 
 
@@ -893,79 +909,74 @@ POST /api/cart/check	结算前检查库存
 多端同步	定时同步任务
 
 
+
+
 # 订单状态管理
 ## 一、订单状态流转
 ### 1.1 状态列表
-状态 说明 可执行操作 pending 待支付 支付/取消 paid 已支付 发货 shipped 已发货 确认收货 delivered 已送达 完成/申请退货 completed 已完成 评价 cancelled 已取消 - refund_requested 退货申请中 审核 refund_approved 退货审核通过 退货 refund_completed 退货完成 - refund_rejected 退货被拒绝 -
+状态 说明 可执行操作 pending 待支付 支付/取消 paid 已支付 发货 shipped 已发货 确认收货 delivered 已送达 完成/申请退货 completed 已完成 评价/申请退货 cancelled 已取消 - refund_requested 退货申请中 审核 refund_approved 退货审核通过 退货 refund_completed 退货完成 - refund_rejected 退货被拒绝 -
 
 ### 1.2 状态流转图
 ```
-pending (待支付)
-    ↓ 支付成功
-paid (已支付)
-    ↓ 商家发货
-shipped (已发货)
-    ↓ 确认收货
-delivered (已送达)
-    ↓ 完成交易
-completed (已完成)
-    ↓ 申请退货
-refund_requested (退货申请中)
-    ↓ 审核通过
-refund_approved (退货审核通过)
-    ↓ 退货完成
-refund_completed (退货完成)
+pending (待支付)
+    ↓ 支付成功
+paid (已支付)
+    ↓ 商家发货
+shipped (已发货)
+    ↓ 确认收货
+delivered (已送达)
+    ↓ 完成交易
+completed (已完成)
+    ↓ 申请退货
+refund_requested (退货申请中)
+    ↓ 审核通过
+refund_approved (退货审核通过)
+    ↓ 退货完成
+refund_completed (退货完成)
 
 ──────────────────────────
 
-pending (待支付)
-    ↓ 超时/用户取消
-cancelled (已取消)
+pending (待支付)
+    ↓ 超时/用户取消
+cancelled (已取消)
 ```
 ## 二、订单状态日志
 ### 2.1 为什么需要日志
 ```
 订单从创建到完成，可能经历多个状态
-        ↓
+        ↓
 需要记录每个状态的变化
-        ↓
-1. 追踪问题
-2. 用户查看
-3. 数据分析
+        ↓
+1. 追踪问题
+2. 用户查看
+3. 数据分析
 ```
 ### 2.2 order_status_logs 表
 ```
-CREATE TABLE order_status_logs (
-  id INTEGER PRIMARY KEY,
-  order_id INTEGER REFERENCES orders(id),
-  from_status VARCHAR(50),
-  to_status VARCHAR(50) NOT NULL,
-  operator_type VARCHAR(20),  -- system/
-  user/admin
-  operator_id INTEGER,
-  reason TEXT,
-  created_at TIMESTAMP DEFAULT 
-  CURRENT_TIMESTAMP
+CREATE TABLE order_status_logs (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER REFERENCES orders(id),
+  from_status VARCHAR(50),
+  to_status VARCHAR(50) NOT NULL,
+  operator_type VARCHAR(20),  -- system/user/admin
+  operator_id INTEGER,
+  reason TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 ### 2.3 记录示例
 ```
--- 用户下单
-INSERT INTO order_status_logs (order_id, 
-from_status, to_status, operator_type)
-VALUES (1, NULL, 'pending', 'user');
+-- 用户下单
+INSERT INTO order_status_logs (order_id, from_status, to_status, operator_type)
+VALUES (1, NULL, 'pending', 'user');
 
--- 用户支付
-INSERT INTO order_status_logs (order_id, 
-from_status, to_status, operator_type)
-VALUES (1, 'pending', 'paid', 'system');
+-- 用户支付
+INSERT INTO order_status_logs (order_id, from_status, to_status, operator_type)
+VALUES (1, 'pending', 'paid', 'system');
 
--- 商家发货
-INSERT INTO order_status_logs (order_id, 
-from_status, to_status, operator_id, 
-reason)
-VALUES (1, 'paid', 'shipped', 100, '快递单
-号：SF123456789');
+-- 商家发货
+INSERT INTO order_status_logs (order_id, from_status, to_status, operator_id, reason)
+VALUES (1, 'paid', 'shipped', 100, '快递单号：SF123456789');
 ```
 ## 三、退货退款流程
 ### 3.1 退货条件
@@ -974,37 +985,37 @@ VALUES (1, 'paid', 'shipped', 100, '快递单
 ### 3.2 退货流程
 ```
 用户申请退货
-        ↓
+        ↓
 填写退货原因、上传凭证
-        ↓
+        ↓
 商家审核
-        ↓
-    ┌────┴────┐
-    ↓         ↓
-审核通过    审核拒绝
-    ↓         ↓
-用户退货    结束
-    ↓
+        ↓
+    ┌────┴────┐
+    ↓         ↓
+审核通过    审核拒绝
+    ↓         ↓
+用户退货    结束
+    ↓
 商家收货确认
-    ↓
+    ↓
 退款到用户账户
-    ↓
+    ↓
 更新订单状态
 ```
 ### 3.3 退款金额计算
 ```
 订单总金额：1000元
-        ↓
+        ↓
 商品A：300元（使用了促销减50元）
 商品B：200元
 运费：50元
-        ↓
+        ↓
 如果只退商品A：
-  退款金额 = 300元
-        ↓
+  退款金额 = 300元
+        ↓
 如果全部退货：
-  退款金额 = 1000元 - 50元（运费）= 950元
-  注意：促销活动已使用的优惠不退回
+  退款金额 = 1000元 - 50元（运费）= 950元
+  注意：促销活动已使用的优惠不退回
 ```
 ## 四、订单相关 API
 API 方法 说明 GET /api/orders GET 获取用户订单列表 GET /api/orders/:id GET 获取订单详情 POST /api/orders/:id/cancel POST 取消订单 POST /api/orders/:id/refund POST 申请退货 GET /api/orders/:id/status GET 获取订单状态日志
@@ -1026,9 +1037,11 @@ PlainText
 
 
 
+
 用户选择支付方式        ↓创建支付订单（Stripe/PayPal等）        ↓跳转第三方支付页面        ↓用户完成支付        ↓第三方回调通知        ↓更新订单支付状态        ↓继续后续流程
 2.2 支付回调处理
 TypeScript
+
 
 
 
@@ -1047,6 +1060,7 @@ TypeScript
 
 
 
+
 interface PaymentMethod {  id: string;  name: string;  enabled: boolean;  fee_percent: number;  // 手续费}// 支付时计算const totalWithFee = finalAmount * (1 + paymentMethod.fee_percent / 100);
 四、支付失败处理
 4.1 失败原因
@@ -1057,6 +1071,7 @@ interface PaymentMethod {  id: string;  name: string;  enabled: boolean;  fee_pe
 超时	订单关闭，重新下单
 4.2 超时处理
 PlainText
+
 
 
 
@@ -1074,73 +1089,72 @@ POST /api/payments/:id/cancel	POST	取消支付
 失败处理	提示原因，允许重试
 超时处理	自动取消，释放库存
 
+
+
 # 地址管理
 ## 一、地址类型
 类型 说明 shipping 收货地址 billing 账单地址
 
 ## 二、地址表结构
 ```
-CREATE TABLE addresses (
-  id INTEGER PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id),
-  
-  -- 联系人
-  contact_name VARCHAR(100) NOT NULL,
-  phone VARCHAR(20) NOT NULL,
-  
-  -- 地址
-  country VARCHAR(50) DEFAULT 'China',
-  province VARCHAR(50) NOT NULL,
-  city VARCHAR(50) NOT NULL,
-  district VARCHAR(50),
-  street VARCHAR(200),
-  postal_code VARCHAR(20),
-  
-  -- 类型
-  type VARCHAR(20) DEFAULT 'shipping',  
-  -- shipping/billing
-  
-  -- 默认地址
-  is_default BOOLEAN DEFAULT FALSE,
-  
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
+CREATE TABLE addresses (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+
+  -- 联系人
+  contact_name VARCHAR(100) NOT NULL,
+  phone VARCHAR(20) NOT NULL,
+
+  -- 地址
+  country VARCHAR(50) DEFAULT 'China',
+  province VARCHAR(50) NOT NULL,
+  city VARCHAR(50) NOT NULL,
+  district VARCHAR(50),
+  street VARCHAR(200),
+  postal_code VARCHAR(20),
+
+  -- 类型
+  type VARCHAR(20) DEFAULT 'shipping',
+
+  -- 默认地址
+  is_default BOOLEAN DEFAULT FALSE,
+
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
 );
 ```
 ## 三、地址管理流程
 ### 3.1 设置默认地址
 ```
--- 设置新默认地址
+-- 设置新默认地址
 BEGIN;
-UPDATE addresses 
-SET is_default = FALSE 
-WHERE user_id = ? AND type = 'shipping';
+UPDATE addresses
+SET is_default = FALSE
+WHERE user_id = ? AND type = 'shipping';
 
-UPDATE addresses 
-SET is_default = TRUE 
-WHERE id = ?;
+UPDATE addresses
+SET is_default = TRUE
+WHERE id = ?;
 COMMIT;
 ```
 ### 3.2 地址验证
 ```
-const validateAddress = (address) => {
-  const errors = [];
-  
-  if (!address.contact_name) {
-    errors.push("收货人姓名不能为空");
-  }
-  
-  if (!address.phone || !/^1[3-9]\d{9}$/.
-  test(address.phone)) {
-    errors.push("手机号格式不正确");
-  }
-  
-  if (!address.province || !address.city) 
-  {
-    errors.push("省市区不能为空");
-  }
-  
-  return errors;
+const validateAddress = (address) => {
+  const errors = [];
+
+  if (!address.contact_name) {
+    errors.push("收货人姓名不能为空");
+  }
+
+  if (!address.phone || !/^1[3-9]\d{9}$/.test(address.phone)) {
+    errors.push("手机号格式不正确");
+  }
+
+  if (!address.province || !address.city) {
+    errors.push("省市区不能为空");
+  }
+
+  return errors;
 };
 ```
 ## 四、地址相关 API
@@ -1149,23 +1163,25 @@ API 方法 说明 GET /api/addresses GET 获取用户地址列表 GET /api/addre
 ## 五、结算时地址选择
 ```
 用户点击"去结算"
-        ↓
+        ↓
 检查是否有收货地址
-        ↓
-    ┌────┴────┐
-    ↓         ↓
-有地址      无地址
-    ↓         ↓
-选择地址    新增收货地址
-    ↓
+        ↓
+    ┌────┴────┐
+    ↓         ↓
+有地址      无地址
+    ↓         ↓
+选择地址    新增收货地址
+    ↓
 选择优惠券
-    ↓
+    ↓
 选择支付方式
-    ↓
+    ↓
 创建订单
 ```
 ## 六、总结
 功能 说明 地址CRUD 增删改查地址 默认地址 结算时自动选中 地址验证 手机号、必填项验证 多地址 用户可管理多个地址
+
+
 
 # 运费计算
 ## 一、运费规则
@@ -1175,64 +1191,59 @@ API 方法 说明 GET /api/addresses GET 获取用户地址列表 GET /api/addre
 ### 1.2 我们的运费规则
 ```
 包邮条件：
-- 订单金额 >= 100元 → 免费
-- 订单金额 < 100元 → 运费10元
+- 订单金额 >= 100元 → 免费
+- 订单金额 < 100元 → 运费10元
 
 固定运费模式（简化版）
 ```
 ## 二、运费计算
 ### 2.1 计算流程
 ```
-const calculateShipping = (subtotal, 
-address) => {
-  // 1. 检查是否包邮
-  if (subtotal >= 100) {
-    return 0;  // 包邮
-  }
-  
-  // 2. 基础运费
-  let shippingFee = 10;
-  
-  // 3. 偏远地区加收（可选）
-  if (isRemoteArea(address)) {
-    shippingFee += 10;
-  }
-  
-  return shippingFee;
+const calculateShipping = (subtotal, address) => {
+  // 1. 检查是否包邮
+  if (subtotal >= 100) {
+    return 0;  // 包邮
+  }
+
+  // 2. 基础运费
+  let shippingFee = 10;
+
+  // 3. 偏远地区加收（可选）
+  if (isRemoteArea(address)) {
+    shippingFee += 10;
+  }
+
+  return shippingFee;
 };
 
-const isRemoteArea = (address) => {
-  // 西藏、新疆、内蒙古等偏远地区
-  const remoteProvinces = ['西藏', '新疆', 
-  '内蒙古', '青海', '宁夏'];
-  return remoteProvinces.includes(address.
-  province);
+const isRemoteArea = (address) => {
+  // 西藏、新疆、内蒙古等偏远地区
+  const remoteProvinces = ['西藏', '新疆', '内蒙古', '青海', '宁夏'];
+  return remoteProvinces.includes(address.province);
 };
 ```
 ### 2.2 运费计算 API
 ```
-// POST /api/shipping/calculate
+// POST /api/shipping/calculate
 
 Request:
 {
-  address_id: 5,
-  items: [
-    { product_id: 1, quantity: 2 }
-  ]
+  address_id: 5,
+  items: [
+    { product_id: 1, quantity: 2 }
+  ]
 }
 
 Response:
 {
-  success: true,
-  data: {
-    subtotal: 250,
-    is_free_shipping: true,  // 已满100元包
-    邮
-    shipping_fee: 0,
-    free_shipping_threshold: 100,
-    amount_to_free_shipping: 0  // 距离包邮
-    还差多少
-  }
+  success: true,
+  data: {
+    subtotal: 250,
+    is_free_shipping: true,  // 已满100元包邮
+    shipping_fee: 0,
+    free_shipping_threshold: 100,
+    amount_to_free_shipping: 0  // 距离包邮还差多少
+  }
 }
 ```
 ## 三、运费相关 API
@@ -1241,30 +1252,30 @@ API 方法 说明 POST /api/shipping/calculate POST 计算运费 GET /api/shippi
 ## 四、总结
 功能 说明 包邮条件 满100元包邮 基础运费 不满100元收10元 偏远地区 可选加收10元
 
+
+
 # 购物车页面 UI 设计
 ## 一、页面布局
 ```
 ┌────────────────────────────────────┐
-│ [全选] 购物车(3)       [删除]    │ ← 顶部操
-作栏
+│ [全选] 购物车(3)       [删除]    │ ← 顶部操作栏
 ├────────────────────────────────────┤
-│ ┌────┐ 商品名称                     │
-│ │图片│ ¥299  数量: 2             │
-│ └────┘ 泥料:紫泥  容量:200ml      │
-│        [-][ 2 ][+]  🗑️            │
+│ ┌────┐ 商品名称                     │
+│ │图片│ ¥299  数量: 2             │
+│ └────┘ 泥料:紫泥  容量:200ml      │
+│        [-][ 2 ][+]  🗑️            │
 ├────────────────────────────────────┤
-│ ┌────┐ 商品名称                     │
-│ │图片│ ¥199  数量: 1             │
-│ └────┘ ...                         │
+│ ┌────┐ 商品名称                     │
+│ │图片│ ¥199  数量: 1             │
+│ └────┘ ...                         │
 ├────────────────────────────────────┤
-│ ─────── 订单总结 ───────           │
-│ 小计: ¥797                         │
-│ 运费: ¥0 (免费)                    │
-│ ────────────────────────           │
-│ 合计: ¥797                         │
+│ ─────── 订单总结 ───────           │
+│ 小计: ¥797                         │
+│ 运费: ¥0 (免费)                    │
+│ ─────────────────────────           │
+│ 合计: ¥797                         │
 ├────────────────────────────────────┤
-│ [全选]          [去结算 ¥797]       │ ← 
-底部固定
+│ [全选]          [去结算 ¥797]       │ ← 底部固定
 └────────────────────────────────────┘
 ```
 ## 二、组件结构
@@ -1276,6 +1287,8 @@ API 方法 说明 POST /api/shipping/calculate POST 计算运费 GET /api/shippi
 ## 四、总结
 功能 说明 页面布局 顶部+商品列表+底部结算 组件 CartHeader/CartItem/CartSummary/CartFooter 交互 全选、单选、数量、删除
 
+
+
 # 用户中心
 ## 一、用户中心功能
 功能 说明 个人信息 头像、昵称、手机、邮箱 订单列表 查看所有订单 收货地址 管理收货地址 我的优惠券 查看已领取/已使用的券 我的收藏 收藏的商品 浏览历史 最近浏览的商品 账户安全 修改密码、绑定手机
@@ -1283,24 +1296,24 @@ API 方法 说明 POST /api/shipping/calculate POST 计算运费 GET /api/shippi
 ## 二、用户中心页面结构
 ```
 ┌────────────────────────────────────┐
-│ 👤 用户头像                         │
-│    昵称 | 会员等级                 │
-│    [编辑资料]                       │
+│ 👤 用户头像                         │
+│    昵称 | 会员等级                 │
+│    [编辑资料]                       │
 ├────────────────────────────────────┤
-│ 📦 订单                               │
-│ [待支付] [待发货] [待收货] [已完成] │
+│ 📦 订单                               │
+│ [待支付] [待发货] [待收货] [已完成]│
 ├────────────────────────────────────┤
-│ 📍 收货地址                         │
-│ [添加新地址]                        │
+│ 📍 收货地址                         │
+│ [添加新地址]                        │
 ├────────────────────────────────────┤
-│ 🎫 我的优惠券                       │
-│ 可用(3) 已用(2) 已过期(1)          │
+│ 🎫 我的优惠券                       │
+│ 可用(3) 已用(2) 已过期(1)          │
 ├────────────────────────────────────┤
-│ ❤️ 我的收藏                         │
-│ [商品1] [商品2] [商品3]            │
+│ ❤️ 我的收藏                         │
+│ [商品1] [商品2] [商品3]            │
 ├────────────────────────────────────┤
-│ 🔒 账户安全                         │
-│ 修改密码 | 绑定手机                  │
+│ 🔒 账户安全                         │
+│ 修改密码 | 绑定手机                  │
 └────────────────────────────────────┘
 ```
 ## 三、用户中心 API
@@ -1311,3 +1324,498 @@ API 方法 说明 GET /api/users/profile GET 获取用户信息 PUT /api/users/p
 
 ## 五、总结
 功能 说明 个人信息 查看和编辑 订单入口 快捷进入各状态订单 地址管理 增删改查 优惠券 查看我的优惠券 收藏 我的收藏商品
+
+
+
+# 库存管理系统
+
+## 一、现有库存表分析
+
+### 1.1 现有库存相关表
+
+| 表名 | 记录数 | 用途 | 使用状态 |
+|------|--------|------|---------|
+| `products.stock` | 60个商品 | 商品库存字段 | ✅ 核心使用中 |
+| `inventory_logs` | 50条 | 库存变动日志 | ⚠️ 仅有init类型 |
+| `inventory_alerts` | 6条 | 库存预警 | ❌ 未使用 |
+
+### 1.2 现有表结构详情
+
+#### inventory_logs 表（库存变动日志）
+```
+字段:
+  - id: INTEGER (PK)
+  - product_id: INTEGER
+  - change_type: VARCHAR(50)  -- 当前只有 'init'
+  - quantity: INTEGER
+  - before_stock: INTEGER
+  - after_stock: INTEGER
+  - reason: VARCHAR(255)
+  - operator_id: INTEGER
+  - operator_name: VARCHAR(100)
+  - created_at: TIMESTAMP
+```
+
+#### inventory_alerts 表（库存预警）
+```
+字段:
+  - id: INTEGER (PK)
+  - product_id: INTEGER
+  - alert_type: VARCHAR(50)  -- 当前只有 'low_stock'
+  - current_stock: INTEGER
+  - threshold: INTEGER
+  - status: VARCHAR(20)  -- pending/resolved
+  - handled_by: VARCHAR(100)
+  - handled_at: TIMESTAMP
+  - created_at: TIMESTAMP
+```
+
+#### products.stock 字段
+```
+products 表的 stock 字段:
+  - stock: INT  -- 当前库存数量
+  - 共60个商品，库存从几十到上百不等
+```
+
+### 1.3 现有API分析
+
+| API | 操作 | 当前库存来源 | 问题 |
+|-----|------|------------|------|
+| `/api/products` GET | 查库存 | products.stock | ✅ 直接读取 |
+| `/api/cart` POST | 扣库存检查 | products.stock | ✅ 直接检查 |
+| `/api/orders` POST | 扣库存 | products.stock | ✅ 直接扣减 |
+| `/api/inventory` GET | 查统计 | products.stock | ⚠️ 间接读取 |
+| `/api/inventory` POST | 调整库存 | products.stock | ⚠️ 只更新products |
+
+### 1.4 核心问题
+
+1. **数据分散**：库存同时存在于 `products.stock` 和 `inventory_logs`
+2. **查询不一致**：有些API查products表，有些查inventory_logs
+3. **类型不完整**：inventory_logs只有`init`类型，缺少业务场景类型
+4. **预警未启用**：inventory_alerts表存在但无代码使用
+5. **无实时库存表**：缺少一张`inventory`表来记录当前库存快照
+
+---
+
+## 二、概念解释
+
+### 2.1 预留/锁定库存解释
+
+预留库存（Reserved Quantity）是电商系统中防止超卖的重要机制：
+
+**举例说明**：
+```
+场景：某商品库存100个，用户A参加秒杀
+
+1. 用户A下单购买10个（未支付）
+   → 系统锁定10个库存 → 可销售库存：100 - 10 = 90
+
+2. 用户A支付成功
+   → 锁定转为出库 → 实际库存：90
+
+3. 用户A超时未支付，订单取消
+   → 释放锁定库存 → 可销售库存：90 + 10 = 100
+```
+
+**适用场景**：
+- 秒杀/限时促销：活动期间锁定库存防止超卖
+- 预售：先下单后发货的模式
+- 多仓库分配：订单确认前预留某仓库的货
+
+**本项目决策**：
+- 商品价值较高，通常用户下单后直接支付
+- 没有秒杀/预售功能
+- 超时订单自动取消即可释放库存
+- **结论：本项目不需要预留库存字段**
+
+---
+
+## 三、新表结构设计
+
+### 3.1 【新建】inventory 表（当前库存快照表）
+
+```
+用途: 记录每个商品的当前实时库存
+
+字段:
+  - id: INTEGER PRIMARY KEY AUTOINCREMENT
+  - product_id: INTEGER NOT NULL UNIQUE REFERENCES products(id)
+  - product_name: TEXT NOT NULL  -- 冗余存储，便于查看
+  - quantity: INTEGER NOT NULL DEFAULT 0  -- 当前库存
+  - low_stock_threshold: INTEGER DEFAULT 10  -- 低库存预警阈值（每个商品可单独设置）
+  - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  - updated_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+索引:
+  - UNIQUE(product_id)
+  - INDEX(quantity)
+```
+
+### 3.2 【新建】inventory_transactions 表（库存流水/日志表）
+
+```
+用途: 记录所有库存变动，替代现有的inventory_logs
+
+字段:
+  - id: INTEGER PRIMARY KEY AUTOINCREMENT
+  - product_id: INTEGER NOT NULL REFERENCES products(id)
+  - product_name: TEXT NOT NULL  -- 冗余存储，便于查看
+  - transaction_type: VARCHAR(50) NOT NULL  -- 变动类型
+  - quantity_change: INTEGER NOT NULL  -- 变动数量（正=入库，负=出库）
+  - quantity_before: INTEGER NOT NULL  -- 变动前库存
+  - quantity_after: INTEGER NOT NULL  -- 变动后库存
+  - reason: TEXT  -- 变动原因
+  - reference_type: VARCHAR(50)  -- 关联单据类型: order/return/adjustment/check
+  - reference_id: INTEGER  -- 关联单据ID
+  - operator_id: INTEGER REFERENCES users(id)
+  - operator_name: VARCHAR(100)
+  - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+索引:
+  - INDEX(product_id)
+  - INDEX(transaction_type)
+  - INDEX(created_at)
+  - INDEX(reference_type, reference_id)
+```
+
+### 3.3 【新建】inventory_checks 表（盘点单表）
+
+```
+用途: 记录盘点批次
+
+字段:
+  - id: INTEGER PRIMARY KEY AUTOINCREMENT
+  - check_number: VARCHAR(50) UNIQUE NOT NULL  -- 盘点单号
+  - status: VARCHAR(20) DEFAULT 'pending'  -- pending/in_progress/completed/cancelled
+  - total_products: INTEGER  -- 盘点商品数
+  - profit_count: INTEGER  -- 盘盈商品数
+  - loss_count: INTEGER  -- 盘亏商品数
+  - profit_quantity: INTEGER  -- 盘盈总数量
+  - loss_quantity: INTEGER  -- 盘亏总数量
+  - operator_id: INTEGER REFERENCES users(id)
+  - operator_name: VARCHAR(100)
+  - completed_at: TIMESTAMP
+  - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  - updated_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+```
+
+### 3.4 【新建】inventory_check_items 表（盘点明细表）
+
+```
+用途: 记录盘点明细
+
+字段:
+  - id: INTEGER PRIMARY KEY AUTOINCREMENT
+  - check_id: INTEGER NOT NULL REFERENCES inventory_checks(id)
+  - product_id: INTEGER NOT NULL REFERENCES products(id)
+  - product_name: TEXT NOT NULL
+  - system_quantity: INTEGER  -- 系统库存
+  - actual_quantity: INTEGER  -- 实际库存
+  - difference: INTEGER  -- 差异数量 (actual - system)
+  - difference_type: VARCHAR(20)  -- profit(盘盈)/loss(盘亏)/ok(无差异)
+  - reason: TEXT  -- 差异原因
+  - status: VARCHAR(20) DEFAULT 'pending'  -- pending/confirmed/adjusted
+  - adjusted_at: TIMESTAMP  -- 调整时间
+  - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  - updated_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+```
+
+### 3.5 【保留并增强】inventory_alerts 表（库存预警表）
+
+```
+用途: 库存预警记录
+
+新增字段:
+  - alert_type: VARCHAR(50) NOT NULL  -- low_stock/out_of_stock/overstock
+  - old_status: VARCHAR(20)  -- 旧状态
+  - new_status: VARCHAR(20)  -- 新状态
+  - is_resolved: BOOLEAN DEFAULT false  -- 是否已处理
+  - resolved_at: TIMESTAMP  -- 处理时间
+  - resolution_note: TEXT  -- 处理备注
+
+保留字段: id, product_id, current_stock, threshold, created_at
+
+删除字段: 无
+```
+
+### 3.6 【保留】products.stock 字段
+
+```
+保留原因: 向后兼容，现有API仍在使用
+注意: 后续新API统一从inventory表读取库存
+```
+
+---
+
+## 四、库存操作类型
+
+### 4.1 入库类（正数 quantity_change）
+
+| 类型代码 | 中文名 | 说明 |
+|---------|--------|------|
+| `init` | 初始化 | 产品创建时初始化库存 |
+| `purchase` | 采购入库 | 供应商送货入库 |
+| `return` | 退货入库 | 客户退货入库 |
+| `return_out` | 退货出库 | 退货给供应商 |
+| `profit` | 盘盈 | 盘点发现多了 |
+| `transfer_in` | 调拨入库 | 从其他仓库调入 |
+| `gift` | 赠送入库 | 赠送、补偿等 |
+| `adjustment` | 调整入库 | 人工调整增加 |
+
+### 4.2 出库类（负数 quantity_change）
+
+| 类型代码 | 中文名 | 说明 |
+|---------|--------|------|
+| `sale` | 销售出库 | 订单支付成功 |
+| `cancel` | 订单取消 | 取消订单释放库存（正数回滚） |
+| `loss` | 盘亏 | 盘点发现少了 |
+| `damage` | 损耗 | 商品损坏报损 |
+| `missing` | 遗失 | 商品丢失 |
+| `transfer_out` | 调拨出库 | 调往其他仓库 |
+| `gift_out` | 赠送出库 | 赠送、样品等 |
+| `adjustment` | 调整出库 | 人工调整减少 |
+
+---
+
+## 五、盘点功能实现
+
+### 5.1 盘点业务流程（简单模式：无审核）
+
+```
+1. 创建盘点单 (inventory_checks)
+   └── 状态: pending
+
+2. 选择要盘点的商品
+   └── 逐个录入实际库存
+
+3. 差异分析 (系统 vs 实际)
+   └── 生成盘点差异明细 (inventory_check_items)
+
+4. 确认盘点结果
+   └── 状态: completed
+   └── 直接执行库存调整
+
+5. 执行库存调整
+   └── quantity_before → quantity_after
+   └── 记录 inventory_transactions (profit/loss)
+```
+
+### 5.2 盘点详细流程
+
+```
+Step 1: 创建盘点单
+POST /api/inventory/checks
+{
+  product_ids: [1, 2, 3]  // 要盘点的商品ID，不传则全选
+}
+返回: check_id, check_number
+
+Step 2: 录入实际库存
+POST /api/inventory/checks/:id/items
+{
+  items: [
+    { product_id: 1, actual_quantity: 95 },
+    { product_id: 2, actual_quantity: 48 },
+    { product_id: 3, actual_quantity: 30 }
+  ]
+}
+系统自动计算差异:
+  product_id: 1 → system: 100, actual: 95 → difference: -5, type: loss
+  product_id: 2 → system: 50, actual: 48 → difference: -2, type: loss
+  product_id: 3 → system: 30, actual: 30 → difference: 0, type: ok
+
+Step 3: 确认盘点并调整库存
+POST /api/inventory/checks/:id/complete
+直接调整库存，无需审核
+
+库存调整记录:
+  product_id: 1 → inventory_transactions (type: loss, quantity_change: -5)
+  product_id: 2 → inventory_transactions (type: loss, quantity_change: -2)
+  product_id: 3 → 无变动
+```
+
+### 5.3 盘点API清单
+
+| API | 方法 | 说明 |
+|-----|------|------|
+| `/api/inventory/checks` | GET | 获取盘点单列表 |
+| `/api/inventory/checks` | POST | 创建盘点单 |
+| `/api/inventory/checks/:id` | GET | 获取盘点单详情 |
+| `/api/inventory/checks/:id/items` | POST | 录入实际库存 |
+| `/api/inventory/checks/:id/complete` | POST | 确认盘点并调整库存 |
+| `/api/inventory/checks/:id` | DELETE | 删除/取消盘点单 |
+
+---
+
+## 六、数据库操作汇总
+
+### 6.1 表操作清单
+
+| 操作 | 表名 | SQL类型 | 详细说明 |
+|------|------|--------|---------|
+| **新建** | `inventory` | CREATE TABLE | 当前库存快照表 |
+| **新建** | `inventory_transactions` | CREATE TABLE | 库存流水日志（替代inventory_logs） |
+| **新建** | `inventory_checks` | CREATE TABLE | 盘点单表 |
+| **新建** | `inventory_check_items` | CREATE TABLE | 盘点明细表 |
+| **保留** | `inventory_alerts` | ALTER TABLE | 增加字段，保留预警功能 |
+| **删除** | `inventory_logs` | DROP TABLE | 数据迁移到inventory_transactions后删除 |
+| **保留** | `products.stock` | 无 | 保留字段，向后兼容 |
+
+### 6.2 新增字段明细
+
+#### inventory_alerts 表新增字段
+```sql
+ALTER TABLE inventory_alerts ADD COLUMN old_status VARCHAR(20);
+ALTER TABLE inventory_alerts ADD COLUMN new_status VARCHAR(20);
+ALTER TABLE inventory_alerts ADD COLUMN is_resolved BOOLEAN DEFAULT 0;
+ALTER TABLE inventory_alerts ADD COLUMN resolved_at TIMESTAMP;
+ALTER TABLE inventory_alerts ADD COLUMN resolution_note TEXT;
+```
+
+### 6.3 数据迁移SQL
+
+#### 从 products.stock 迁移到 inventory
+```sql
+INSERT INTO inventory (product_id, product_name, quantity, created_at, updated_at)
+SELECT id, name, stock, datetime('now'), datetime('now') FROM products;
+```
+
+#### 从 inventory_logs 迁移到 inventory_transactions
+```sql
+INSERT INTO inventory_transactions (product_id, product_name, transaction_type, quantity_change, quantity_before, quantity_after, reason, operator_id, operator_name, created_at)
+SELECT il.product_id, p.name, il.change_type, il.quantity, il.before_stock, il.after_stock, il.reason, il.operator_id, il.operator_name, il.created_at
+FROM inventory_logs il
+JOIN products p ON il.product_id = p.id;
+```
+
+#### 删除旧的 inventory_logs 表
+```sql
+DROP TABLE inventory_logs;
+```
+
+---
+
+## 七、API改造清单
+
+### 7.1 需要修改的API
+
+| API | 修改内容 | 优先级 |
+|-----|---------|--------|
+| `/api/products` GET | 返回 `inventory.quantity` 替代 `products.stock` | P0 |
+| `/api/cart` POST | 检查 `inventory.quantity` | P0 |
+| `/api/orders` POST | 写入 `inventory_transactions` | P0 |
+| `/api/inventory` GET | 改为查询 `inventory` 和 `inventory_transactions` | P1 |
+| `/api/inventory` POST | 支持更多 `transaction_type` | P1 |
+
+### 7.2 需要新建的API
+
+| API | 方法 | 说明 |
+|-----|------|------|
+| `/api/inventory/init` | POST | 初始化产品库存（从products迁移） |
+| `/api/inventory/transactions` | GET | 库存流水查询 |
+| `/api/inventory/alerts` | GET | 库存预警列表 |
+| `/api/inventory/alerts/:id/resolve` | POST | 处理预警 |
+| `/api/inventory/checks` | GET | 盘点单列表 |
+| `/api/inventory/checks` | POST | 创建盘点单 |
+| `/api/inventory/checks/:id` | GET | 盘点单详情 |
+| `/api/inventory/checks/:id/items` | POST | 录入实际库存 |
+| `/api/inventory/checks/:id/complete` | POST | 确认盘点并调整 |
+| `/api/inventory/checks/:id` | DELETE | 取消盘点单 |
+
+---
+
+## 八、实施步骤
+
+### 阶段一：数据库结构重建
+
+1. 创建 `inventory` 表
+2. 创建 `inventory_transactions` 表
+3. 创建 `inventory_checks` 表
+4. 创建 `inventory_check_items` 表
+5. 修改 `inventory_alerts` 表（增加字段）
+6. 数据迁移：products.stock → inventory
+7. 数据迁移：inventory_logs → inventory_transactions
+8. 删除 `inventory_logs` 表
+
+### 阶段二：API改造
+
+1. 修改 `/api/products` GET - 读inventory表
+2. 修改 `/api/cart` - 检查inventory表
+3. 修改 `/api/orders` POST - 写inventory_transactions
+4. 修改 `/api/inventory` GET - 支持新表
+5. 修改 `/api/inventory` POST - 支持更多类型
+
+### 阶段三：新功能开发
+
+1. 开发 `/api/inventory/init` - 初始化API
+2. 开发 `/api/inventory/transactions` - 流水查询
+3. 开发 `/api/inventory/alerts` - 预警管理
+4. 开发盘点相关API
+5. 开发库存管理后台页面
+
+---
+
+## 九、库存预警功能
+
+### 9.1 预警触发条件
+
+```
+当 inventory.quantity <= inventory.low_stock_threshold 时:
+  → 创建/更新 inventory_alerts 记录
+  → alert_type = 'low_stock'
+  → status = 'pending'
+```
+
+### 9.2 预警处理流程
+
+```
+1. 系统自动检测库存低于阈值
+   ↓
+2. 创建预警记录
+   ↓
+3. 管理员在后台看到预警列表
+   ↓
+4. 管理员处理预警（调整库存/忽略）
+   ↓
+5. 标记预警为已解决
+   ↓
+6. 如果库存继续低于阈值，再次触发预警
+```
+
+### 9.3 预警相关API
+
+| API | 方法 | 说明 |
+|-----|------|------|
+| `/api/inventory/alerts` | GET | 获取预警列表 |
+| `/api/inventory/alerts/:id/resolve` | POST | 处理预警 |
+
+---
+
+## 十、总结
+
+### 设计决策
+
+| 问题 | 决策 |
+|------|------|
+| 是否需要预留库存 | ❌ 不需要，简化设计 |
+| 盘点是否需要审核 | ❌ 不需要，盘点后直接调整 |
+| 库存预警阈值 | ✅ 每个商品单独设置 (low_stock_threshold) |
+| 删除inventory_logs时机 | ✅ 立即删除（数据已迁移） |
+
+### 新表结构
+
+1. `inventory` - 当前库存快照
+2. `inventory_transactions` - 库存流水日志
+3. `inventory_checks` - 盘点单
+4. `inventory_check_items` - 盘点明细
+5. `inventory_alerts` - 预警记录（增强）
+
+### 库存操作类型
+
+入库: init, purchase, return, return_out, profit, transfer_in, gift, adjustment
+出库: sale, cancel, loss, damage, missing, transfer_out, gift_out, adjustment
+
+### 盘点流程
+
+简单模式（无审核）:
+创建盘点单 → 录入实际库存 → 自动计算差异 → 确认并调整库存 → 完成
