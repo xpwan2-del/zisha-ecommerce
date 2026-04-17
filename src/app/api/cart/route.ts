@@ -77,7 +77,8 @@ export async function GET(request: NextRequest) {
     const productIds = result.rows.map((row: any) => row.product_id);
 
     // 批量查询促销信息（一次性查询，避免 Promise.all 问题）
-    let promotionsMap: Record<number, any> = {};
+    // 修改：支持多促销，添加 can_stack 和 priority 字段
+    let promotionsMap: Record<number, any[]> = {};
     if (productIds.length > 0) {
       const placeholders = productIds.map(() => '?').join(',');
       const promoQuery = await query(
@@ -89,7 +90,10 @@ export async function GET(request: NextRequest) {
           pr.name_en as promotion_name_en,
           pr.name_ar as promotion_name_ar,
           pr.discount_percent,
-          pp.end_time
+          pr.color as promotion_color,
+          pp.end_time,
+          pp.can_stack,
+          pp.priority
         FROM product_promotions pp
         JOIN promotions pr ON pp.promotion_id = pr.id
         WHERE pp.product_id IN (${placeholders})
@@ -98,9 +102,12 @@ export async function GET(request: NextRequest) {
         productIds
       );
 
-      // 建立 product_id -> promotion 的映射
+      // 建立 product_id -> promotions 数组的映射
       for (const promo of promoQuery.rows) {
-        promotionsMap[promo.product_id] = promo;
+        if (!promotionsMap[promo.product_id]) {
+          promotionsMap[promo.product_id] = [];
+        }
+        promotionsMap[promo.product_id].push(promo);
       }
     }
 
@@ -109,31 +116,75 @@ export async function GET(request: NextRequest) {
     const items = result.rows.map((item: any) => {
       let currentPrice = parseFloat(item.original_price) || 0;
       let promotion = null;
+      let promotions: any[] = [];
 
-      // 检查是否有有效促销
-      const promo = promotionsMap[item.product_id];
-      if (promo) {
-        const endTime = promo.end_time ? new Date(promo.end_time) : null;
-        const isExpired = endTime && endTime < new Date();
-        if (!isExpired) {
-          // 计算促销价格 = 原价 * (100 - 折扣) / 100
-          const originalPrice = parseFloat(promo.promo_original_price) || 0;
-          const discountPercent = promo.discount_percent || 0;
-          const promoPrice = originalPrice * (100 - discountPercent) / 100;
-          currentPrice = promoPrice;
+      // 检查是否有有效促销（现在是数组）
+      const promos = promotionsMap[item.product_id] || [];
+      if (promos.length > 0) {
+        // 计算总折扣和最终价格（使用正确的叠加逻辑）
+        // 1. 检查是否有独占促销 (can_stack === 1)
+        const exclusive = promos.find((p: any) => p.can_stack === 1);
+        let totalDiscountPercent = 0;
+        let finalPrice = parseFloat(item.original_price) || 0;
+
+        if (exclusive) {
+          // 有独占：直接用独占促销的折扣
+          totalDiscountPercent = exclusive.discount_percent || 0;
+          finalPrice = finalPrice * (100 - totalDiscountPercent) / 100;
           promotion = {
-            id: promo.product_id,
-            promotion_id: promo.promotion_id,
-            name: lang === 'en' ? promo.promotion_name_en || promo.promotion_name :
-                  lang === 'ar' ? promo.promotion_name_ar || promo.promotion_name :
-                  promo.promotion_name,
-            discount_percent: discountPercent,
-            end_time: promo.end_time,
+            id: item.product_id,
+            promotion_id: exclusive.promotion_id,
+            name: lang === 'en' ? exclusive.promotion_name_en || exclusive.promotion_name :
+                  lang === 'ar' ? exclusive.promotion_name_ar || exclusive.promotion_name :
+                  exclusive.promotion_name,
+            discount_percent: totalDiscountPercent,
+            end_time: exclusive.end_time,
             is_expired: false,
-            promotion_price: promoPrice,
-            original_price: originalPrice
+            promotion_price: finalPrice,
+            original_price: parseFloat(item.original_price) || 0,
+            color: exclusive.promotion_color,
+            is_exclusive: true
+          };
+        } else {
+          // 无独占：所有可叠加促销相乘
+          const sortedPromos = [...promos].sort((a: any, b: any) => a.priority - b.priority);
+          let multiplier = 1;
+          sortedPromos.forEach((p: any) => {
+            multiplier *= (1 - (p.discount_percent || 0) / 100);
+          });
+          totalDiscountPercent = Math.round((1 - multiplier) * 100);
+          finalPrice = finalPrice * multiplier;
+          currentPrice = finalPrice;
+
+          // 返回第一个促销作为主促销（用于显示）
+          const mainPromo = sortedPromos[0];
+          promotion = {
+            id: item.product_id,
+            promotion_id: mainPromo.promotion_id,
+            name: lang === 'en' ? mainPromo.promotion_name_en || mainPromo.promotion_name :
+                  lang === 'ar' ? mainPromo.promotion_name_ar || mainPromo.promotion_name :
+                  mainPromo.promotion_name,
+            discount_percent: totalDiscountPercent,
+            end_time: mainPromo.end_time,
+            is_expired: false,
+            promotion_price: finalPrice,
+            original_price: parseFloat(item.original_price) || 0,
+            color: mainPromo.promotion_color,
+            is_exclusive: false
           };
         }
+
+        // 构建所有促销的数组（用于显示）
+        promotions = promos.map((p: any) => ({
+          id: p.promotion_id,
+          name: lang === 'en' ? p.promotion_name_en || p.promotion_name :
+                lang === 'ar' ? p.promotion_name_ar || p.promotion_name :
+                p.promotion_name,
+          discount_percent: p.discount_percent,
+          color: p.promotion_color,
+          can_stack: p.can_stack,
+          priority: p.priority
+        }));
       }
 
       const item_total = currentPrice * item.quantity;
@@ -154,7 +205,10 @@ export async function GET(request: NextRequest) {
         stock: item.stock,
         stock_status_id: item.stock_status_id,
         subtotal: item_total,
-        promotion: promotion
+        promotion: promotion,
+        promotions: promotions,
+        total_discount_percent: promos.length > 0 ?
+          (promotion?.discount_percent || 0) : 0
       };
     });
 

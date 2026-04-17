@@ -35,7 +35,18 @@ interface CartItem {
     end_time: string;
     is_expired: boolean;
     promotion_price: number;
+    color?: string;
+    is_exclusive?: boolean;
   } | null;
+  promotions?: Array<{
+    id: number;
+    name: string;
+    discount_percent: number;
+    color?: string;
+    can_stack: number;
+    priority: number;
+  }>;
+  total_discount_percent?: number;
 }
 
 interface CartData {
@@ -534,13 +545,25 @@ export default function CartPage() {
                           </div>
 
                           {item.promotion && !item.promotion.is_expired && (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="badge-discount">
-                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                </svg>
-                                {item.promotion.name} {item.promotion.discount_percent}%OFF
-                              </span>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              {/* 总折扣标签 - 红色渐变 */}
+                              {item.total_discount_percent && item.total_discount_percent > 0 && (
+                                <span className="px-2 py-1 rounded-md shadow-md font-bold text-white text-[10px] sm:text-xs" style={{ background: 'linear-gradient(135deg, #EF4444, rgba(239, 68, 68, 0.6))', boxShadow: 'rgba(0, 0, 0, 0.2) 0px 2px 4px' }}>
+                                  最终折扣 {item.total_discount_percent}% OFF SALE
+                                </span>
+                              )}
+                              {/* 每个促销的单独标签 */}
+                              {(item.promotions || []).map((promo: any) => {
+                                if (['今日特惠', '特惠商品'].includes(promo.name)) return null;
+                                return (
+                                  <span key={promo.id} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: promo.color || 'var(--accent)' }}>
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
+                                    </svg>
+                                    {promo.name} - {promo.discount_percent}%
+                                  </span>
+                                );
+                              })}
                               {item.promotion.end_time && (
                                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                                   {i18n.language === 'ar' ? `ينتهي: ${new Date(item.promotion.end_time).toLocaleDateString('ar-SA')}` :

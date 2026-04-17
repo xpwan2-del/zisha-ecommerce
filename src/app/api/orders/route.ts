@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
         const originalPrice = parseFloat(promos[0].original_price);
 
         // 按新逻辑计算：独占优先 or 叠加计算
-        const exclusive = promos.find((p: any) => p.can_stack === 0 || p.can_stack === false);
+        const exclusive = promos.find((p: any) => p.can_stack === 1);
         let multiplier = 1;
         if (exclusive) {
           multiplier = 1 - exclusive.discount_percent / 100;
