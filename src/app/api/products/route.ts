@@ -173,12 +173,12 @@ export async function GET(request: NextRequest) {
       );
       const promotions = promotionsResult.rows || [];
 
-      // 计算最终价格（按新逻辑：独占can_stack=1优先 or 叠加计算can_stack=0）
+      // 计算最终价格（按新逻辑：独占can_stack=0优先 or 叠加计算can_stack=1）
       const calculateFinalPrice = (originalPrice: number, promos: any[]) => {
         if (promos.length === 0) return originalPrice;
 
-        // 检查是否有独占活动（can_stack=1）
-        const exclusive = promos.find(p => p.can_stack === 1);
+        // 检查是否有独占活动（can_stack=0）
+        const exclusive = promos.find(p => p.can_stack === 0);
         if (exclusive) {
           // 有独占促销 → 直接使用独占促销折扣
           return originalPrice * (1 - exclusive.discount_percent / 100);
@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
       const calculateDiscount = (promos: any[]) => {
         if (promos.length === 0) return { discount: 0, formula: '' };
 
-        const exclusive = promos.find(p => p.can_stack === 1);
+        const exclusive = promos.find(p => p.can_stack === 0);
         if (exclusive) {
           return {
             discount: exclusive.discount_percent,

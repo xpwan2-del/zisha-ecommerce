@@ -349,7 +349,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                     促销叠加计算：
                     {(() => {
                       const promos = product.promotions || [];
-                      const exclusive = promos.find((p: any) => p.can_stack === 1);
+                      const exclusive = promos.find((p: any) => p.can_stack === 0);
                       let formula = '';
                       let totalDiscount = 0;
 
