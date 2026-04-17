@@ -273,28 +273,41 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                     {activity.name}
                   </span>
                 ))}
-                {/* 促销活动标签 (promotion) - 最大折扣的促销 */}
-                {(product.promotion && product.promotion.discount_percent > 0) && (
-                  <span className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: product.promotion.color || 'var(--accent)' }}>
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
-                    </svg>
-                    {product.promotion.name || t("products.discount", "限时特惠")} - {product.promotion.discount_percent}%
-                  </span>
-                )}
-                {/* 其他促销活动标签 (promotions数组) - 排除"今日特惠"和"特惠商品" */}
-                {(product.promotions || []).map((promo: any) => {
-                  if (promo.name === '今日特惠' || promo.name === '特惠商品') return null;
-                  if (product.promotion && promo.id === product.promotion.id) return null;
+                {/* 促销活动标签 - 计算总折扣并显示每个促销 */}
+                {product.promotions && product.promotions.length > 0 && (() => {
+                  const promos = product.promotions;
+                  const exclusive = promos.find((p: any) => p.can_stack === 1);
+                  let totalDiscount = 0;
+
+                  if (exclusive) {
+                    totalDiscount = exclusive.discount_percent;
+                  } else {
+                    const sortedPromos = [...promos].sort((a: any, b: any) => a.priority - b.priority);
+                    const multiplier = sortedPromos.reduce((acc: number, p: any) => acc * (1 - p.discount_percent / 100), 1);
+                    totalDiscount = Math.round((1 - multiplier) * 100);
+                  }
+
                   return (
-                    <span key={promo.id} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: promo.color || 'var(--accent)' }}>
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
-                      </svg>
-                      {promo.name}
-                    </span>
+                    <>
+                      {/* 总折扣标签 */}
+                      <span className="px-2 py-1 rounded-md shadow-md font-bold text-white text-[10px] sm:text-xs" style={{ background: 'linear-gradient(135deg, #EF4444, rgba(239, 68, 68, 0.6))', boxShadow: 'rgba(0, 0, 0, 0.2) 0px 2px 4px' }}>
+                        最终折扣 {totalDiscount}% OFF SALE
+                      </span>
+                      {/* 每个促销的单独标签 */}
+                      {promos.map((promo: any) => {
+                        if (promo.name === '今日特惠' || promo.name === '特惠商品') return null;
+                        return (
+                          <span key={promo.id} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: promo.color || 'var(--accent)' }}>
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
+                            </svg>
+                            {promo.name} - {promo.discount_percent}%
+                          </span>
+                        );
+                      })}
+                    </>
                   );
-                })}
+                })()}
                 {product.is_limited && (
                   <span className="text-white text-xs font-bold px-3 py-1 rounded-full" style={{ backgroundColor: 'var(--secondary)' }}>
                     {t("products.limited", "限量")}

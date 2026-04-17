@@ -339,13 +339,13 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
       }
     }
     
-    // 处理promotions字段（多个活动数组）
+    // 处理promotions字段（多个活动数组）- 显示每个促销及折扣
     if (product.promotions && Array.isArray(product.promotions)) {
       product.promotions.forEach((promo: any) => {
         if (promo.name && !addedNames.has(promo.name) && !['今日特惠', '特惠商品'].includes(promo.name)) {
           tags.push({
             id: promo.id || product.id,
-            name: promo.name || '活动',
+            name: `${promo.name} - ${promo.discount_percent}%`,
             icon: promo.icon || 'tag',
             color: promo.color || 'var(--color-red)'
           });
