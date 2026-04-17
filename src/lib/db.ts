@@ -24,8 +24,8 @@ export async function query(sql: string, params: any[] = []) {
   const hasReturning = sqlUpper.includes('RETURNING');
 
   if (isWriteOperation && !hasReturning) {
-    const result = await database.run(sql, params);
-    return { rows: [], changes: result.changes };
+    const result = await database.run(sql, params) as any;
+    return { rows: [], changes: result.changes, lastInsertRowid: result.lastInsertRowid };
   } else if (isWriteOperation && hasReturning) {
     // For INSERT/UPDATE/DELETE with RETURNING clause, use all() to get returned data
     const result = await database.all(sql, params);
