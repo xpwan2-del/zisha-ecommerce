@@ -249,7 +249,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
           multiplier *= (1 - p.discount_percent / 100);
           parts.push(`(1-${p.discount_percent}%)`);
         });
-        totalDiscount = Math.round((1 - multiplier) * 100);
+        totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
         formula = parts.join(' × ') + ` = ${totalDiscount}%`;
       }
 
@@ -307,16 +307,31 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
   };
 
   // 获取普通活动标签
-  const getActivityTags = (product: any) => {
-    const tags = [];
+  const getActivityTags = (product: any): Array<{id: string | number, name: string, icon: string, color: string}> => {
+    const tags: Array<{id: string | number, name: string, icon: string, color: string}> = [];
     const addedNames = new Set();
-    
+
+    // 处理promotions字段（多个促销数组）- 显示每个促销及折扣（优先显示）
+    if (product.promotions && Array.isArray(product.promotions)) {
+      product.promotions.forEach((promo: any) => {
+        if (promo.name && !addedNames.has(promo.name) && !['今日特惠', '特惠商品'].includes(promo.name)) {
+          tags.push({
+            id: `promo-${promo.id}` || product.id,
+            name: promo.name,
+            icon: promo.icon || 'tag',
+            color: promo.color || 'var(--color-red)'
+          });
+          addedNames.add(promo.name);
+        }
+      });
+    }
+
     // 处理activities数组（来自activity_categories）
     if (product.activities && Array.isArray(product.activities)) {
       product.activities.forEach((act: any) => {
         if (act.name && !addedNames.has(act.name)) {
           tags.push({
-            id: act.id || product.id,
+            id: `activity-${act.id}` || product.id,
             name: act.name || act.name_en || act.name_ar || '活动',
             icon: act.icon_url || act.icon || 'tag',
             color: act.color || 'var(--accent)'
@@ -325,35 +340,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
         }
       });
     }
-    
-    // 处理promotion字段（单个活动）
-    if (product.promotion && typeof product.promotion === 'object') {
-      if (!['今日特惠', '特惠商品'].includes(product.promotion.name)) {
-        tags.push({
-          id: product.promotion.id || product.id,
-          name: product.promotion.name || '活动',
-          icon: product.promotion.icon || 'tag',
-          color: product.promotion.color || 'var(--accent)'
-        });
-        addedNames.add(product.promotion.name);
-      }
-    }
-    
-    // 处理promotions字段（多个活动数组）- 显示每个促销及折扣
-    if (product.promotions && Array.isArray(product.promotions)) {
-      product.promotions.forEach((promo: any) => {
-        if (promo.name && !addedNames.has(promo.name) && !['今日特惠', '特惠商品'].includes(promo.name)) {
-          tags.push({
-            id: promo.id || product.id,
-            name: `${promo.name} - ${promo.discount_percent}%`,
-            icon: promo.icon || 'tag',
-            color: promo.color || 'var(--color-red)'
-          });
-          addedNames.add(promo.name);
-        }
-      });
-    }
-    
+
     // 处理activity_tag字段（单独标签）
     if (product.activity_tag && !tags.find((t: any) => t.name === product.activity_tag)) {
       tags.push({
@@ -363,7 +350,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
         color: product.activity_color || (product.activity_tag === '今日特惠' ? 'var(--color-red)' : 'var(--accent)')
       });
     }
-    
+
     return tags;
   };
 
@@ -547,7 +534,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                     {/* 普通活动标签 - 商品名称下方 */}
                     {activityTags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-3">
-                        {activityTags.slice(0, 4).map((activity: any) => (
+                        {activityTags.slice(0, 5).map((activity: any) => (
                           <div
                             key={activity.id}
                             className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[var(--accent)]/20 rounded-md shadow-sm hover:shadow-md transition-all duration-300"

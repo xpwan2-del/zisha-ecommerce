@@ -143,13 +143,6 @@ const categories: Category[] = [
 
 export async function GET(request: NextRequest) {
   try {
-    // 自动更新过期活动状态
-    await query(
-      `UPDATE product_promotions 
-       SET status = 'inactive' 
-       WHERE status = 'active' AND end_time < datetime('now')`
-    );
-
     // 按顺序排序
     const sortedModules = [...homeModules].sort((a, b) => a.order - b.order);
     const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
@@ -173,25 +166,49 @@ export async function GET(request: NextRequest) {
         pr.icon as promotion_icon,
         pr.color as promotion_color,
         pp.priority,
-        pp.can_stack,
-        ac.id as activity_id,
-        ac.name as activity_name,
-        ac.name_en as activity_name_en,
-        ac.name_ar as activity_name_ar,
-        ac.icon_url as activity_icon_url,
-        ac.color as activity_color
+        pp.can_stack
       FROM products p
       LEFT JOIN product_promotions pp ON p.id = pp.product_id
       LEFT JOIN promotions pr ON pp.promotion_id = pr.id
       LEFT JOIN inventory i ON p.id = i.product_id
       LEFT JOIN inventory_status ins ON i.status_id = ins.id
-      LEFT JOIN product_activities pa ON p.id = pa.product_id
-      LEFT JOIN activity_categories ac ON pa.activity_category_id = ac.id
-      WHERE (pp.status IS NULL OR (pp.status = 'active' AND pr.status = 'active'))
+      WHERE (pp.end_time IS NULL OR (pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')))
       GROUP BY p.id
       ORDER BY p.id ASC
       LIMIT 9
     `);
+
+    // 单独查询每个商品的有效活动（与 /api/products 逻辑一致，不影响促销逻辑）
+    const productIds = productsResult.rows.map((p: any) => p.id);
+    let activitiesMap: { [key: number]: any[] } = {};
+
+    if (productIds.length > 0) {
+      const placeholders = productIds.map(() => '?').join(',');
+      const activitiesResult = await query(`
+        SELECT pa.product_id, ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url, ac.color
+        FROM product_activities pa
+        JOIN activity_categories ac ON pa.activity_category_id = ac.id
+        WHERE pa.product_id IN (${placeholders})
+          AND pa.end_time > datetime('now')
+          AND datetime(pa.start_time) <= datetime('now')
+          AND ac.status = 'active'
+      `, productIds);
+
+      // 按 product_id 分组
+      activitiesResult.rows.forEach((activity: any) => {
+        if (!activitiesMap[activity.product_id]) {
+          activitiesMap[activity.product_id] = [];
+        }
+        activitiesMap[activity.product_id].push({
+          id: activity.id,
+          name: activity.name,
+          name_en: activity.name_en,
+          name_ar: activity.name_ar,
+          icon_url: activity.icon_url,
+          color: activity.color
+        });
+      });
+    }
     
     // 处理产品数据，添加活动标签和图标（使用嵌套promotion结构，与/api/products一致）
     const calculateFinalPrice = (originalPrice: number, discount: number, priority: number, canStack: number) => {
@@ -205,14 +222,7 @@ export async function GET(request: NextRequest) {
       const discount = product.promotion_discount || 0;
       const finalPrice = discount > 0 ? calculateFinalPrice(originalPrice, discount, product.priority || 2, product.can_stack || 1) : originalPrice;
       
-      const activities = product.activity_id ? [{
-        id: product.activity_id,
-        name: product.activity_name,
-        name_en: product.activity_name_en,
-        name_ar: product.activity_name_ar,
-        icon_url: product.activity_icon_url,
-        color: product.activity_color
-      }] : [];
+      const activities = activitiesMap[product.id] || [];
       
       return {
         ...product,

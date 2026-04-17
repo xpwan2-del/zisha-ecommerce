@@ -26,7 +26,6 @@ async function calculateItemPrice(productId: number): Promise<number> {
     FROM product_promotions pp
     JOIN promotions pr ON pp.promotion_id = pr.id
     WHERE pp.product_id = ?
-      AND pp.status = 'active'
       AND datetime(pp.start_time) <= datetime('now')
       AND datetime(pp.end_time) >= datetime('now')`,
     [productId]

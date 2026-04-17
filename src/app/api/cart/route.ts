@@ -97,8 +97,7 @@ export async function GET(request: NextRequest) {
         FROM product_promotions pp
         JOIN promotions pr ON pp.promotion_id = pr.id
         WHERE pp.product_id IN (${placeholders})
-          AND pp.status = 'active'
-          AND (pp.end_time IS NULL OR pp.end_time > datetime('now'))`,
+          AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')`,
         productIds
       );
 
@@ -152,7 +151,7 @@ export async function GET(request: NextRequest) {
           sortedPromos.forEach((p: any) => {
             multiplier *= (1 - (p.discount_percent || 0) / 100);
           });
-          totalDiscountPercent = Math.round((1 - multiplier) * 100);
+          totalDiscountPercent = Math.round((1 - multiplier) * 10000) / 100;
           finalPrice = finalPrice * multiplier;
           currentPrice = finalPrice;
 

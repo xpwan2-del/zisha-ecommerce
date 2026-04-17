@@ -105,7 +105,10 @@ export async function GET(request: NextRequest) {
         `SELECT ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url, ac.color
          FROM product_activities pa
          JOIN activity_categories ac ON pa.activity_category_id = ac.id
-         WHERE pa.product_id = ?`,
+         WHERE pa.product_id = ?
+           AND pa.end_time > datetime('now')
+           AND datetime(pa.start_time) <= datetime('now')
+           AND ac.status = 'active'`,
         [productId]
       );
       const activities = activitiesResult.rows || [];
@@ -149,12 +152,13 @@ export async function GET(request: NextRequest) {
       };
 
       const calculateDiscount = (promos: any[]) => {
-        if (promos.length === 0) return { discount: 0, formula: '' };
+        if (promos.length === 0) return { discount: 0, formula: '', multiplier: 1 };
         const exclusive = promos.find(p => p.can_stack === 1);
         if (exclusive) {
           return {
             discount: exclusive.discount_percent,
-            formula: `${exclusive.discount_percent}% (独占)`
+            formula: `${exclusive.discount_percent}% (独占)`,
+            multiplier: 1 - exclusive.discount_percent / 100
           };
         }
         const sortedPromos = [...promos].sort((a, b) => a.priority - b.priority);
@@ -162,10 +166,12 @@ export async function GET(request: NextRequest) {
         sortedPromos.forEach(p => {
           parts.push(`(1-${p.discount_percent}%)`);
         });
-        const totalDiscount = Math.round((1 - sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1)) * 100);
+        const multiplier = sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1);
+        const totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
         return {
           discount: totalDiscount,
-          formula: parts.join(' × ') + ` = ${totalDiscount}%`
+          formula: parts.join(' × ') + ` = ${totalDiscount}%`,
+          multiplier: multiplier
         };
       };
 

@@ -16,13 +16,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const productId = parseInt(id, 10);
 
   try {
-    // 自动更新过期活动状态
-    await query(
-      `UPDATE product_promotions 
-       SET status = 'inactive' 
-       WHERE status = 'active' AND end_time < datetime('now')`
-    );
-
     // 查询产品基本信息（JOIN inventory和inventory_status获取库存状态）
     const productResult = await query(
       `SELECT
@@ -62,12 +55,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const shipping = parseJSON(row.shipping, {});
     const after_sale = parseJSON(row.after_sale, {});
 
-    // 查询产品关联的活动分类
+    // 查询产品关联的活动分类（只返回有效且未过期的活动）
     const activitiesResult = await query(
       `SELECT ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url, ac.color
        FROM product_activities pa
        JOIN activity_categories ac ON pa.activity_category_id = ac.id
-       WHERE pa.product_id = ?`,
+       WHERE pa.product_id = ?
+         AND pa.end_time > datetime('now')
+         AND datetime(pa.start_time) <= datetime('now')
+         AND ac.status = 'active'`,
       [productId]
     );
     const activities = activitiesResult.rows || [];
@@ -91,7 +87,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pp.end_time
        FROM product_promotions pp
        JOIN promotions pr ON pp.promotion_id = pr.id
-       WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
+       WHERE pp.product_id = ? AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')
        ORDER BY pp.priority DESC, pr.discount_percent DESC
        LIMIT 1`,
       [productId]
@@ -114,7 +110,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pr.color as promotion_color
        FROM product_promotions pp
        JOIN promotions pr ON pp.promotion_id = pr.id
-       WHERE pp.product_id = ? AND pp.status = 'active' AND pr.status = 'active'
+       WHERE pp.product_id = ? AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')
        ORDER BY pp.priority DESC, pr.discount_percent DESC`,
       [productId]
     );
@@ -151,9 +147,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       sortedPromos.forEach(p => {
         parts.push(`(1-${p.discount_percent}%)`);
       });
-      const totalDiscount = Math.round((1 - sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1)) * 100);
+      const multiplier = sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1);
+      const totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
       return {
         discount: totalDiscount,
+        multiplier: multiplier,
         formula: parts.join(' × ') + ` = ${totalDiscount}%`
       };
     };
@@ -311,7 +309,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         priority: promotion.priority,
         can_stack: promotion.can_stack,
         original_price: parseFloat(row.price),
-        promotion_price: parseFloat(row.price) * (1 - discountInfo.discount / 100),
+        promotion_price: parseFloat(row.price) * discountInfo.multiplier,
         start_time: promotion.start_time,
         end_time: promotion.end_time
       } : null,

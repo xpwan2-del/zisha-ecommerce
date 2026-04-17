@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
         `SELECT pp.id, pp.promotion_id, pp.original_price, pr.name as promo_name, pr.discount_percent, pp.end_time, pp.can_stack, pp.priority
          FROM product_promotions pp
          JOIN promotions pr ON pp.promotion_id = pr.id
-         WHERE pp.product_id = ? AND pp.status = 'active'`,
+         WHERE pp.product_id = ? AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')`,
         [item.product_id]
       );
 

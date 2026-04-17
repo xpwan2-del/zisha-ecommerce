@@ -24,13 +24,6 @@ export async function GET(request: NextRequest) {
   const sort = url.searchParams.get('sort') || 'newest';
 
   try {
-    // 自动更新过期活动状态
-    await query(
-      `UPDATE product_promotions 
-       SET status = 'inactive' 
-       WHERE status = 'active' AND end_time < datetime('now')`
-    );
-
     let whereConditions: string[] = [];
     let params: any[] = [];
 
@@ -69,7 +62,7 @@ export async function GET(request: NextRequest) {
     if (promotion_id) {
       whereConditions.push(`EXISTS (
         SELECT 1 FROM product_promotions pp 
-        WHERE pp.product_id = p.id AND pp.promotion_id = ? AND pp.status = 'active'
+        WHERE pp.product_id = p.id AND pp.promotion_id = ? AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')
       )`);
       params.push(promotion_id);
     }
@@ -138,12 +131,15 @@ export async function GET(request: NextRequest) {
       // 解析JSON字段
       const images = parseJSON(row.images, []);
 
-      // 查询产品关联的活动分类
+      // 查询产品关联的活动分类（只返回有效且未过期的活动）
       const activitiesResult = await query(
         `SELECT ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url, ac.color
          FROM product_activities pa
          JOIN activity_categories ac ON pa.activity_category_id = ac.id
-         WHERE pa.product_id = ?`,
+         WHERE pa.product_id = ?
+           AND pa.end_time > datetime('now')
+           AND datetime(pa.start_time) <= datetime('now')
+           AND ac.status = 'active'`,
         [productId]
       );
       const activities = activitiesResult.rows || [];
@@ -166,8 +162,7 @@ export async function GET(request: NextRequest) {
          FROM product_promotions pp
          JOIN promotions pr ON pp.promotion_id = pr.id
          WHERE pp.product_id = ? 
-           AND pp.status = 'active' 
-           AND pr.status = 'active'
+           AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')
          ORDER BY pp.priority DESC, pr.discount_percent DESC`,
         [productId]
       );
@@ -195,13 +190,14 @@ export async function GET(request: NextRequest) {
 
       // 计算总折扣和公式
       const calculateDiscount = (promos: any[]) => {
-        if (promos.length === 0) return { discount: 0, formula: '' };
+        if (promos.length === 0) return { discount: 0, formula: '', multiplier: 1 };
 
         const exclusive = promos.find(p => p.can_stack === 1);
         if (exclusive) {
           return {
             discount: exclusive.discount_percent,
-            formula: `${exclusive.discount_percent}% (独占)`
+            formula: `${exclusive.discount_percent}% (独占)`,
+            multiplier: 1 - exclusive.discount_percent / 100
           };
         }
 
@@ -210,10 +206,12 @@ export async function GET(request: NextRequest) {
         sortedPromos.forEach(p => {
           parts.push(`(1-${p.discount_percent}%)`);
         });
-        const totalDiscount = Math.round((1 - sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1)) * 100);
+        const multiplier = sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1);
+        const totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
         return {
           discount: totalDiscount,
-          formula: parts.join(' × ') + ` = ${totalDiscount}%`
+          formula: parts.join(' × ') + ` = ${totalDiscount}%`,
+          multiplier: multiplier
         };
       };
 

@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
             JOIN promotions pr ON pp.promotion_id = pr.id
             LEFT JOIN inventory i ON p.id = i.product_id
             LEFT JOIN inventory_status ins ON i.status_id = ins.id
-            WHERE pp.promotion_id = ? AND pp.status = 'active'
+            WHERE pp.promotion_id = ? AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')
             ORDER BY pp.created_at DESC`,
             [promotion.id]
           );

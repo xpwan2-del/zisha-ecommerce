@@ -11,16 +11,19 @@ export async function GET(request: NextRequest) {
     }
 
     const sql = `
-      SELECT 
+      SELECT
         ac.id,
         ac.name,
         ac.name_en,
         ac.name_ar,
-        ac.icon,
+        ac.icon_url,
         ac.color
       FROM product_activities pa
       JOIN activity_categories ac ON pa.activity_category_id = ac.id
-      WHERE pa.product_id = ? AND ac.status = 'active'
+      WHERE pa.product_id = ?
+        AND pa.end_time > datetime('now')
+        AND datetime(pa.start_time) <= datetime('now')
+        AND ac.status = 'active'
       ORDER BY ac.id
     `;
 
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
       name: activity.name,
       name_en: activity.name_en,
       name_ar: activity.name_ar,
-      icon: activity.icon,
+      icon_url: activity.icon_url,
       color: activity.color
     }));
 

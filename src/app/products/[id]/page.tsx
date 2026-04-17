@@ -266,13 +266,6 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
             <div className="bg-white rounded-lg border p-6" style={{ borderColor: 'var(--border)' }}>
               {/* 活动标签 */}
               <div className="flex flex-wrap gap-2 mb-4">
-                {/* 活动标签 (activities) - 产品活动标签 */}
-                {(product.activities || []).length > 0 && (product.activities || []).map((activity: any) => (
-                  <span key={activity.id} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: activity.color || 'var(--accent)' }}>
-                    {activity.icon_url ? <img src={activity.icon_url} className="w-3 h-3" alt="" /> : null}
-                    {activity.name}
-                  </span>
-                ))}
                 {/* 促销活动标签 - 计算总折扣并显示每个促销 */}
                 {product.promotions && product.promotions.length > 0 && (() => {
                   const promos = product.promotions;
@@ -284,7 +277,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                   } else {
                     const sortedPromos = [...promos].sort((a: any, b: any) => a.priority - b.priority);
                     const multiplier = sortedPromos.reduce((acc: number, p: any) => acc * (1 - p.discount_percent / 100), 1);
-                    totalDiscount = Math.round((1 - multiplier) * 100);
+                    totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
                   }
 
                   return (
@@ -297,7 +290,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       {promos.map((promo: any) => {
                         if (promo.name === '今日特惠' || promo.name === '特惠商品') return null;
                         return (
-                          <span key={promo.id} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: promo.color || 'var(--accent)' }}>
+                          <span key={`promo-${promo.id}`} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: promo.color || 'var(--accent)' }}>
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
                             </svg>
@@ -308,6 +301,13 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                     </>
                   );
                 })()}
+                {/* 活动标签 (activities) - 产品活动标签 */}
+                {(product.activities || []).length > 0 && (product.activities || []).map((activity: any) => (
+                  <span key={`activity-${activity.id}`} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: activity.color || 'var(--accent)' }}>
+                    {activity.icon_url ? <img src={activity.icon_url} className="w-3 h-3" alt="" /> : null}
+                    {activity.name}
+                  </span>
+                ))}
                 {product.is_limited && (
                   <span className="text-white text-xs font-bold px-3 py-1 rounded-full" style={{ backgroundColor: 'var(--secondary)' }}>
                     {t("products.limited", "限量")}
@@ -377,7 +377,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                           parts.push(`(1-${p.discount_percent}%)`);
                         });
                         const multiplier = sortedPromos.reduce((acc: number, p: any) => acc * (1 - p.discount_percent / 100), 1);
-                        totalDiscount = Math.round((1 - multiplier) * 100);
+                        totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
                         formula = parts.join(' × ') + ` = ${totalDiscount}%`;
                       }
 
