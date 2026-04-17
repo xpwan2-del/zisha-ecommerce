@@ -29,7 +29,7 @@ export async function PUT(
     const columnsResult = await query(`PRAGMA table_info(${table})`);
     const columns = (columnsResult.rows || []).filter((col: any) => col.name !== 'id');
 
-    console.log(`[DB UPDATE] columns:`, columns.map(c => c.name));
+    console.log(`[DB UPDATE] columns:`, columns.map((c: any) => c.name));
 
     let updates = columns.map((col: any) => `${col.name} = ?`).join(', ');
     let values = columns.map((col: any) => body[col.name]);
