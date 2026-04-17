@@ -8,43 +8,38 @@
 @tailwind utilities;
 
 :root {
-  /* 按钮样式变量 - 保留 */
-  --btn-primary-bg: #CA8A04;
+  /* 按钮样式变量 - 由JavaScript从数据库动态设置，初始为fallback值 */
+  --btn-primary-bg: #1A237E;
   --btn-primary-text: #FFFFFF;
-  --btn-primary-border: #CA8A04;
-  --btn-primary-shadow: 0 4px 14px rgba(202, 138, 4, 0.3);
-  --btn-primary-hover-bg: #B47C03;
+  --btn-primary-border: #D4AF37;
+  --btn-primary-shadow: 0 4px 14px rgba(26, 35, 126, 0.3);
+  --btn-primary-hover-bg: #151E63;
   --btn-primary-hover-text: #FFFFFF;
-  --btn-primary-hover-border: #B47C03;
+  --btn-primary-hover-border: #E6C250;
   --btn-primary-hover-transform: scale(1.05);
-  --btn-primary-hover-shadow: 0 6px 20px rgba(202, 138, 4, 0.4);
-  
+  --btn-primary-hover-shadow: 0 6px 20px rgba(26, 35, 126, 0.4);
+
   /* 加载动画颜色 */
-  --loading-color: #CA8A04;
-  
-  /* 状态颜色变量 */
+  --loading-color: #1A237E;
+
+  /* 状态颜色变量 - fallback默认值 */
   --color-red: #DC2626;
   --color-green: #16A34A;
   --color-blue: #2563EB;
   --color-yellow: #EAB308;
   --color-orange: #F97316;
-  
-  /* 其他变量 - 保留 */
+
+  /* 其他变量 */
   --gold-gradient: linear-gradient(135deg, #CA8A04 0%, #F59E0B 50%, #CA8A04 100%);
   --glass-bg: rgba(255, 255, 255, 0.85);
   --foreground-rgb: 12, 10, 9;
   --background-rgb: 250, 250, 249;
-  
-  /* 字体变量 - 保留 */
-  --heading-font: 'Cormorant', 'Noto Naskh Arabic', serif;
-  --body-font: 'Montserrat', 'Noto Sans Arabic', sans-serif;
-  
-  /* 颜色变量 - 由JavaScript从数据库动态设置，初始为空 */
-  /* --primary, --secondary, --accent, --dark, --light, --background, --background-alt, --text, --text-muted, --border, --card */
-}
 
-/* 传统中国风主题 */
-.theme-chinese {
+  /* 字体变量 - 由JavaScript从数据库动态设置 */
+  --heading-font: 'Cormorant', serif;
+  --body-font: 'Inter', sans-serif;
+
+  /* 颜色变量 - 由JavaScript从数据库动态设置 */
   --primary: #1A237E;
   --secondary: #D4AF37;
   --accent: #5D3B6D;
@@ -59,68 +54,6 @@
   --primary-rgb: 26, 35, 126;
   --accent-rgb: 93, 59, 109;
   --border-rgb: 229, 231, 235;
-  --heading-font: 'Cormorant', serif;
-  --body-font: 'Inter', sans-serif;
-}
-
-/* 中东高档风主题 */
-.theme-middleEastern {
-  --primary: #5D3B6D;
-  --secondary: #D4AF37;
-  --accent: #1E3A8A;
-  --dark: #1F2937;
-  --light: #F3F4F6;
-  --background: #F3F4F6;
-  --background-alt: #E5E7EB;
-  --text: #1F2937;
-  --text-muted: #6B7280;
-  --border: #D1D5DB;
-  --card: #FFFFFF;
-  --primary-rgb: 93, 59, 109;
-  --accent-rgb: 30, 58, 138;
-  --border-rgb: 209, 213, 219;
-  --heading-font: 'Cormorant', serif;
-  --body-font: 'Inter', sans-serif;
-}
-
-/* 亚马逊风主题 */
-.theme-amazon {
-  --primary: #FF9900;
-  --secondary: #007185;
-  --accent: #374151;
-  --dark: #111111;
-  --light: #F5F5F5;
-  --background: #FFFFFF;
-  --background-alt: #F5F5F5;
-  --text: #111111;
-  --text-muted: #6B7280;
-  --border: #E5E7EB;
-  --card: #FFFFFF;
-  --primary-rgb: 255, 153, 0;
-  --accent-rgb: 55, 65, 81;
-  --border-rgb: 229, 231, 235;
-  --heading-font: 'Inter', sans-serif;
-  --body-font: 'Inter', sans-serif;
-}
-
-/* 中东奢华风主题 */
-.theme-middleEasternLuxury {
-  --primary: #5D3B6D;
-  --secondary: #D4AF37;
-  --accent: #8B4513;
-  --dark: #1F2937;
-  --light: #F3F4F6;
-  --background: #F3F4F6;
-  --background-alt: #E5E7EB;
-  --text: #1F2937;
-  --text-muted: #6B7280;
-  --border: #D1D5DB;
-  --card: #FFFFFF;
-  --primary-rgb: 93, 59, 109;
-  --accent-rgb: 139, 69, 19;
-  --border-rgb: 209, 213, 219;
-  --heading-font: 'Cormorant', serif;
-  --body-font: 'Inter', sans-serif;
 }
 
 body {

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
     
-    const user_id = authResult.user?.id;
+    const user_id = authResult.user?.userId;
     
     if (productId) {
       const result = await query(
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       return authResult.response;
     }
     
-    const user_id = authResult.user?.id;
+    const user_id = authResult.user?.userId;
     const { product_id } = await request.json();
     
     if (!product_id) {
@@ -110,7 +110,7 @@ export async function DELETE(request: NextRequest) {
       return authResult.response;
     }
     
-    const user_id = authResult.user?.id;
+    const user_id = authResult.user?.userId;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const productId = searchParams.get('product_id');

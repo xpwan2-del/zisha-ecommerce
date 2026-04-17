@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const order = orderResult.rows[0];
 
     // 验证权限：普通用户只能查看自己的订单
-    if (authResult.user?.role !== 'admin' && order.user_id !== authResult.user?.id) {
+    if (authResult.user?.role !== 'admin' && order.user_id !== authResult.user?.userId) {
       return NextResponse.json(
         { success: false, error: 'Permission denied' },
         { status: 403 }

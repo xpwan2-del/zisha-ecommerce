@@ -7,7 +7,7 @@ interface InventoryItem {
   product_id: number;
   product_name: string;
   quantity: number;
-  low_stock_threshold: number;
+  status_id: number;
   updated_at: string;
 }
 
@@ -51,7 +51,7 @@ export default function InventoryPage() {
           product_id: p.id,
           product_name: p.name,
           quantity: p.stock || 0,
-          low_stock_threshold: 10,
+          status_id: p.stock_status_id || 1,
           updated_at: p.updated_at
         }));
         setInventory(invData);
@@ -118,9 +118,10 @@ export default function InventoryPage() {
     }
   };
 
-  const getStockStatus = (quantity: number, threshold: number) => {
-    if (quantity <= 0) return { label: 'Out of Stock', color: 'bg-red-100 text-red-800' };
-    if (quantity <= threshold) return { label: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
+  const getStockStatus = (quantity: number, statusId: number) => {
+    if (statusId === 4) return { label: 'Out of Stock', color: 'bg-red-100 text-red-800' };
+    if (statusId === 3) return { label: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
+    if (statusId === 2) return { label: 'Limited', color: 'bg-orange-100 text-orange-800' };
     return { label: 'In Stock', color: 'bg-green-100 text-green-800' };
   };
 
@@ -200,7 +201,7 @@ export default function InventoryPage() {
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Threshold</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status ID</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                       </tr>
@@ -214,7 +215,7 @@ export default function InventoryPage() {
                         </tr>
                       ) : (
                         inventory.map((item) => {
-                          const status = getStockStatus(item.quantity, item.low_stock_threshold);
+                          const status = getStockStatus(item.quantity, item.status_id);
                           return (
                             <tr key={item.id} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-sm text-gray-900">
@@ -222,7 +223,7 @@ export default function InventoryPage() {
                                 <div className="text-xs text-gray-500">ID: {item.product_id}</div>
                               </td>
                               <td className="px-4 py-3 text-sm font-semibold">{item.quantity}</td>
-                              <td className="px-4 py-3 text-sm text-gray-500">{item.low_stock_threshold}</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{item.status_id}</td>
                               <td className="px-4 py-3">
                                 <span className={`px-2 py-1 text-xs rounded-full ${status.color}`}>
                                   {status.label}

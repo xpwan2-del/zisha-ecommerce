@@ -17,6 +17,21 @@ export async function getDB() {
 // Execute a query
 export async function query(sql: string, params: any[] = []) {
   const database = await getDB();
-  const result = await database.all(sql, params);
-  return { rows: result };
+  const sqlUpper = sql.trim().toUpperCase();
+  const isWriteOperation = sqlUpper.startsWith('UPDATE') ||
+                           sqlUpper.startsWith('DELETE') ||
+                           sqlUpper.startsWith('INSERT');
+  const hasReturning = sqlUpper.includes('RETURNING');
+
+  if (isWriteOperation && !hasReturning) {
+    const result = await database.run(sql, params);
+    return { rows: [], changes: result.changes };
+  } else if (isWriteOperation && hasReturning) {
+    // For INSERT/UPDATE/DELETE with RETURNING clause, use all() to get returned data
+    const result = await database.all(sql, params);
+    return { rows: result, changes: result.length };
+  } else {
+    const result = await database.all(sql, params);
+    return { rows: result };
+  }
 }

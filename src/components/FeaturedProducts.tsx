@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { useCurrency } from '@/lib/contexts/CurrencyContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useCart } from '@/lib/contexts/CartContext';
 import { convertCurrency, formatCurrency } from '@/lib/utils/currency';
 
 interface HomeData {
@@ -31,6 +32,7 @@ interface FeaturedProductsProps {
 export function FeaturedProducts({ category = "all", data, pageType = "products" }: FeaturedProductsProps) {
   const { currency } = useCurrency();
   const { user, isAuthenticated } = useAuth();
+  const { refreshCart } = useCart();
   const router = useRouter();
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,7 +57,6 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
       reviewCount: 128,
       inStock: true,
       fastDelivery: true,
-      bestSeller: true,
     },
     {
       id: 2,
@@ -81,7 +82,6 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
       rating: 4.9,
       reviewCount: 210,
       inStock: true,
-      bestSeller: true,
     },
     {
       id: 4,
@@ -137,14 +137,18 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
             category: product.category_id,
             inStock: product.stock > 0,
             fastDelivery: true, // Default fast delivery
-            bestSeller: product.id <= 2, // Mark first 2 products as best sellers
             image: product.image || product.main_image, // Use image or main_image
-            activities: product.activity_tag ? [{
+            activities: product.activities && product.activities.length > 0 ? product.activities.map((act: any) => ({
+              id: act.id,
+              name: act.name || act.name_en || act.name_ar,
+              icon: act.icon_url || act.icon || 'tag',
+              color: act.color || 'var(--accent)'
+            })) : (product.activity_tag ? [{
               id: product.id,
               name: product.activity_tag,
               icon: product.activity_icon || 'tag',
-              color: product.activity_tag === '今日特惠' ? 'var(--accent)' : product.activity_tag === '特惠产品' ? 'var(--accent)' : 'var(--accent)'
-            }] : [] // Include activity data
+              color: product.activity_color || 'var(--accent)'
+            }] : [])
           }));
           console.log('Formatted products:', formattedProducts.length, 'products');
           console.log('First formatted product:', formattedProducts[0]);
@@ -173,8 +177,9 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
             reviewCount: product.review_count || product.reviewCount || 0,
             category: product.category_id || product.category,
             inStock: product.stock > 0,
+            stock_status_id: product.stock_status_id || 1,
+            stock_status_info: product.stock_status_info || null,
             fastDelivery: true, // Default fast delivery
-            bestSeller: product.id <= 2, // Mark first 2 products as best sellers
             image: product.image || product.main_image, // Use image or main_image
           }));
           
@@ -264,13 +269,6 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
   // 分类状态标签
   const getStatusBadges = (product: any) => {
     const badges = [];
-    if (product.bestSeller) {
-      badges.push({
-        type: 'bestSeller',
-        text: '畅销',
-        color: 'var(--secondary)'
-      });
-    }
     if (product.isNew) {
       badges.push({
         type: 'new',
@@ -278,11 +276,34 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
         color: 'var(--color-green)'
       });
     }
-    if (product.stock < 10 && product.stock > 0) {
+    // 根据库存状态显示标签
+    if (product.stock_status_info) {
+      const statusId = product.stock_status_info.id;
+      const statusName = product.stock_status_info.name;
+      if (statusId === 4) {
+        badges.push({
+          type: 'outOfStock',
+          text: statusName,
+          color: product.stock_status_info.color
+        });
+      } else if (statusId === 2 || statusId === 3) {
+        badges.push({
+          type: 'limited',
+          text: statusName,
+          color: product.stock_status_info.color
+        });
+      }
+    } else if (product.stock <= 0) {
+      badges.push({
+        type: 'outOfStock',
+        text: '缺货',
+        color: 'var(--color-red)'
+      });
+    } else if (product.stock < 10 && product.stock > 0) {
       badges.push({
         type: 'limited',
         text: '库存有限',
-        color: 'var(--color-red)'
+        color: 'var(--color-orange)'
       });
     }
     return badges;
@@ -292,6 +313,21 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
   const getActivityTags = (product: any) => {
     const tags = [];
     const addedNames = new Set();
+    
+    // 处理activities数组（来自activity_categories）
+    if (product.activities && Array.isArray(product.activities)) {
+      product.activities.forEach((act: any) => {
+        if (act.name && !addedNames.has(act.name)) {
+          tags.push({
+            id: act.id || product.id,
+            name: act.name || act.name_en || act.name_ar || '活动',
+            icon: act.icon_url || act.icon || 'tag',
+            color: act.color || 'var(--accent)'
+          });
+          addedNames.add(act.name);
+        }
+      });
+    }
     
     // 处理promotion字段（单个活动）
     if (product.promotion && typeof product.promotion === 'object') {
@@ -314,7 +350,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
             id: promo.id || product.id,
             name: promo.name || '活动',
             icon: promo.icon || 'tag',
-            color: 'var(--color-red)'
+            color: promo.color || 'var(--color-red)'
           });
           addedNames.add(promo.name);
         }
@@ -347,6 +383,30 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     ));
   };
 
+  const refreshInventoryStatus = async (productId: number) => {
+    try {
+      const response = await fetch(`/api/inventory/status?ids=${productId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data && data.data.length > 0) {
+          const statusData = data.data[0];
+          setProducts(prev => prev.map(p =>
+            p.id === productId
+              ? {
+                  ...p,
+                  stock: statusData.stock,
+                  stock_status_id: statusData.stock_status_id,
+                  stock_status_info: statusData.stock_status_info
+                }
+              : p
+          ));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh inventory status:', error);
+    }
+  };
+
   const handleAddToCart = async (product: any) => {
     if (!product) return;
     
@@ -367,6 +427,8 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
         
         if (response.ok) {
           alert('已添加到购物车');
+          await refreshCart();
+          await refreshInventoryStatus(product.id);
         } else {
           alert('添加失败');
         }
@@ -388,6 +450,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
         
         localStorage.setItem('cart_guest', JSON.stringify(guestCart));
         alert('已添加到购物车（未登录）');
+        await refreshInventoryStatus(product.id);
       }
     } catch (error) {
       console.error('添加购物车失败:', error);
@@ -521,8 +584,17 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                     </div>
 
                     <div className="flex items-center text-xs text-gray-500 mb-3 min-h-[20px]">
-                      {product.inStock && (
+                      {product.stock_status_info ? (
+                        <span
+                          className="mr-2 font-medium"
+                          style={{ color: product.stock_status_info.color }}
+                        >
+                          {product.stock_status_info.name}
+                        </span>
+                      ) : product.inStock ? (
                         <span className="text-green-600 mr-2">有货</span>
+                      ) : (
+                        <span className="text-red-600 mr-2">缺货</span>
                       )}
                       {product.fastDelivery && (
                         <span className="mr-2">快速配送</span>
@@ -530,21 +602,25 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                     </div>
 
                     <div className="flex gap-2 mt-auto">
-                      <Link
-                        href={`/products/${product.id}`}
+                      <button
+                        onClick={() => router.push(`/products/${product.id}`)}
                         className="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all duration-300 hover:opacity-90"
-                        style={{ 
-                          backgroundColor: 'var(--card)', 
-                          color: 'var(--text)',
-                          border: '1px solid var(--border)'
+                        style={{
+                          backgroundColor: 'var(--btn-secondary-bg)',
+                          color: 'var(--btn-secondary-text)',
+                          border: '1px solid var(--btn-secondary-border)'
                         }}
                       >
                         查看详情
-                      </Link>
+                      </button>
                       <button
                         onClick={() => handleAddToCart(product)}
-                        className="flex-1 text-center py-2 rounded-md text-sm font-medium text-white transition-all duration-300 hover:opacity-90"
-                        style={{ backgroundColor: 'var(--accent)' }}
+                        className="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all duration-300 hover:opacity-90"
+                        style={{
+                          backgroundColor: 'var(--btn-primary-bg)',
+                          color: 'var(--btn-primary-text)',
+                          border: '1px solid var(--btn-primary-border)'
+                        }}
                       >
                         加入购物车
                       </button>

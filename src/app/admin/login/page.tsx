@@ -57,7 +57,12 @@ export default function LoginPage() {
           </div>
           <button
             type="submit"
-            className="w-full bg-[#CA8A04] hover:bg-[#B47C03] text-white py-3 rounded-lg font-['Noto_Sans_Arabic'] font-medium transition-all duration-300"
+            className="w-full text-white py-3 rounded-lg font-['Noto_Sans_Arabic'] font-medium transition-all duration-300"
+            style={{
+              backgroundColor: 'var(--btn-primary-bg)',
+              color: 'var(--btn-primary-text)',
+              border: '1px solid var(--btn-primary-border)'
+            }}
           >
             Login
           </button>

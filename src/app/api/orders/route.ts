@@ -1,11 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth, requireAdmin } from '@/lib/auth';
+import { getMessage, getMessageWithParams } from '@/lib/messages';
+
+function getLangFromRequest(request: NextRequest): string {
+  return request.headers.get('x-lang') ||
+         request.cookies.get('locale')?.value ||
+         'zh';
+}
+
+function createErrorResponse(key: string, lang: string, status: number = 400) {
+  return NextResponse.json(
+    {
+      success: false,
+      error_code: key,
+      message: getMessage(key as any, lang),
+      message_en: getMessage(key as any, 'en'),
+      message_ar: getMessage(key as any, 'ar'),
+    },
+    { status }
+  );
+}
 
 // GET /api/orders - Get orders (user's own or all if admin)
 export async function GET(request: NextRequest) {
   try {
-    // 验证登录
+    const lang = getLangFromRequest(request);
+
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -39,7 +60,7 @@ export async function GET(request: NextRequest) {
     // 普通用户只能看到自己的订单
     if (authResult.user?.role !== 'admin') {
       sql += ' WHERE o.user_id = ?';
-      params.push(authResult.user?.id);
+      params.push(authResult.user?.userId);
     }
 
     if (status) {
@@ -58,7 +79,7 @@ export async function GET(request: NextRequest) {
 
     if (authResult.user?.role !== 'admin') {
       countSql += ' WHERE user_id = ?';
-      countParams.push(authResult.user?.id);
+      countParams.push(authResult.user?.userId);
     }
 
     if (status) {
@@ -93,7 +114,8 @@ export async function GET(request: NextRequest) {
 // POST /api/orders - Create new order
 export async function POST(request: NextRequest) {
   try {
-    // 验证登录
+    const lang = getLangFromRequest(request);
+
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -220,12 +242,13 @@ export async function POST(request: NextRequest) {
       // Create order
       const orderResult = await query(
         `INSERT INTO orders (
-          user_id, order_number, status, total_amount, discount_amount, 
+          user_id, order_number, payment_method, order_status, total_amount, discount_amount,
           final_amount, shipping_address_id, shipping_fee
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
         [
-          authResult.user?.id,
+          authResult.user?.userId,
           order_number,
+          data.payment_method || 'stripe',
           'pending',
           total_amount,
           discount_amount,
@@ -241,46 +264,100 @@ export async function POST(request: NextRequest) {
       for (const item of items) {
         const promoInfo = itemPromoInfo.get(item.product_id);
         const unit_price = promoInfo ? promoInfo.promotionPrice : parseFloat((await query('SELECT price FROM products WHERE id = ?', [item.product_id])).rows[0].price);
-        const item_total = unit_price * item.quantity;
 
         await query(
-          `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, original_price, promotion_ids, discount_amount)
+          `INSERT INTO order_items (order_id, product_id, quantity, price, specifications, original_price, promotion_ids, discount_amount)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             order_id,
             item.product_id,
             item.quantity,
             unit_price,
-            item_total,
+            '{}',
             promoInfo ? promoInfo.originalPrice : unit_price,
             promoInfo && promoInfo.promotionIds.length > 0 ? JSON.stringify(promoInfo.promotionIds) : null,
             promoInfo ? promoInfo.discountAmount * item.quantity : 0
           ]
         );
 
-        // Update product stock
-        await query(
-          'UPDATE products SET stock = stock - ? WHERE id = ?',
-          [item.quantity, item.product_id]
+        // Update inventory with optimistic lock (prevent overselling)
+        // SQLite doesn't support FOR UPDATE, so we use conditional UPDATE
+        // Step 1: Get current stock
+        const beforeStockResult = await query(
+          'SELECT quantity FROM inventory WHERE product_id = ?',
+          [item.product_id]
+        );
+        const before_stock = beforeStockResult.rows[0]?.quantity || 0;
+
+        // Step 2: Check if enough stock
+        if (before_stock < item.quantity) {
+          // Rollback transaction
+          await query('ROLLBACK');
+          return NextResponse.json(
+            {
+              success: false,
+              error_code: 'INSUFFICIENT_STOCK',
+              message: getMessageWithParams('INSUFFICIENT_STOCK', lang, { requested: item.quantity, available: before_stock }),
+              message_en: getMessageWithParams('INSUFFICIENT_STOCK', 'en', { requested: item.quantity, available: before_stock }),
+              message_ar: getMessageWithParams('INSUFFICIENT_STOCK', 'ar', { requested: item.quantity, available: before_stock }),
+              failed_items: [{
+                product_id: item.product_id,
+                requested: item.quantity,
+                available: before_stock
+              }]
+            },
+            { status: 400 }
+          );
+        }
+
+        // Step 3: Deduct stock with condition (optimistic lock)
+        const updateResult = await query(
+          'UPDATE inventory SET quantity = quantity - ? WHERE product_id = ? AND quantity >= ?',
+          [item.quantity, item.product_id, item.quantity]
         );
 
-        // Record inventory log
-        const productResult2 = await query('SELECT stock FROM products WHERE id = ?', [item.product_id]);
-        const after_stock = productResult2.rows[0].stock;
+        // Check if update was successful (changes > 0)
+        if (!updateResult.changes || updateResult.changes === 0) {
+          await query('ROLLBACK');
+          return NextResponse.json(
+            {
+              success: false,
+              error_code: 'INSUFFICIENT_STOCK',
+              message: getMessageWithParams('INSUFFICIENT_STOCK', lang, { requested: item.quantity, available: before_stock }),
+              message_en: getMessageWithParams('INSUFFICIENT_STOCK', 'en', { requested: item.quantity, available: before_stock }),
+              message_ar: getMessageWithParams('INSUFFICIENT_STOCK', 'ar', { requested: item.quantity, available: before_stock }),
+              failed_items: [{
+                product_id: item.product_id,
+                requested: item.quantity,
+                available: before_stock
+              }]
+            },
+            { status: 400 }
+          );
+        }
 
+        // Get product name for transaction log
+        const productInfo = await query('SELECT name FROM products WHERE id = ?', [item.product_id]);
+        const product_name = productInfo.rows[0]?.name || 'Product';
+
+        // Record inventory transaction
         await query(
-          `INSERT INTO inventory_logs (
-            product_id, change_type, quantity, before_stock, after_stock, 
-            reason, operator_id, operator_name
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO inventory_transactions (
+            product_id, product_name, transaction_type, quantity_change,
+            quantity_before, quantity_after, reason,
+            reference_type, reference_id, operator_id, operator_name
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             item.product_id,
-            'order',
+            product_name,
+            'sale',
             -item.quantity,
-            after_stock + item.quantity,
-            after_stock,
+            before_stock,
+            before_stock - item.quantity,
             `Order ${order_number}`,
-            authResult.user?.id,
+            'order',
+            order_id,
+            authResult.user?.userId,
             authResult.user?.name
           ]
         );

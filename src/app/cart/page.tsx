@@ -4,325 +4,715 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '@/lib/contexts/CurrencyContext';
-import { formatCurrency } from '@/lib/utils/currency';
-import { useCart } from '@/lib/contexts/CartContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
-
-interface Coupon {
-  code: string;
-  discount_type: string;
-  discount_value: number;
-  minimum_spend?: number;
-  max_discount?: number;
-  is_active: boolean;
-}
+import { useCart } from '@/lib/contexts/CartContext';
+import { formatCurrency } from '@/lib/utils/currency';
+import Image from 'next/image';
 
 interface CartItem {
   id: number;
+  product_id: number;
   name: string;
+  name_en?: string;
+  name_ar?: string;
   price: number;
+  original_price?: number;
   quantity: number;
   image: string;
+  stock: number;
+  stock_status_id?: number;
+  stock_status_info?: {
+    id: number;
+    name: string;
+    name_en: string;
+    name_ar: string;
+  };
+  promotion?: {
+    id: number;
+    promotion_id: number;
+    name: string;
+    discount_percent: number;
+    end_time: string;
+    is_expired: boolean;
+    promotion_price: number;
+  } | null;
 }
 
 interface CartData {
-  cart: CartItem[];
-  subtotal: number;
-  coupon: Coupon | null;
-  discount: number;
-  shipping: number;
-  tax: number;
+  items: CartItem[];
   total: number;
-  totalItems: number;
+  total_items: number;
+}
+
+interface StockStatusInfo {
+  id: number;
+  name: string;
+  name_en: string;
+  name_ar: string;
 }
 
 export default function CartPage() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { currency } = useCurrency();
-  const { cart, removeFromCart, updateQuantity, clearCart, totalItems, debug } = useCart();
-  const { user } = useAuth();
-  
-  // 调用 debug 函数来调试购物车状态
-  debug();
-  
-  console.log('Cart in CartPage:', cart);
-  console.log('Total items in CartPage:', totalItems);
-  
-  const [isLoading, setIsLoading] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const { refreshCart } = useCart();
+
+  const [cartData, setCartData] = useState<CartData>({ items: [], total: 0, total_items: 0 });
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [couponCode, setCouponCode] = useState('');
-  const [cartData, setCartData] = useState<CartData>({
-    cart: cart,
-    subtotal: 0,
-    coupon: null,
-    discount: 0,
-    shipping: 0,
-    tax: 0,
-    total: 0,
-    totalItems: totalItems
-  });
+  const [couponApplied, setCouponApplied] = useState(false);
   const [couponError, setCouponError] = useState('');
-  
-  // 从后端获取购物车数据
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
   const fetchCartData = async () => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const cartJson = JSON.stringify(cart);
-      const response = await fetch(`/api/cart?cart=${encodeURIComponent(cartJson)}&coupon=${couponCode}`);
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/cart', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-lang': i18n.language
+        }
+      });
+
       if (response.ok) {
         const data = await response.json();
-        setCartData(data);
-        setCouponError('');
-      } else {
-        const data = await response.json();
-        setCouponError(data.error || 'Failed to fetch cart data');
+        setCartData(data.data);
+        setSelectedItems(data.data.items.map((item: CartItem) => item.id));
       }
     } catch (error) {
-      console.error('Error fetching cart data:', error);
-      setCouponError('Failed to fetch cart data');
+      console.error('Error fetching cart:', error);
+    } finally {
+      setLoading(false);
     }
   };
-  
-  // 当购物车或优惠券代码变化时，重新获取数据
+
   useEffect(() => {
     fetchCartData();
-  }, [cart, couponCode]);
-  
-  const applyCoupon = () => {
-    // 优惠券代码变化会触发 useEffect 重新获取数据
+  }, [isAuthenticated, i18n.language]);
+
+  const getStockStatus = (item: CartItem): StockStatusInfo | null => {
+    if (item.stock_status_info) {
+      return item.stock_status_info;
+    }
+    if (item.stock_status_id) {
+      const statusMap: Record<number, StockStatusInfo> = {
+        1: { id: 1, name: '有货', name_en: 'In Stock', name_ar: 'متوفر' },
+        2: { id: 2, name: '库存有限', name_en: 'Limited Stock', name_ar: 'مخزون محدود' },
+        3: { id: 3, name: '库存紧张', name_en: 'Low Stock', name_ar: 'مخزون منخفض' },
+        4: { id: 4, name: '缺货', name_en: 'Out of Stock', name_ar: 'نفد المخزون' },
+      };
+      return statusMap[item.stock_status_id] || null;
+    }
+    return null;
   };
-  
-  const handleCheckout = async () => {
-    if (!user) {
+
+  const getStockStatusText = (item: CartItem): string => {
+    const status = getStockStatus(item);
+    if (!status) return '';
+    if (i18n.language === 'ar') return status.name_ar;
+    if (i18n.language === 'en') return status.name_en;
+    return status.name;
+  };
+
+  const getStockStatusColor = (item: CartItem): string => {
+    const status = getStockStatus(item);
+    if (!status) return 'var(--color-green)';
+    if (status.id === 4) return 'var(--color-red)';
+    if (status.id === 3) return 'var(--color-orange)';
+    if (status.id === 2) return 'var(--color-yellow)';
+    return 'var(--color-green)';
+  };
+
+  const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
+
+  const handleDecrement = async (itemId: number, currentQuantity: number) => {
+    if (currentQuantity <= 1) {
+      const item = cartData.items.find(i => i.id === itemId);
+      if (!item) return;
+
+      if (!window.confirm(i18n.language === 'ar'
+        ? 'حذف هذا المنتج من السلة؟'
+        : i18n.language === 'en'
+        ? 'Remove this item from cart?'
+        : '确定要从购物车删除这个商品吗？')) {
+        return;
+      }
+
+      setRemovingId(itemId);
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`/api/cart?id=${itemId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'x-lang': i18n.language
+          }
+        });
+
+        if (response.ok) {
+          await fetchCartData();
+          await refreshCart();
+        }
+      } catch (error) {
+        console.error('Error removing item:', error);
+      } finally {
+        setRemovingId(null);
+      }
+      return;
+    }
+
+    const item = cartData.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    setUpdatingId(itemId);
+    try {
+      const token = localStorage.getItem('access_token');
+      const newQuantity = currentQuantity - 1;
+      const response = await fetch('/api/cart', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-lang': i18n.language
+        },
+        body: JSON.stringify({ id: itemId, quantity: newQuantity })
+      });
+
+      if (response.ok) {
+        setLocalQuantities(prev => ({ ...prev, [itemId]: newQuantity }));
+        await fetchCartData();
+        await refreshCart();
+      }
+    } catch (error) {
+      console.error('Error decrementing quantity:', error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleIncrement = async (itemId: number) => {
+    const item = cartData.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const currentQty = localQuantities[itemId] ?? item.quantity;
+
+    if (item.stock < 1) {
+      alert(i18n.language === 'ar'
+        ? `المخزون المتاح فقط ${item.stock}`
+        : i18n.language === 'en'
+        ? `Only ${item.stock} available`
+        : `库存不足，仅剩 ${item.stock} 件`);
+      return;
+    }
+
+    setUpdatingId(itemId);
+
+    try {
+      const token = localStorage.getItem('access_token');
+      const newQuantity = currentQty + 1;
+      const response = await fetch('/api/cart', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-lang': i18n.language
+        },
+        body: JSON.stringify({ id: itemId, quantity: newQuantity })
+      });
+
+      if (response.ok) {
+        setLocalQuantities(prev => {
+          const next = { ...prev };
+          delete next[itemId];
+          return next;
+        });
+        await fetchCartData();
+        await refreshCart();
+      } else {
+        const data = await response.json();
+        alert(data.message || data.message_en || 'Failed to update quantity');
+      }
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleRemoveSelected = async () => {
+    if (selectedItems.length === 0) return;
+
+    const confirmMessage = i18n.language === 'ar'
+      ? `هل أنت متأكد من حذف ${selectedItems.length} منتجات؟`
+      : i18n.language === 'en'
+      ? `Are you sure you want to remove ${selectedItems.length} items?`
+      : `确定要删除选中的 ${selectedItems.length} 个商品吗？`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    for (const itemId of selectedItems) {
+      setRemovingId(itemId);
+      try {
+        const token = localStorage.getItem('access_token');
+        await fetch(`/api/cart?id=${itemId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'x-lang': i18n.language
+          }
+        });
+      } catch (error) {
+        console.error('Error removing item:', error);
+      } finally {
+        setRemovingId(null);
+      }
+    }
+
+    setSelectedItems([]);
+    await fetchCartData();
+    await refreshCart();
+  };
+
+  const handleRemoveItem = async (itemId: number) => {
+    const confirmMessage = i18n.language === 'ar'
+      ? 'هل أنت متأكد من حذف هذا المنتج؟'
+      : i18n.language === 'en'
+      ? 'Are you sure you want to remove this item?'
+      : '确定要删除这个商品吗？';
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setRemovingId(itemId);
+
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`/api/cart?id=${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-lang': i18n.language
+        }
+      });
+
+      if (response.ok) {
+        await fetchCartData();
+        await refreshCart();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to remove item');
+      }
+    } catch (error) {
+      console.error('Error removing item:', error);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedItems.length === cartData.items.length) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(cartData.items.map(item => item.id));
+    }
+  };
+
+  const handleSelectItem = (itemId: number) => {
+    if (selectedItems.includes(itemId)) {
+      setSelectedItems(selectedItems.filter(id => id !== itemId));
+    } else {
+      setSelectedItems([...selectedItems, itemId]);
+    }
+  };
+
+  const getSelectedTotal = (): number => {
+    return cartData.items
+      .filter(item => selectedItems.includes(item.id))
+      .reduce((sum, item) => sum + item.price * item.quantity, 0);
+  };
+
+  const handleCheckout = () => {
+    if (!isAuthenticated) {
       router.push('/login?redirect=/cart');
       return;
     }
-    
-    setIsLoading(true);
-    try {
-      // 调用后端 API 清空购物车
-      await fetch('/api/cart', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ action: 'clear' })
-      });
-      
-      // 清空本地购物车
-      clearCart();
-      router.push('/checkout/success');
-    } catch (error) {
-      console.error('Checkout error:', error);
-    } finally {
-      setIsLoading(false);
+
+    if (selectedItems.length === 0) {
+      alert(i18n.language === 'ar'
+        ? 'الرجاء تحديد منتج واحد على الأقل'
+        : i18n.language === 'en'
+        ? 'Please select at least one product'
+        : '请至少选择一个商品');
+      return;
     }
+
+    router.push(`/checkout?items=${JSON.stringify(selectedItems)}`);
   };
-  
-  if (cart.length === 0) {
+
+  const handleContinueShopping = () => {
+    router.push('/products');
+  };
+
+  if (!isAuthenticated) {
     return (
-      <div className="py-12 px-4 bg-[#FDF2F8] middle-east-pattern">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="bg-white/80 glass-effect rounded-lg shadow-md p-8 border border-[#DB2777]/20">
-            <svg className="w-16 h-16 text-[#831843]/50 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <h2 className="text-2xl font-bold mb-4 font-['Noto_Naskh_Arabic'] text-[#831843]">{t('cart.empty')}</h2>
-            <p className="text-[#831843]/70 mb-6 font-['Noto_Sans_Arabic']">{t('cart.empty_description')}</p>
-            <button
-              onClick={() => router.push('/products')}
-              className="px-6 py-3 bg-[#CA8A04] text-white rounded-lg hover:bg-[#B47C03] transition-colors font-['Noto_Sans_Arabic']"
-            >
-              {t('cart.shop_now')}
-            </button>
-          </div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+        <div className="text-center p-8 rounded-lg" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+          <svg className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text)', fontFamily: 'var(--heading-font)' }}>
+            {i18n.language === 'ar' ? 'سلة التسوق فارغة' : i18n.language === 'en' ? 'Your cart is empty' : '购物车是空的'}
+          </h2>
+          <p className="mb-6" style={{ color: 'var(--text-muted)' }}>
+            {i18n.language === 'ar' ? 'الرجاء تسجيل الدخول لعرض سلة التسوق' : i18n.language === 'en' ? 'Please login to view your cart' : '请登录后查看购物车'}
+          </p>
+          <button
+            onClick={() => router.push('/login?redirect=/cart')}
+            className="btn-primary px-6 py-3 rounded-lg font-medium"
+            style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)', border: '1px solid var(--btn-primary-border)' }}
+          >
+            {i18n.language === 'ar' ? 'تسجيل الدخول' : i18n.language === 'en' ? 'Login' : '登录'}
+          </button>
         </div>
       </div>
     );
   }
-  
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+
+  if (cartData.items.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+        <div className="text-center p-8 rounded-lg" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+          <svg className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text)', fontFamily: 'var(--heading-font)' }}>
+            {i18n.language === 'ar' ? 'سلة التسوق فارغة' : i18n.language === 'en' ? 'Your cart is empty' : '购物车是空的'}
+          </h2>
+          <p className="mb-6" style={{ color: 'var(--text-muted)' }}>
+            {i18n.language === 'ar' ? 'لم تقم بإضافة أي منتجات بعد' : i18n.language === 'en' ? 'You haven\'t added any products yet' : '您还没有添加任何商品'}
+          </p>
+          <button
+            onClick={handleContinueShopping}
+            className="btn-primary px-6 py-3 rounded-lg font-medium"
+            style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)', border: '1px solid var(--btn-primary-border)' }}
+          >
+            {i18n.language === 'ar' ? 'تسوق الآن' : i18n.language === 'en' ? 'Shop Now' : '立即购物'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="py-12 px-4 bg-[#FDF2F8] middle-east-pattern">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-center font-['Noto_Naskh_Arabic'] text-[#831843]">{t('cart.title')}</h1>
-        
+    <div className="min-h-screen" style={{ background: 'var(--background)' }}>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)', fontFamily: 'var(--heading-font)' }}>
+            {i18n.language === 'ar' ? 'سلة التسوق' : i18n.language === 'en' ? 'Shopping Cart' : '购物车'}
+            <span className="text-lg ml-2" style={{ color: 'var(--text-muted)' }}>
+              ({cartData.total_items} {i18n.language === 'ar' ? 'منتج' : i18n.language === 'en' ? 'items' : '件商品'})
+            </span>
+          </h1>
+          <button
+            onClick={handleContinueShopping}
+            className="px-4 py-2 rounded-lg font-medium transition-colors"
+            style={{
+              background: 'transparent',
+              color: 'var(--primary)',
+              border: '1px solid var(--border)'
+            }}
+          >
+            {i18n.language === 'ar' ? 'متابعة التسوق' : i18n.language === 'en' ? 'Continue Shopping' : '继续购物'}
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cart items */}
           <div className="lg:col-span-2">
-            <div className="bg-white/80 glass-effect rounded-lg shadow-md border border-[#DB2777]/20">
-              <div className="px-6 py-4 border-b border-[#DB2777]/20">
-                <h2 className="text-lg font-semibold font-['Noto_Naskh_Arabic'] text-[#831843]">{t('cart.items')}</h2>
-              </div>
-              
-              <div className="divide-y divide-[#DB2777]/10">
-                {cart.map((item) => (
-                  <div key={item.id} className="px-6 py-4 flex items-center">
-                    <div className="flex-shrink-0">
-                      <img
-                        src={item.image || '/placeholder.jpg'}
-                        alt={item.name}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
-                    </div>
-                    
-                    <div className="ml-4 flex-1">
-                      <h3 className="font-medium font-['Noto_Naskh_Arabic'] text-[#831843]">{item.name}</h3>
-                      <p className="text-sm font-['Noto_Sans_Arabic'] text-[#831843]/70">{formatCurrency(item.price, currency)}</p>
-                    </div>
-                    
-                    <div className="ml-4 flex items-center">
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="px-2 py-1 border border-[#DB2777]/30 rounded-l-md hover:bg-[#DB2777]/10 font-['Noto_Sans_Arabic']"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
-                        className="w-12 text-center border-y border-[#DB2777]/30 py-1 font-['Noto_Sans_Arabic'] text-[#831843]"
-                        min="1"
-                      />
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="px-2 py-1 border border-[#DB2777]/30 rounded-r-md hover:bg-[#DB2777]/10 font-['Noto_Sans_Arabic']"
-                      >
-                        +
-                      </button>
-                    </div>
-                    
-                    <div className="ml-4">
-                      <p className="font-semibold font-['Noto_Naskh_Arabic'] text-[#831843]">{formatCurrency(item.price * item.quantity, currency)}</p>
-                    </div>
-                    
-                    <div className="ml-4">
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-[#DB2777] hover:text-[#831843]"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="px-6 py-4 flex justify-between">
+            <div className="rounded-lg overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.length === cartData.items.length}
+                    onChange={handleSelectAll}
+                    className="w-5 h-5 rounded mr-3"
+                    style={{ accentColor: 'var(--primary)' }}
+                  />
+                  <span className="font-medium" style={{ color: 'var(--text)' }}>
+                    {i18n.language === 'ar' ? 'تحديد الكل' : i18n.language === 'en' ? 'Select All' : '全选'}
+                  </span>
+                </div>
+                {isEditing && selectedItems.length > 0 && (
+                  <button
+                    onClick={handleRemoveSelected}
+                    className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                    style={{ background: 'var(--color-red)', color: 'white' }}
+                  >
+                    {i18n.language === 'ar' ? 'حذف المحدد' : i18n.language === 'en' ? 'Delete Selected' : '删除选中'}
+                  </button>
+                )}
                 <button
-                  onClick={() => router.push('/products')}
-                  className="px-4 py-2 border border-[#DB2777]/30 rounded-lg hover:bg-[#DB2777]/10 font-['Noto_Sans_Arabic'] text-[#831843]"
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  style={{
+                    background: 'transparent',
+                    color: 'var(--primary)',
+                    border: '1px solid var(--border)'
+                  }}
                 >
-                  {t('cart.continue_shopping')}
+                  {isEditing
+                    ? (i18n.language === 'ar' ? 'تم' : i18n.language === 'en' ? 'Done' : '完成')
+                    : (i18n.language === 'ar' ? 'تعديل' : i18n.language === 'en' ? 'Edit' : '编辑')}
                 </button>
-                <button
-                  onClick={clearCart}
-                  className="px-4 py-2 text-[#DB2777] border border-[#DB2777]/30 rounded-lg hover:bg-[#DB2777]/10 font-['Noto_Sans_Arabic']"
-                >
-                  {t('cart.clear_cart')}
-                </button>
+              </div>
+
+              <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                {cartData.items.map((item) => {
+                  const stockStatus = getStockStatus(item);
+                  const isOutOfStock = stockStatus?.id === 4;
+                  const isLowStock = stockStatus?.id === 3;
+                  const isSelected = selectedItems.includes(item.id);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-4 sm:p-6 transition-opacity ${removingId === item.id ? 'opacity-50' : ''}`}
+                      style={{ opacity: isOutOfStock ? 0.6 : 1 }}
+                    >
+                      <div className="flex items-start sm:items-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleSelectItem(item.id)}
+                          className="w-5 h-5 rounded mr-3 mt-1 sm:mt-0 flex-shrink-0"
+                          style={{ accentColor: 'var(--primary)' }}
+                        />
+
+                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden flex-shrink-0">
+                          <Image
+                            src={item.image || '/placeholder.jpg'}
+                            alt={item.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+
+                        <div className="ml-4 flex-1 min-w-0">
+                          <h3 className="font-medium text-base sm:text-lg truncate" style={{ color: 'var(--text)', fontFamily: i18n.language === 'ar' ? 'var(--heading-font)' : 'inherit' }}>
+                            {i18n.language === 'ar' ? (item.name_ar || item.name) : i18n.language === 'en' ? (item.name_en || item.name) : item.name}
+                          </h3>
+
+                          <div className="flex items-center mt-1">
+                            <span className="text-lg sm:text-xl font-bold" style={{ color: 'var(--primary)' }}>
+                              {formatCurrency(item.price, currency)}
+                            </span>
+                            {item.original_price && item.original_price > item.price && (
+                              <span className="ml-2 text-sm line-through" style={{ color: 'var(--text-muted)' }}>
+                                {formatCurrency(item.original_price, currency)}
+                              </span>
+                            )}
+                          </div>
+
+                          {item.promotion && !item.promotion.is_expired && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="badge-discount">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                                {item.promotion.name} {item.promotion.discount_percent}%OFF
+                              </span>
+                              {item.promotion.end_time && (
+                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                  {i18n.language === 'ar' ? `ينتهي: ${new Date(item.promotion.end_time).toLocaleDateString('ar-SA')}` :
+                                   i18n.language === 'en' ? `Exp: ${new Date(item.promotion.end_time).toLocaleDateString('en-US')}` :
+                                   `截止: ${new Date(item.promotion.end_time).toLocaleDateString('zh-CN')}`}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center mt-2 text-sm" style={{ color: getStockStatusColor(item) }}>
+                            {isOutOfStock ? (
+                              <span className="font-medium">
+                                {i18n.language === 'ar' ? 'نفد المخزون' : i18n.language === 'en' ? 'Out of Stock' : '缺货'}
+                              </span>
+                            ) : isLowStock ? (
+                              <span className="font-medium">
+                                ⚠️ {getStockStatusText(item)} - {i18n.language === 'ar' ? `المخزون المتاح ${item.stock}` : i18n.language === 'en' ? `Only ${item.stock} left` : `仅剩 ${item.stock} 件`}
+                              </span>
+                            ) : (
+                              <span>{getStockStatusText(item)}</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center mt-3 sm:mt-4">
+                            <div className="flex items-center border rounded-lg" style={{ borderColor: 'var(--border)' }}>
+                              <button
+                                onClick={() => handleDecrement(item.id, localQuantities[item.id] ?? item.quantity)}
+                                disabled={(localQuantities[item.id] ?? item.quantity) <= 1 || updatingId === item.id}
+                                className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center transition-colors disabled:opacity-50"
+                                style={{ color: 'var(--text)' }}
+                              >
+                                -
+                              </button>
+                              <span
+                                className="w-10 sm:w-12 text-center font-medium"
+                                style={{ color: 'var(--text)' }}
+                              >
+                                {updatingId === item.id ? '...' : (localQuantities[item.id] ?? item.quantity)}
+                              </span>
+                              <button
+                                onClick={() => handleIncrement(item.id)}
+                                disabled={updatingId === item.id}
+                                className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center transition-colors disabled:opacity-50"
+                                style={{ color: 'var(--text)' }}
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            <button
+                              onClick={() => handleRemoveItem(item.id)}
+                              disabled={removingId === item.id}
+                              className="ml-4 p-2 rounded-lg transition-colors disabled:opacity-50"
+                              style={{ color: 'var(--color-red)', background: 'transparent' }}
+                            >
+                              {removingId === item.id ? (
+                                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                              ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="hidden sm:block text-right ml-4">
+                          <p className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
+                            {formatCurrency(item.price * item.quantity, currency)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="sm:hidden mt-3 flex justify-between items-center">
+                        <span className="text-lg font-bold" style={{ color: 'var(--primary)' }}>
+                          {formatCurrency(item.price * item.quantity, currency)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
-          
-          {/* Order summary */}
+
           <div className="lg:col-span-1">
-            <div className="bg-white/80 glass-effect rounded-lg shadow-md border border-[#DB2777]/20">
-              <div className="px-6 py-4 border-b border-[#DB2777]/20">
-                <h2 className="text-lg font-semibold font-['Noto_Naskh_Arabic'] text-[#831843]">{t('cart.order_summary')}</h2>
+            <div className="rounded-lg sticky top-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+              <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--text)', fontFamily: 'var(--heading-font)' }}>
+                  {i18n.language === 'ar' ? 'ملخص الطلب' : i18n.language === 'en' ? 'Order Summary' : '订单摘要'}
+                </h2>
               </div>
-              
-              <div className="px-6 py-4 space-y-4">
+
+              <div className="p-6 space-y-4">
                 <div className="flex justify-between">
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]/70">{t('cart.subtotal')}</span>
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]">{formatCurrency(cartData.subtotal, currency)}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {i18n.language === 'ar' ? 'المجموع الفرعي' : i18n.language === 'en' ? 'Subtotal' : '小计'}
+                    <span className="text-sm ml-1">({selectedItems.length} {i18n.language === 'ar' ? 'منتج' : i18n.language === 'en' ? 'items' : '件'})</span>
+                  </span>
+                  <span style={{ color: 'var(--text)' }}>{formatCurrency(getSelectedTotal(), currency)}</span>
                 </div>
-                
-                {cartData.coupon && (
-                  <div className="flex justify-between text-green-600 font-['Noto_Sans_Arabic']">
-                    <span>Discount ({cartData.coupon.code})</span>
-                    <span>-{formatCurrency(cartData.discount, currency)}</span>
+
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {i18n.language === 'ar' ? 'الشحن' : i18n.language === 'en' ? 'Shipping' : '运费'}
+                  </span>
+                  <span style={{ color: 'var(--color-green)' }}>
+                    {i18n.language === 'ar' ? 'مجاني' : i18n.language === 'en' ? 'Free' : '免费'}
+                  </span>
+                </div>
+
+                <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+                  <div className="flex justify-between text-lg font-bold">
+                    <span style={{ color: 'var(--text)' }}>
+                      {i18n.language === 'ar' ? 'المجموع' : i18n.language === 'en' ? 'Total' : '合计'}
+                    </span>
+                    <span style={{ color: 'var(--primary)' }}>{formatCurrency(getSelectedTotal(), currency)}</span>
                   </div>
-                )}
-                
-                <div className="flex justify-between">
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]/70">{t('cart.shipping')}</span>
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]">{cartData.shipping === 0 ? 'Free' : formatCurrency(cartData.shipping, currency)}</span>
                 </div>
-                
-                <div className="flex justify-between">
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]/70">{t('cart.tax')}</span>
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]">{formatCurrency(cartData.tax, currency)}</span>
-                </div>
-                
-                <div className="pt-4 border-t border-[#DB2777]/20 flex justify-between font-semibold text-lg font-['Noto_Naskh_Arabic'] text-[#831843]">
-                  <span>{t('cart.total')}</span>
-                  <span>{formatCurrency(cartData.total, currency)}</span>
-                </div>
-                
-                <div className="mt-6">
-                  <button
-                    onClick={handleCheckout}
-                    disabled={isLoading}
-                    className="w-full py-3 bg-[#CA8A04] text-white rounded-lg hover:bg-[#B47C03] transition-colors disabled:opacity-50 font-['Noto_Sans_Arabic']"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        {t('cart.processing')}
-                      </div>
-                    ) : (
-                      t('cart.checkout')
-                    )}
-                  </button>
-                </div>
-                
-                <div className="mt-4">
-                  <div className="flex items-center justify-center space-x-2">
-                    <svg className="w-5 h-5 text-[#831843]/50" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v11a3 3 0 106 0V6a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-15a2 2 0 012-2h2a2 2 0 012 2v12a1 1 0 110 2h-2a1 1 0 01-1-1v-1H6V5z" clipRule="evenodd" />
-                    </svg>
-                    <svg className="w-5 h-5 text-[#831843]/50" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10 0C4.477 0 0 4.477 0 10c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V19c0 .27.16.59.67.5C17.14 18.16 20 14.42 20 10A10 10 0 0010 0z" />
-                    </svg>
-                    <svg className="w-5 h-5 text-[#831843]/50" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10.03 2.97a.75.75 0 00-1.06 0l-7.5 7.5a.75.75 0 001.06 1.06L10 4.06l6.47 6.47a.75.75 0 101.06-1.06l-7.5-7.5z" />
-                      <path d="M2 10a8 8 0 1116 0 8 8 0 01-16 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-xs text-center font-['Noto_Sans_Arabic'] text-[#831843]/70 mt-2">
-                    {t('cart.secure_checkout')}
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Discount code */}
-            <div className="mt-6 bg-white/80 glass-effect rounded-lg shadow-md p-6 border border-[#DB2777]/20">
-              <h3 className="font-medium mb-4 font-['Noto_Naskh_Arabic'] text-[#831843]">{t('cart.discount')}</h3>
-              {couponError && (
-                <div className="text-[#DB2777] text-sm mb-2 font-['Noto_Sans_Arabic']">{couponError}</div>
-              )}
-              {cartData.coupon && (
-                <div className="text-green-600 text-sm mb-2 font-['Noto_Sans_Arabic']">
-                  Coupon applied successfully!
-                </div>
-              )}
-              <div className="flex">
-                <input
-                  type="text"
-                  placeholder={t('cart.enter_code')}
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value)}
-                  className="flex-1 px-4 py-2 border border-[#DB2777]/30 rounded-l-lg font-['Noto_Sans_Arabic'] text-[#831843] bg-white/90"
-                />
-                <button 
-                  onClick={applyCoupon}
-                  className="px-4 py-2 bg-[#CA8A04] text-white rounded-r-lg hover:bg-[#B47C03] font-['Noto_Sans_Arabic']"
+
+                <button
+                  onClick={handleCheckout}
+                  disabled={selectedItems.length === 0}
+                  className="w-full py-3 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: selectedItems.length > 0 ? 'var(--btn-primary-bg)' : 'var(--border)',
+                    color: selectedItems.length > 0 ? 'var(--btn-primary-text)' : 'var(--text-muted)',
+                    border: selectedItems.length > 0 ? '1px solid var(--btn-primary-border)' : 'none'
+                  }}
                 >
-                  {t('cart.apply')}
+                  {i18n.language === 'ar' ? 'إتمام الشراء' : i18n.language === 'en' ? 'Checkout' : '结 算'}
                 </button>
+
+                <div className="flex items-center justify-center gap-2 pt-2">
+                  <svg className="w-5 h-5" style={{ color: 'var(--text-muted)' }} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    {i18n.language === 'ar' ? 'دفع آمن' : i18n.language === 'en' ? 'Secure Payment' : '安全支付'}
+                  </span>
+                </div>
+
+                <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={i18n.language === 'ar' ? 'كود الخصم' : i18n.language === 'en' ? 'Coupon Code' : '优惠券代码'}
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-lg text-sm"
+                      style={{
+                        background: 'var(--background)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text)'
+                      }}
+                    />
+                    <button
+                      className="px-4 py-2 rounded-lg text-sm font-medium"
+                      style={{
+                        background: 'transparent',
+                        color: 'var(--primary)',
+                        border: '1px solid var(--primary)'
+                      }}
+                    >
+                      {i18n.language === 'ar' ? 'تطبيق' : i18n.language === 'en' ? 'Apply' : '应用'}
+                    </button>
+                  </div>
+                  {couponError && (
+                    <p className="text-sm mt-2" style={{ color: 'var(--color-red)' }}>{couponError}</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

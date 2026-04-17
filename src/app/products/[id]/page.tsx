@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/contexts/AuthContext";
+import { useCart } from "@/lib/contexts/CartContext";
 import { useCurrency } from "@/lib/contexts/CurrencyContext";
 import { convertCurrency, formatCurrency } from "@/lib/utils/currency";
 import ImageModal from "@/components/ImageModal";
@@ -14,6 +15,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+  const { refreshCart } = useCart();
   const { currency } = useCurrency();
   
   const [product, setProduct] = useState<any>(null);
@@ -120,7 +122,11 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
           body: JSON.stringify({ product_id: product.id, quantity })
         });
         const data = await response.json();
-        if (response.ok) setCartMessage({ type: 'success', text: t('cart.added_success', '已添加到购物车') });
+        if (response.ok) {
+          setCartMessage({ type: 'success', text: t('cart.added_success', '已添加到购物车') });
+          await refreshCart();
+          await fetchProduct();
+        }
         else setCartMessage({ type: 'error', text: data.error || t('cart.add_failed', '添加失败') });
       } else {
         const guestCart = JSON.parse(localStorage.getItem('cart_guest') || '[]');
@@ -373,8 +379,22 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
               {/* 库存和配送 */}
               <div className="mb-6 space-y-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <span style={{ color: 'var(--text-muted)' }}>{t("products.stock", "库存")}:</span>
-                  <span style={{ color: product.stock > 0 ? 'var(--color-green)' : 'var(--color-red)' }}>{product.stock > 0 ? `${product.stock} ${t("products.in_stock", "件有货")}` : t("products.out_of_stock", "缺货")}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>库存:</span>
+                  {(() => {
+                    const statusInfo = product.stock_status_info;
+                    if (statusInfo) {
+                      return (
+                        <span style={{ color: statusInfo.color }}>
+                          {statusInfo.name} {product.stock > 0 ? `(${product.stock}件)` : ''}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span style={{ color: product.stock > 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
+                        {product.stock > 0 ? `${product.stock} 件有货` : '缺货'}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   <span style={{ color: 'var(--text-muted)' }}>{t("products.shipping", "配送")}:</span>
@@ -397,10 +417,10 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                 <div className={`mb-4 p-2 rounded text-sm ${cartMessage.type === 'success' ? 'bg-green-100' : 'bg-red-100'}`} style={{ color: cartMessage.type === 'success' ? 'var(--color-green)' : 'var(--color-red)' }}>{cartMessage.text}</div>
               )}
               <div className="flex gap-3">
-                <button onClick={handleAddToCart} disabled={isAddingToCart || product.stock <= 0} className="flex-1 py-3 rounded-md font-medium transition-all hover:opacity-90" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <button onClick={handleAddToCart} disabled={isAddingToCart || product.stock <= 0} className="flex-1 py-3 rounded-md font-medium transition-all hover:opacity-90" style={{ backgroundColor: 'var(--btn-secondary-bg)', border: '1px solid var(--btn-secondary-border)', color: 'var(--btn-secondary-text)' }}>
                   {isAddingToCart ? t('cart.adding', '添加中...') : t("products.add_to_cart", "加入购物车")}
                 </button>
-                <button onClick={handleBuyNow} disabled={product.stock <= 0} className="flex-1 py-3 rounded-md font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: 'var(--accent)' }}>
+                <button onClick={handleBuyNow} disabled={product.stock <= 0} className="flex-1 py-3 rounded-md font-medium transition-all hover:opacity-90" style={{ backgroundColor: 'var(--btn-primary-bg)', border: '1px solid var(--btn-primary-border)', color: 'var(--btn-primary-text)' }}>
                   {t("products.buy_now", "立即购买")}
                 </button>
               </div>

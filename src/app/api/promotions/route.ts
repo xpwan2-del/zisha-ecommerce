@@ -41,11 +41,20 @@ export async function GET(request: NextRequest) {
               p.name as product_name,
               p.name_en as product_name_en,
               p.image,
-              p.stock,
+              COALESCE(i.quantity, 0) as stock,
+              i.status_id as stock_status_id,
+              ins.id as status_id,
+              ins.name as status_name,
+              ins.name_en as status_name_en,
+              ins.name_ar as status_name_ar,
+              ins.color as status_color,
+              ins.color_name as status_color_name,
               pr.discount_percent
             FROM product_promotions pp
             JOIN products p ON pp.product_id = p.id
             JOIN promotions pr ON pp.promotion_id = pr.id
+            LEFT JOIN inventory i ON p.id = i.product_id
+            LEFT JOIN inventory_status ins ON i.status_id = ins.id
             WHERE pp.promotion_id = ? AND pp.status = 'active'
             ORDER BY pp.created_at DESC`,
             [promotion.id]
@@ -61,6 +70,15 @@ export async function GET(request: NextRequest) {
               name_en: prod.product_name_en,
               image: prod.image,
               stock: prod.stock,
+              stock_status_id: prod.stock_status_id,
+              stock_status_info: prod.status_id ? {
+                id: prod.status_id,
+                name: prod.status_name,
+                name_en: prod.status_name_en,
+                name_ar: prod.status_name_ar,
+                color: prod.status_color,
+                color_name: prod.status_color_name
+              } : null,
               original_price: originalPrice,
               promotion_price: promoPrice,
               discount_amount: originalPrice - promoPrice

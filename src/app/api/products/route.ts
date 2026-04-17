@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-// 辅助函数：计算库存状态
-function getStockStatus(stock: number): string {
-  if (stock <= 0) return '缺货';
-  if (stock <= 5) return '紧张';
-  if (stock <= 20) return '有限';
-  return '充足';
-}
-
 // 辅助函数：解析JSON字段
 function parseJSON(value: any, defaultValue: any = []): any {
   if (!value) return defaultValue;
@@ -94,7 +86,7 @@ export async function GET(request: NextRequest) {
         orderBy = 'ORDER BY p.price DESC';
         break;
       case 'sales':
-        orderBy = 'ORDER BY p.stock DESC';
+        orderBy = 'ORDER BY i.quantity DESC';
         break;
       case 'newest':
         orderBy = 'ORDER BY p.id ASC';
@@ -109,18 +101,29 @@ export async function GET(request: NextRequest) {
     const total = parseInt(String(countResult.rows?.[0]?.count || 0));
 
     // 查询产品列表 - 关联所有需要的数据
+    // 库存从 inventory 表读取（单一数据源）
     const productsQuery = `
       SELECT 
         p.id, p.name, p.name_en, p.name_ar,
         p.description, p.description_en, p.description_ar,
-        p.price, p.stock,
+        p.price,
         p.image, p.images,
         p.category_id, p.created_at,
         c.name as category_name,
         c.name_en as category_name_en,
-        c.name_ar as category_name_ar
+        c.name_ar as category_name_ar,
+        COALESCE(i.quantity, 0) as stock,
+        i.status_id as stock_status_id,
+        ins.id as status_id,
+        ins.name as status_name,
+        ins.name_en as status_name_en,
+        ins.name_ar as status_name_ar,
+        ins.color as status_color,
+        ins.color_name as status_color_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN inventory i ON p.id = i.product_id
+      LEFT JOIN inventory_status ins ON i.status_id = ins.id
       ${whereClause}
       ${orderBy}
       LIMIT ? OFFSET ?
@@ -286,7 +289,15 @@ export async function GET(request: NextRequest) {
         price: parseFloat(row.price) || 0,
         original_price: parseFloat(row.price) || 0,
         stock: parseInt(row.stock) || 0,
-        stock_status: getStockStatus(parseInt(row.stock) || 0),
+        stock_status_id: row.stock_status_id || 1,
+        stock_status_info: row.status_id ? {
+          id: row.status_id,
+          name: row.status_name,
+          name_en: row.status_name_en,
+          name_ar: row.status_name_ar,
+          color: row.status_color,
+          color_name: row.status_color_name
+        } : null,
         image: row.image || (images.length > 0 ? images[0] : ''),
         images: images,
         parameters: {
@@ -407,13 +418,28 @@ export async function POST(request: NextRequest) {
 
     const productId = result.rows[0]?.id;
 
-    // 记录库存初始化日志
+    // 写入 inventory 表（单一数据源）
+    // 根据 quantity 自动计算 status_id
+    const calcStatusId = (qty: number) => {
+      if (qty > 10) return 1;
+      if (qty > 5) return 2;
+      if (qty > 0) return 3;
+      return 4;
+    };
+    const newStatusId = calcStatusId(stock || 0);
     await query(
-      `INSERT INTO inventory_logs (
-        product_id, change_type, quantity,
-        before_stock, after_stock, reason, operator_name, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [productId, 'init', stock || 0, 0, stock || 0, '产品初始化', 'system']
+      `INSERT INTO inventory (product_id, product_name, quantity, status_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`,
+      [productId, name, stock || 0, newStatusId]
+    );
+
+    // 记录库存初始化流水（inventory_transactions）
+    await query(
+      `INSERT INTO inventory_transactions (
+        product_id, product_name, transaction_type, quantity_change,
+        quantity_before, quantity_after, reason, operator_name, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [productId, name, 'init', stock || 0, 0, stock || 0, '产品初始化', 'system']
     );
 
     // 记录产品创建日志

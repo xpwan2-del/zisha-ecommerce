@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+function calculateStatusId(quantity: number): number {
+  if (quantity <= 0) return 4;
+  if (quantity <= 5) return 3;
+  if (quantity <= 10) return 2;
+  return 1;
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ table: string; id: string }> }
@@ -8,6 +15,9 @@ export async function PUT(
   try {
     const { table, id } = await params;
     const body = await request.json();
+
+    console.log(`[DB UPDATE] table=${table}, id=${id}`);
+    console.log(`[DB UPDATE] body:`, JSON.stringify(body));
 
     if (!table || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table)) {
       return NextResponse.json(
@@ -19,8 +29,21 @@ export async function PUT(
     const columnsResult = await query(`PRAGMA table_info(${table})`);
     const columns = (columnsResult.rows || []).filter((col: any) => col.name !== 'id');
 
-    const updates = columns.map((col: any) => `${col.name} = ?`).join(', ');
-    const values = columns.map((col: any) => body[col.name]);
+    console.log(`[DB UPDATE] columns:`, columns.map(c => c.name));
+
+    let updates = columns.map((col: any) => `${col.name} = ?`).join(', ');
+    let values = columns.map((col: any) => body[col.name]);
+
+    // 如果是 inventory 表且 quantity 被修改了，自动更新 status_id
+    if (table === 'inventory' && body.quantity !== undefined) {
+      const newStatusId = calculateStatusId(body.quantity);
+      updates = `${updates}, status_id = ?`;
+      values = [...values, newStatusId];
+      console.log(`[DB UPDATE] 自动计算新 status_id: ${newStatusId}`);
+    }
+
+    console.log(`[DB UPDATE] SQL: UPDATE ${table} SET ${updates} WHERE id = ?`);
+    console.log(`[DB UPDATE] values:`, values);
 
     await query(
       `UPDATE ${table} SET ${updates} WHERE id = ?`,

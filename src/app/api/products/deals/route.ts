@@ -10,13 +10,6 @@ function parseJSON(value: any, defaultValue: any = []): any {
   }
 }
 
-function getStockStatus(stock: number): string {
-  if (stock <= 0) return '缺货';
-  if (stock <= 5) return '紧张';
-  if (stock <= 20) return '有限';
-  return '充足';
-}
-
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get('page') || '1');
@@ -77,17 +70,27 @@ export async function GET(request: NextRequest) {
     const placeholders = productIds.map(() => '?').join(',');
     const caseWhen = productIds.map((id, index) => `WHEN ${id} THEN ${index + 1}`).join(' ');
     const baseQuery = `
-      SELECT 
+      SELECT
         p.id, p.name, p.name_en, p.name_ar,
         p.description, p.description_en, p.description_ar,
-        p.price, p.stock,
+        p.price,
         p.image, p.images,
         p.category_id, p.created_at,
         c.name as category_name,
         c.name_en as category_name_en,
-        c.name_ar as category_name_ar
+        c.name_ar as category_name_ar,
+        COALESCE(i.quantity, 0) as stock,
+        i.status_id as stock_status_id,
+        ins.id as status_id,
+        ins.name as status_name,
+        ins.name_en as status_name_en,
+        ins.name_ar as status_name_ar,
+        ins.color as status_color,
+        ins.color_name as status_color_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN inventory i ON p.id = i.product_id
+      LEFT JOIN inventory_status ins ON i.status_id = ins.id
       WHERE p.id IN (${placeholders})
       ORDER BY CASE p.id ${caseWhen} END
     `;
@@ -232,7 +235,15 @@ export async function GET(request: NextRequest) {
         price: parseFloat(row.price) || 0,
         original_price: parseFloat(row.price) || 0,
         stock: parseInt(row.stock) || 0,
-        stock_status: getStockStatus(parseInt(row.stock) || 0),
+        stock_status_id: row.stock_status_id || 1,
+        stock_status_info: row.status_id ? {
+          id: row.status_id,
+          name: row.status_name,
+          name_en: row.status_name_en,
+          name_ar: row.status_name_ar,
+          color: row.status_color,
+          color_name: row.status_color_name
+        } : null,
         image: row.image || (images.length > 0 ? images[0] : ''),
         images: images,
         parameters: {

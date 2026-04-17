@@ -156,19 +156,37 @@ export async function GET(request: NextRequest) {
     
     // 从数据库获取产品数据（关联促销活动，每个产品只取最大折扣的促销）
     const productsResult = await query(`
-      SELECT 
-        p.id, p.name, p.name_en, p.name_ar, p.description, 
-        p.price, p.stock, p.category_id, p.image,
+      SELECT
+        p.id, p.name, p.name_en, p.name_ar, p.description,
+        p.price, p.category_id, p.image,
+        COALESCE(i.quantity, 0) as stock,
+        i.status_id as stock_status_id,
+        ins.id as status_id,
+        ins.name as status_name,
+        ins.name_en as status_name_en,
+        ins.name_ar as status_name_ar,
+        ins.color as status_color,
+        ins.color_name as status_color_name,
         pr.id as promotion_id,
         pr.name as promotion_name,
         pr.discount_percent as promotion_discount,
         pr.icon as promotion_icon,
         pr.color as promotion_color,
         pp.priority,
-        pp.can_stack
+        pp.can_stack,
+        ac.id as activity_id,
+        ac.name as activity_name,
+        ac.name_en as activity_name_en,
+        ac.name_ar as activity_name_ar,
+        ac.icon_url as activity_icon_url,
+        ac.color as activity_color
       FROM products p
       LEFT JOIN product_promotions pp ON p.id = pp.product_id
       LEFT JOIN promotions pr ON pp.promotion_id = pr.id
+      LEFT JOIN inventory i ON p.id = i.product_id
+      LEFT JOIN inventory_status ins ON i.status_id = ins.id
+      LEFT JOIN product_activities pa ON p.id = pa.product_id
+      LEFT JOIN activity_categories ac ON pa.activity_category_id = ac.id
       WHERE (pp.status IS NULL OR (pp.status = 'active' AND pr.status = 'active'))
       GROUP BY p.id
       ORDER BY p.id ASC
@@ -190,6 +208,15 @@ export async function GET(request: NextRequest) {
       const discount = product.promotion_discount || 0;
       const finalPrice = discount > 0 ? calculateFinalPrice(originalPrice, discount, product.priority || 2, product.can_stack || 1) : originalPrice;
       
+      const activities = product.activity_id ? [{
+        id: product.activity_id,
+        name: product.activity_name,
+        name_en: product.activity_name_en,
+        name_ar: product.activity_name_ar,
+        icon_url: product.activity_icon_url,
+        color: product.activity_color
+      }] : [];
+      
       return {
         ...product,
         is_active: true,
@@ -197,7 +224,15 @@ export async function GET(request: NextRequest) {
         teapot_type_id: 1,
         description_en: product.name_en,
         description_ar: product.name_ar,
-        // 使用嵌套promotion结构
+        activities: activities,
+        stock_status_info: product.status_id ? {
+          id: product.status_id,
+          name: product.status_name,
+          name_en: product.status_name_en,
+          name_ar: product.status_name_ar,
+          color: product.status_color,
+          color_name: product.status_color_name
+        } : null,
         promotion: product.promotion_name ? {
           id: product.promotion_id || null,
           name: product.promotion_name,
@@ -208,9 +243,9 @@ export async function GET(request: NextRequest) {
           can_stack: product.can_stack || 1,
           promotion_price: finalPrice
         } : null,
-        activity_tag: product.promotion_name || null,
-        activity_icon: product.promotion_icon || null,
-        activity_color: product.promotion_color || null
+        activity_tag: product.activity_name || product.promotion_name || null,
+        activity_icon: product.activity_icon_url || product.promotion_icon || null,
+        activity_color: product.activity_color || product.promotion_color || null
       };
     });
     

@@ -69,7 +69,12 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold font-['Noto_Naskh_Arabic'] text-[#831843]">Admin Dashboard</h1>
           <button 
             onClick={() => router.push('/')}
-            className="bg-[#CA8A04] hover:bg-[#B47C03] text-white px-4 py-2 rounded-lg font-['Noto_Sans_Arabic'] font-medium transition-all duration-300"
+            className="text-white px-4 py-2 rounded-lg font-['Noto_Sans_Arabic'] font-medium transition-all duration-300"
+            style={{
+              backgroundColor: 'var(--btn-primary-bg)',
+              color: 'var(--btn-primary-text)',
+              border: '1px solid var(--btn-primary-border)'
+            }}
           >
             View Store
           </button>

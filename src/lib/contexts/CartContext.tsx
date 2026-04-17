@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface CartItem {
   id: number;
@@ -12,12 +13,19 @@ interface CartItem {
   currency?: string;
 }
 
+interface AddToCartResult {
+  success: boolean;
+  error?: string;
+  message?: string;
+}
+
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: Omit<CartItem, 'quantity'>) => Promise<void>;
+  addToCart: (product: Omit<CartItem, 'quantity'>) => Promise<AddToCartResult>;
   removeFromCart: (id: number) => Promise<void>;
   updateQuantity: (id: number, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  refreshCart: () => Promise<void>;
   totalItems: number;
   totalAmount: number;
   debug: () => void;
@@ -27,6 +35,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, checkAuth } = useAuth();
+  const router = useRouter();
   
   const getCartKey = () => {
     return isAuthenticated && user ? `cart_${user.id}` : 'cart_guest';
@@ -34,17 +43,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      const cartKey = getCartKey();
-      const storedCart = localStorage.getItem(cartKey);
-      if (storedCart) {
-        const parsedCart = JSON.parse(storedCart);
-        if (Array.isArray(parsedCart)) {
-          return parsedCart;
+      // Guest 用户从 localStorage 读取
+      if (!isAuthenticated) {
+        const storedCart = localStorage.getItem('cart_guest');
+        if (storedCart) {
+          const parsedCart = JSON.parse(storedCart);
+          if (Array.isArray(parsedCart)) {
+            return parsedCart;
+          }
         }
       }
+      // 已登录用户：返回空数组，等 API 获取最新数据
+      return [];
     } catch (error) {
-      const cartKey = getCartKey();
-      localStorage.removeItem(cartKey);
+      if (!isAuthenticated) {
+        localStorage.removeItem('cart_guest');
+      }
     }
     return [];
   });
@@ -55,11 +69,36 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(cartKey, JSON.stringify(cart));
   }, [cart, isAuthenticated, user]);
 
-  // Handle cart synchronization when user logs in/out
+  // 已登录用户立即从 API 获取最新数据
   useEffect(() => {
+    if (isAuthenticated && user) {
+      const accessToken = localStorage.getItem('access_token');
+      if (accessToken) {
+        fetch('/api/cart', {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data?.items) {
+            setCart(data.data.items);
+          }
+        })
+        .catch(err => console.error('Failed to fetch cart:', err));
+      }
+    }
+  }, [isAuthenticated, user]);
+
+  // Handle cart synchronization when user logs in/out
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     const handleAuthChange = async () => {
       if (isAuthenticated && user) {
-        // User logged in, merge guest cart if exists
         const guestCart = localStorage.getItem('cart_guest');
         if (guestCart) {
           try {
@@ -74,9 +113,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 body: JSON.stringify({ guest_cart: JSON.parse(guestCart) }),
               });
               localStorage.removeItem('cart_guest');
-              
-              // Refresh cart from server
-              const cartKey = getCartKey();
+
               const response = await fetch('/api/cart', {
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
@@ -84,14 +121,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
               });
               if (response.ok) {
                 const data = await response.json();
-                setCart(data.cart || []);
+                setCart(data.data?.items || []);
               }
             }
           } catch (error) {
             console.error('Failed to merge guest cart:', error);
           }
         } else {
-          // No guest cart, refresh from server
           try {
             const accessToken = localStorage.getItem('access_token');
             if (accessToken) {
@@ -102,7 +138,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
               });
               if (response.ok) {
                 const data = await response.json();
-                setCart(data.cart || []);
+                setCart(data.data?.items || []);
               }
             }
           } catch (error) {
@@ -110,11 +146,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           }
         }
       } else {
-        // User logged out, clear cart
-        // AuthProvider's logout function should have already cleared localStorage
-        // but we'll double-check and ensure cart is empty
         setCart([]);
-        // Also clear any remaining cart data in localStorage
         localStorage.removeItem('cart_guest');
         const userId = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}').id : null;
         if (userId) {
@@ -126,38 +158,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     handleAuthChange();
   }, [isAuthenticated, user]);
 
-  const addToCart = async (product: Omit<CartItem, 'quantity'>) => {
-    console.log('========== [addToCart] ==========');
-    console.log('1. addToCart called with product:', product);
-    console.log('2. Current isAuthenticated:', isAuthenticated);
-    console.log('3. Current user:', user);
-    
-    // Check if user is authenticated
-    console.log('4. Calling checkAuth()...');
+  const addToCart = async (product: Omit<CartItem, 'quantity'>): Promise<AddToCartResult> => {
     const isAuth = await checkAuth();
-    console.log('5. checkAuth() result:', isAuth);
-    
-    // Version: 2 - Force rebuild
+
     if (!isAuth) {
-      console.log('6. [NOT LOGGED IN] User not authenticated, redirecting to login');
-      console.log('7. Redirecting to: /login?redirect=' + encodeURIComponent(window.location.pathname));
-      console.log('========== [addToCart END - REDIRECTING] ==========');
-      // Redirect to login page with redirect back to current page
-      window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
-      return;
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return { success: false, error: 'NOT_LOGGED_IN', message: 'Please login first' };
     }
-    
-    console.log('8. [LOGGED IN] User is authenticated, proceeding to add to cart');
-    
-    // Sync cart with server first
-    console.log('9. Syncing cart with server...');
+
     if (isAuth && user) {
       try {
         const accessToken = localStorage.getItem('access_token');
-        console.log('10. Access token exists:', !!accessToken);
         if (accessToken) {
-          console.log('11. Calling /api/cart/add...');
-          const response = await fetch('/api/cart/add', {
+          const response = await fetch('/api/cart', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -168,12 +181,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
               quantity: 1
             }),
           });
-          console.log('12. /api/cart/add response status:', response.status);
+
           const result = await response.json();
-          console.log('13. /api/cart/add response:', result);
-          
-          // Refresh cart from server to ensure local state matches server
-          console.log('14. Refreshing cart from server...');
+
+          if (!result.success) {
+            return {
+              success: false,
+              error: result.error_code || 'ADD_TO_CART_FAILED',
+              message: result.message || 'Failed to add to cart'
+            };
+          }
+
           const cartResponse = await fetch('/api/cart', {
             headers: {
               'Authorization': `Bearer ${accessToken}`,
@@ -181,16 +199,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
           });
           if (cartResponse.ok) {
             const cartData = await cartResponse.json();
-            console.log('15. Cart data from server:', cartData);
-            setCart(cartData.cart || []);
+            setCart(cartData.data?.items || []);
           }
+
+          return { success: true };
         }
       } catch (error) {
-        console.error('16. Failed to sync cart with server:', error);
+        console.error('Failed to sync cart with server:', error);
+        return { success: false, error: 'NETWORK_ERROR', message: 'Network error' };
       }
     }
-    
-    console.log('========== [addToCart END - SUCCESS] ==========');
+
+    return { success: false, error: 'UNKNOWN', message: 'Unknown error' };
   };
 
   const removeFromCart = async (id: number) => {
@@ -201,13 +221,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       try {
         const accessToken = localStorage.getItem('access_token');
         if (accessToken) {
-          await fetch('/api/cart/remove', {
-            method: 'POST',
+          await fetch('/api/cart?product_id=' + id, {
+            method: 'DELETE',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({ product_id: id }),
           });
         }
       } catch (error) {
@@ -232,13 +251,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       try {
         const accessToken = localStorage.getItem('access_token');
         if (accessToken) {
-          await fetch('/api/cart/update', {
-            method: 'POST',
+          await fetch('/api/cart', {
+            method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({ product_id: id, quantity }),
+            body: JSON.stringify({ id: id, quantity: quantity }),
           });
         }
       } catch (error) {
@@ -249,14 +268,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = async () => {
     setCart([]);
-    
+
     // Sync with server
     if (isAuthenticated && user) {
       try {
         const accessToken = localStorage.getItem('access_token');
         if (accessToken) {
-          await fetch('/api/cart/clear', {
-            method: 'POST',
+          await fetch('/api/cart?clear=true', {
+            method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
             },
@@ -264,6 +283,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('Failed to sync cart with server:', error);
+      }
+    }
+  };
+
+  const refreshCart = async () => {
+    if (isAuthenticated && user) {
+      try {
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+          const response = await fetch('/api/cart', {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setCart(data.data?.items || []);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to refresh cart:', error);
       }
     }
   };
@@ -289,6 +329,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeFromCart,
         updateQuantity,
         clearCart,
+        refreshCart,
         totalItems,
         totalAmount,
         debug,

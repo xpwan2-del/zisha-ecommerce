@@ -11,7 +11,7 @@ export async function PUT(request: NextRequest) {
       return authResult.response;
     }
 
-    const user_id = authResult.user?.id;
+    const user_id = authResult.user?.userId;
     const data = await request.json();
     const { current_password, new_password } = data;
 

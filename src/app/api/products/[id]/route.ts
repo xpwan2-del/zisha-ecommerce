@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-// 辅助函数：计算库存状态
-function getStockStatus(stock: number): string {
-  if (stock <= 0) return '缺货';
-  if (stock <= 5) return '紧张';
-  if (stock <= 20) return '有限';
-  return '充足';
-}
-
 // 辅助函数：解析JSON字段
 function parseJSON(value: any, defaultValue: any = []): any {
   if (!value) return defaultValue;
@@ -31,15 +23,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        WHERE status = 'active' AND end_time < datetime('now')`
     );
 
-    // 查询产品基本信息
+    // 查询产品基本信息（JOIN inventory和inventory_status获取库存状态）
     const productResult = await query(
       `SELECT
         p.*,
         c.name as category_name,
         c.name_en as category_name_en,
-        c.name_ar as category_name_ar
+        c.name_ar as category_name_ar,
+        COALESCE(i.quantity, 0) as stock,
+        i.status_id as stock_status_id,
+        ins.id as status_id,
+        ins.name as status_name,
+        ins.name_en as status_name_en,
+        ins.name_ar as status_name_ar,
+        ins.color as status_color,
+        ins.color_name as status_color_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN inventory i ON p.id = i.product_id
+      LEFT JOIN inventory_status ins ON i.status_id = ins.id
       WHERE p.id = ?`,
       [productId]
     );
@@ -62,7 +64,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // 查询产品关联的活动分类
     const activitiesResult = await query(
-      `SELECT ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url
+      `SELECT ac.id, ac.name, ac.name_en, ac.name_ar, ac.icon_url, ac.color
        FROM product_activities pa
        JOIN activity_categories ac ON pa.activity_category_id = ac.id
        WHERE pa.product_id = ?`,
@@ -189,18 +191,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
     const productFeatures = featuresResult.rows || [];
 
-    // 查询库存变动历史（最近10条）
+    // 查询库存历史（最近10条）
     const inventoryHistoryResult = await query(
       `SELECT
         id,
-        change_type,
-        quantity,
-        before_stock,
-        after_stock,
+        transaction_type as change_type,
+        quantity_change as quantity,
+        quantity_before as before_stock,
+        quantity_after as after_stock,
         reason,
         operator_name,
         created_at
-       FROM inventory_logs
+       FROM inventory_transactions
        WHERE product_id = ?
        ORDER BY created_at DESC
        LIMIT 10`,
@@ -263,7 +265,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       price: parseFloat(row.price) || 0,
       original_price: parseFloat(row.price) || 0,
       stock: parseInt(row.stock) || 0,
-      stock_status: getStockStatus(parseInt(row.stock) || 0),
+      stock_status_id: row.stock_status_id || 1,
+      stock_status_info: row.status_id ? {
+        id: row.status_id,
+        name: row.status_name,
+        name_en: row.status_name_en,
+        name_ar: row.status_name_ar,
+        color: row.status_color,
+        color_name: row.status_color_name
+      } : null,
       image: row.image || (images.length > 0 ? images[0] : ''),
       images: images,
       video: row.video || '',
@@ -349,7 +359,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // 获取旧数据用于日志记录
     const oldProductResult = await query(
-      'SELECT name, price, stock FROM products WHERE id = ?',
+      'SELECT name, price FROM products WHERE id = ?',
       [productId]
     );
     const oldProduct = oldProductResult.rows?.[0];
@@ -358,7 +368,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       `UPDATE products SET
        name = ?, name_en = ?, name_ar = ?,
        description = ?, description_en = ?, description_ar = ?,
-       price = ?, stock = ?,
+       price = ?,
        category_id = ?, image = ?, images = ?, video = ?,
        features = ?, specifications = ?, shipping = ?, after_sale = ?,
        is_limited = ?, discount = ?,
@@ -368,7 +378,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       [
         name, name_en, name_ar,
         description, description_en, description_ar,
-        price, price, stock,
+        price,
         category_id, image, JSON.stringify(images || []), video || '',
         JSON.stringify(features || []), JSON.stringify(specifications || {}),
         JSON.stringify(shipping || {}), JSON.stringify(after_sale || {}),
@@ -400,23 +410,36 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       ]
     );
 
-    // 如果库存变化，记录库存日志
-    if (oldProduct && parseInt(oldProduct.stock) !== parseInt(stock)) {
-      await query(
-        `INSERT INTO inventory_logs (
-          product_id, change_type, quantity,
-          before_stock, after_stock, reason, operator_name, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [
-          id,
-          'adjust',
-          parseInt(stock) - parseInt(oldProduct.stock),
-          parseInt(oldProduct.stock),
-          parseInt(stock),
-          '产品更新',
-          'system'
-        ]
+    // 如果库存变化，记录库存流水（从 inventory 表读取旧库存）
+    if (stock !== undefined) {
+      const oldInventoryResult = await query(
+        'SELECT quantity FROM inventory WHERE product_id = ?',
+        [productId]
       );
+      const oldStock = oldInventoryResult.rows?.[0]?.quantity || 0;
+
+      if (oldStock !== parseInt(stock)) {
+        const quantityChange = parseInt(stock) - oldStock;
+        await query(
+          `INSERT INTO inventory_transactions (
+            product_id, product_name, transaction_type, quantity_change,
+            quantity_before, quantity_after, reason, reference_type, reference_id,
+            operator_name, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+          [
+            id,
+            oldProduct?.name || 'Product',
+            quantityChange >= 0 ? 'adjustment_in' : 'adjustment_out',
+            quantityChange,
+            oldStock,
+            parseInt(stock),
+            '产品更新调整',
+            'adjustment',
+            id,
+            'system'
+          ]
+        );
+      }
     }
 
     return NextResponse.json({

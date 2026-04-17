@@ -211,7 +211,12 @@ export default function GuaranteesPage() {
           <h1 className="text-2xl font-bold text-gray-900">服务保证管理</h1>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="bg-[#CA8A04] hover:bg-[#B47C03] text-white font-medium py-2 px-4 rounded-md transition-colors duration-300"
+            className="text-white font-medium py-2 px-4 rounded-md transition-colors duration-300"
+            style={{
+              backgroundColor: 'var(--btn-primary-bg)',
+              color: 'var(--btn-primary-text)',
+              border: '1px solid var(--btn-primary-border)'
+            }}
           >
             {showAddForm ? '取消' : '添加服务保证'}
           </button>
@@ -298,7 +303,12 @@ export default function GuaranteesPage() {
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={handleAddGuarantee}
-                  className="bg-[#CA8A04] hover:bg-[#B47C03] text-white font-medium py-2 px-4 rounded-md transition-colors duration-300"
+                  className="text-white font-medium py-2 px-4 rounded-md transition-colors duration-300"
+                  style={{
+                    backgroundColor: 'var(--btn-primary-bg)',
+                    color: 'var(--btn-primary-text)',
+                    border: '1px solid var(--btn-primary-border)'
+                  }}
                 >
                   保存
                 </button>

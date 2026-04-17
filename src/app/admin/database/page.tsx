@@ -31,6 +31,7 @@ export default function DatabaseManager() {
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [searchTable, setSearchTable] = useState("");
+  const [inventoryStatuses, setInventoryStatuses] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTables();
@@ -40,7 +41,22 @@ export default function DatabaseManager() {
     if (selectedTable) {
       fetchTableData();
     }
+    if (selectedTable === 'inventory') {
+      fetchInventoryStatuses();
+    }
   }, [selectedTable, page, pageSize]);
+
+  const fetchInventoryStatuses = async () => {
+    try {
+      const res = await fetch("/api/inventory-status");
+      const data = await res.json();
+      if (data.success) {
+        setInventoryStatuses(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch inventory statuses:", err);
+    }
+  };
 
   const fetchTables = async () => {
     try {
@@ -116,16 +132,38 @@ export default function DatabaseManager() {
       });
 
       const data = await res.json();
+
       if (data.success) {
+        // 保存成功后，从数据库重新读取最新数据
+        let dbRecord = null;
+        if (!isCreating && editingRow?.id) {
+          try {
+            const getRes = await fetch(`/api/db/table/${selectedTable}?page=1&limit=100`);
+            const getData = await getRes.json();
+            if (getData.success) {
+              // 找到更新后的那条记录
+              dbRecord = getData.data.rows.find((r: any) => r.id == editingRow.id);
+            }
+          } catch (e) {
+            console.error("读取数据库失败", e);
+          }
+        }
+
+        if (dbRecord) {
+          alert(`✅ 数据库已更新！\n\n表: ${selectedTable}\nID: ${editingRow.id}\n\n数据库最新数据:\n${JSON.stringify(dbRecord, null, 2)}`);
+        } else {
+          alert(`✅ 数据库已更新！\n\n表: ${selectedTable}\nID: ${editingRow?.id || '新建'}\n\n（无法重新查询数据库，请刷新页面查看）`);
+        }
+
         setEditingRow(null);
         setIsCreating(false);
         fetchTableData();
       } else {
-        alert(data.error || "Failed to save");
+        alert(`❌ 保存失败: ${data.error || "未知错误"}`);
       }
     } catch (err) {
-      alert("Failed to save");
-      console.error(err);
+      console.error("[handleSave] 错误:", err);
+      alert("保存失败: " + String(err));
     }
   };
 
@@ -249,23 +287,67 @@ export default function DatabaseManager() {
                       <div className="grid grid-cols-3 gap-4">
                         {columns
                           .filter((col) => !isCreating || col.name !== "id")
-                          .map((col) => (
-                            <div key={col.name}>
-                              <label className="block text-sm font-medium text-[var(--text)] mb-1">
-                                {col.name}
-                                {col.pk === 1 && <span className="text-red-500 ml-1">*PK</span>}
-                              </label>
-                              <input
-                                type="text"
-                                value={formData[col.name] || ""}
-                                onChange={(e) =>
-                                  setFormData({ ...formData, [col.name]: e.target.value })
-                                }
-                                disabled={col.pk === 1 && !isCreating}
-                                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-[var(--text)] disabled:bg-gray-100"
-                              />
-                            </div>
-                          ))}
+                          .map((col) => {
+                            const isColorField = /color|bg|border|text|accent|secondary|primary/i.test(col.name);
+                            const isStatusIdField = col.name === 'status_id' && selectedTable === 'inventory';
+                            return (
+                              <div key={col.name}>
+                                <label className="block text-sm font-medium text-[var(--text)] mb-1">
+                                  {col.name}
+                                  {col.pk === 1 && <span className="text-red-500 ml-1">*PK</span>}
+                                </label>
+                                {isColorField ? (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="color"
+                                      value={formData[col.name] || "#000000"}
+                                      onChange={(e) =>
+                                        setFormData({ ...formData, [col.name]: e.target.value })
+                                      }
+                                      className="w-10 h-10 cursor-pointer rounded border"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={formData[col.name] || ""}
+                                      onChange={(e) =>
+                                        setFormData({ ...formData, [col.name]: e.target.value })
+                                      }
+                                      className="flex-1 px-3 py-2 border border-[var(--border)] rounded-md text-[var(--text)] font-mono text-sm"
+                                      placeholder="#000000"
+                                    />
+                                    <div
+                                      className="w-8 h-8 rounded border"
+                                      style={{ backgroundColor: formData[col.name] || "#ccc" }}
+                                    />
+                                  </div>
+                                ) : isStatusIdField ? (
+                                  <select
+                                    value={formData[col.name] || "1"}
+                                    onChange={(e) =>
+                                      setFormData({ ...formData, [col.name]: e.target.value })
+                                    }
+                                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-[var(--text)]"
+                                  >
+                                    {inventoryStatuses.map((status: any) => (
+                                      <option key={status.id} value={status.id}>
+                                        {status.name} ({status.color_name})
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={formData[col.name] || ""}
+                                    onChange={(e) =>
+                                      setFormData({ ...formData, [col.name]: e.target.value })
+                                    }
+                                    disabled={col.pk === 1 && !isCreating}
+                                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-[var(--text)] disabled:bg-gray-100"
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
                       </div>
                       <div className="flex gap-2 mt-4">
                         <button

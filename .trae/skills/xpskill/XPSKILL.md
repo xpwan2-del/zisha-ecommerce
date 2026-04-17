@@ -186,6 +186,17 @@ AI必须回复：
 >
 > 请确认后开发。"
 
+### 改动前确认原则
+
+**当需要修改涉及现有功能的代码时，AI必须：**
+
+1. **报告影响范围**：列出所有会受影响的文件
+2. **说明改动内容**：具体改什么
+3. **等待用户确认**：用户说"可以"才执行
+4. **严格执行**：只改必要的部分，不多改
+
+---
+
 ## 禁止事项清单
 
 当AI要做以下操作时，必须阻止：
@@ -811,9 +822,9 @@ PlainText
 
 1. 验证（登录、库存、促销）2. 计算价格（促销→运费→优惠券）3. 创建订单（事务保证一致性）4. 扣减库存5. 更新优惠券6. 跳转支付
 需要新增的 API
-API	说明
-POST /api/cart/checkout/validate	结算前验证
-POST /api/cart/checkout	创建订单
+API 说明
+POST /api/cart/checkout/validate  结算前验证
+POST /api/cart/checkout 创建订单
 数据库修改
 orders 表（已有）
 order_items 表（已有）
@@ -824,11 +835,11 @@ order_items 表（已有）
 
 库存处理
 一、库存类型
-类型	说明	处理方式
-充足	stock > 20	正常销售
-有限	5 < stock <= 20	显示库存紧张
-紧张	0 < stock <= 5	显示仅剩X件
-缺货	stock <= 0	不能加入购物车/结算
+类型  说明  处理方式
+充足  stock > 20  正常销售
+有限  5 < stock <= 20 显示库存紧张
+紧张  0 < stock <= 5  显示仅剩X件
+缺货  stock <= 0  不能加入购物车/结算
 二、超卖问题
 2.1 问题场景
 PlainText
@@ -897,16 +908,16 @@ PlainText
 
 定时任务（每小时）：1. 从外部系统同步库存2. 检查是否有超卖3. 如果超卖，通知客服处理
 六、库存相关 API
-API	说明
-GET /api/products/:id/stock	获取商品库存
-POST /api/cart/check	结算前检查库存
-后台管理系统	库存管理（增删改）
+API 说明
+GET /api/products/:id/stock 获取商品库存
+POST /api/cart/check  结算前检查库存
+后台管理系统  库存管理（增删改）
 七、总结
-问题	解决方案
-超卖	乐观锁（WHERE stock >= ?）
-库存不足	结算前检查，提示用户
-缺货	不能加入购物车/结算
-多端同步	定时同步任务
+问题  解决方案
+超卖  乐观锁（WHERE stock >= ?）
+库存不足  结算前检查，提示用户
+缺货  不能加入购物车/结算
+多端同步  定时同步任务
 
 
 
@@ -1025,12 +1036,12 @@ API 方法 说明 GET /api/orders GET 获取用户订单列表 GET /api/orders/:
 
 支付流程
 一、支付状态
-状态	说明
-pending	待支付
-paid	已支付
-failed	支付失败
-refunded	已退款
-expired	已过期
+状态  说明
+pending 待支付
+paid  已支付
+failed  支付失败
+refunded  已退款
+expired 已过期
 二、支付流程
 2.1 标准支付流程
 PlainText
@@ -1048,13 +1059,13 @@ TypeScript
 // 支付完成后，第三方会回调我们的接口// POST /api/payments/webhook// 验证签名const isValid = verifyWebhookSignature(body, signature);// 更新支付状态if (isValid) {  UPDATE orders   SET payment_status = 'paid',      order_status = 'paid'  WHERE order_id = ?;    // 扣减库存（如果之前没扣的话）  // 发送通知}
 三、支付方式
 3.1 常用支付方式
-方式	说明	集成难度
-Stripe	国际信用卡	中
-PayPal	国际支付	中
-Alipay	支付宝	高
-WeChat Pay	微信支付	高
-Bank Transfer	银行转账	低
-Cash on Delivery	货到付款	低
+方式  说明  集成难度
+Stripe  国际信用卡  中
+PayPal  国际支付  中
+Alipay  支付宝  高
+WeChat Pay  微信支付  高
+Bank Transfer 银行转账  低
+Cash on Delivery  货到付款  低
 3.2 多支付方式支持
 TypeScript
 
@@ -1064,11 +1075,11 @@ TypeScript
 interface PaymentMethod {  id: string;  name: string;  enabled: boolean;  fee_percent: number;  // 手续费}// 支付时计算const totalWithFee = finalAmount * (1 + paymentMethod.fee_percent / 100);
 四、支付失败处理
 4.1 失败原因
-原因	处理
-余额不足	提示用户
-银行卡过期	提示用户更换
-风控拦截	联系客服
-超时	订单关闭，重新下单
+原因  处理
+余额不足  提示用户
+银行卡过期  提示用户更换
+风控拦截  联系客服
+超时  订单关闭，重新下单
 4.2 超时处理
 PlainText
 
@@ -1077,17 +1088,17 @@ PlainText
 
 订单创建后未支付        ↓等待30分钟        ↓超时未支付        ↓自动取消订单        ↓释放锁定的库存
 五、支付相关 API
-API	方法	说明
-POST /api/payments/create	POST	创建支付
-POST /api/payments/webhook	POST	支付回调
-GET /api/payments/:id	GET	查询支付状态
-POST /api/payments/:id/cancel	POST	取消支付
+API 方法  说明
+POST /api/payments/create POST  创建支付
+POST /api/payments/webhook  POST  支付回调
+GET /api/payments/:id GET 查询支付状态
+POST /api/payments/:id/cancel POST  取消支付
 六、总结
-功能	说明
-支付流程	创建 → 跳转 → 回调 → 更新
-支付方式	Stripe/PayPal/支付宝等
-失败处理	提示原因，允许重试
-超时处理	自动取消，释放库存
+功能  说明
+支付流程  创建 → 跳转 → 回调 → 更新
+支付方式  Stripe/PayPal/支付宝等
+失败处理  提示原因，允许重试
+超时处理  自动取消，释放库存
 
 
 
@@ -1329,55 +1340,92 @@ API 方法 说明 GET /api/users/profile GET 获取用户信息 PUT /api/users/p
 
 # 库存管理系统
 
-## 一、现有库存表分析
+## 一、核心原则
 
-### 1.1 现有库存相关表
+### 最重要原则：服务端逻辑优先
+
+**禁止事项**：
+- ❌ 前端计算库存状态（紧张、缺货等）
+- ❌ 前端检查库存是否足够
+- ❌ 前端判断是否触发库存预警
+- ❌ 硬编码库存状态类型
+
+**正确做法**：
+- ✅ API 返回完整的库存数据（包括 status 字段）
+- ✅ 前端只渲染后端返回的结果
+- ✅ 所有库存状态类型从数据库字典表读取
+
+---
+
+## 二、涉及哪些表？
+
+| 表名 | 作用 | 存什么 |
+|------|------|--------|
+| `inventory` | **库存主表** | 每个商品当前的库存数量和状态 |
+| `inventory_transactions` | **库存流水表** | 每次库存变动的记录 |
+| `inventory_alerts` | **库存预警表** | 触发预警的事件记录 |
+| `inventory_checks` | **盘点单表** | 盘点批次记录 |
+| `inventory_check_items` | **盘点明细表** | 盘点时每个商品的差异 |
+| `transaction_types` | **变动类型字典表** | 所有库存变动类型的定义 |
+| `reference_types` | **单据类型字典表** | 所有关联单据类型的定义 |
+
+---
+
+## 三、图解：各表关系
+
+┌─────────────────────────────────────────────────────────────────┐ │ inventory 表 │ │ （库存当前状态） │ │ │ │ 字段：product_id, product_name, quantity, │ │ low_stock_threshold, status │ │ │ │ 作用：记录每个商品当前的库存数量和状态 │ └─────────────────────────────────────────────────────────────────┘
+  变动时更新
+┌─────────────────────────────────────────────────────────────────┐ │ inventory_alerts 表 │ │ （预警事件） │ │ │ │ 字段：product_id, alert_type(code), current_stock, │ │ threshold, status, ... │ │ │ │ 作用：记录触发预警的事件，像报警记录 │ └─────────────────────────────────────────────────────────────────┘
+读取
+┌─────────────────────────────────────────────────────────────────┐ │ transaction_types 表 │ │ （变动类型字典表） │ │ │ │ 字段：code, name, name_en, direction, description │ │ │ │ 作用：定义所有库存变动类型，不硬编码 │ └─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐ │ reference_types 表 │ │ （单据类型字典表） │ │ │ │ 字段：code, name, name_en, description │ │ │ │ 作用：定义所有关联单据类型，不硬编码 │ └─────────────────────────────────────────────────────────────────┘
+
+---
+
+## 四、现有库存表分析
+
+### 4.1 现有库存相关表
 
 | 表名 | 记录数 | 用途 | 使用状态 |
 |------|--------|------|---------|
-| `products.stock` | 60个商品 | 商品库存字段 | ✅ 核心使用中 |
-| `inventory_logs` | 50条 | 库存变动日志 | ⚠️ 仅有init类型 |
-| `inventory_alerts` | 6条 | 库存预警 | ❌ 未使用 |
+| `products.stock` | 60个商品 | 商品库存字段 | ⚠️ 待迁移到inventory |
+| `inventory_logs` | 50条 | 库存变动日志 | ⚠️ 待迁移到inventory_transactions |
+| `inventory_alerts` | 6条 | 库存预警 | ⚠️ 待增强 |
 
-### 1.2 现有表结构详情
+### 4.2 现有表结构详情
 
 #### inventory_logs 表（库存变动日志）
-```
-字段:
-  - id: INTEGER (PK)
-  - product_id: INTEGER
-  - change_type: VARCHAR(50)  -- 当前只有 'init'
-  - quantity: INTEGER
-  - before_stock: INTEGER
-  - after_stock: INTEGER
-  - reason: VARCHAR(255)
-  - operator_id: INTEGER
-  - operator_name: VARCHAR(100)
-  - created_at: TIMESTAMP
-```
 
+字段:
+* id: INTEGER (PK)
+* product_id: INTEGER
+* change_type: VARCHAR(50) -- 当前只有 'init'
+* quantity: INTEGER
+* before_stock: INTEGER
+* after_stock: INTEGER
+* reason: VARCHAR(255)
+* operator_id: INTEGER
+* operator_name: VARCHAR(100)
+	•	created_at: TIMESTAMP
 #### inventory_alerts 表（库存预警）
-```
 字段:
-  - id: INTEGER (PK)
-  - product_id: INTEGER
-  - alert_type: VARCHAR(50)  -- 当前只有 'low_stock'
-  - current_stock: INTEGER
-  - threshold: INTEGER
-  - status: VARCHAR(20)  -- pending/resolved
-  - handled_by: VARCHAR(100)
-  - handled_at: TIMESTAMP
-  - created_at: TIMESTAMP
-```
-
+* id: INTEGER (PK)
+* product_id: INTEGER
+* alert_type: VARCHAR(50) -- 当前只有 'low_stock'
+* current_stock: INTEGER
+* threshold: INTEGER
+* status: VARCHAR(20) -- pending/resolved
+* handled_by: VARCHAR(100)
+* handled_at: TIMESTAMP
+	•	created_at: TIMESTAMP
 #### products.stock 字段
-```
 products 表的 stock 字段:
-  - stock: INT  -- 当前库存数量
-  - 共60个商品，库存从几十到上百不等
-```
+* stock: INT -- 当前库存数量
+	•	共60个商品，库存从几十到上百不等
+### 4.3 现有API分析
 
-### 1.3 现有API分析
+
+### 4.3 现有API分析
 
 | API | 操作 | 当前库存来源 | 问题 |
 |-----|------|------------|------|
@@ -1387,7 +1435,7 @@ products 表的 stock 字段:
 | `/api/inventory` GET | 查统计 | products.stock | ⚠️ 间接读取 |
 | `/api/inventory` POST | 调整库存 | products.stock | ⚠️ 只更新products |
 
-### 1.4 核心问题
+### 4.4 核心问题
 
 1. **数据分散**：库存同时存在于 `products.stock` 和 `inventory_logs`
 2. **查询不一致**：有些API查products表，有些查inventory_logs
@@ -1397,26 +1445,17 @@ products 表的 stock 字段:
 
 ---
 
-## 二、概念解释
+## 五、概念解释
 
-### 2.1 预留/锁定库存解释
+### 5.1 预留/锁定库存解释
 
 预留库存（Reserved Quantity）是电商系统中防止超卖的重要机制：
 
 **举例说明**：
-```
 场景：某商品库存100个，用户A参加秒杀
-
-1. 用户A下单购买10个（未支付）
-   → 系统锁定10个库存 → 可销售库存：100 - 10 = 90
-
-2. 用户A支付成功
-   → 锁定转为出库 → 实际库存：90
-
-3. 用户A超时未支付，订单取消
-   → 释放锁定库存 → 可销售库存：90 + 10 = 100
-```
-
+1. 用户A下单购买10个（未支付） → 系统锁定10个库存 → 可销售库存：100 - 10 = 90
+2. 用户A支付成功 → 锁定转为出库 → 实际库存：90
+	3	用户A超时未支付，订单取消 → 释放锁定库存 → 可销售库存：90 + 10 = 100
 **适用场景**：
 - 秒杀/限时促销：活动期间锁定库存防止超卖
 - 预售：先下单后发货的模式
@@ -1430,158 +1469,231 @@ products 表的 stock 字段:
 
 ---
 
-## 三、新表结构设计
+## 六、新表结构设计
 
-### 3.1 【新建】inventory 表（当前库存快照表）
+### 6.1 【新建】transaction_types 表（变动类型字典表）
 
-```
-用途: 记录每个商品的当前实时库存
+```sql
+CREATE TABLE transaction_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code VARCHAR(50) UNIQUE NOT NULL,      -- 变动类型代码
+  name VARCHAR(100) NOT NULL,             -- 中文名称
+  name_en VARCHAR(100),                   -- 英文名称
+  direction VARCHAR(10) NOT NULL,         -- 'in'(入库) 或 'out'(出库)
+  description TEXT,                        -- 说明
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+数据内容：
+code	name	name_en	direction	说明
+init	初始化	Initialize	in	产品创建时初始化
+purchase	采购入库	Purchase In	in	供应商送货入库
+return_in	退货入库	Return In	in	客户退货入库
+return_out	退货出库	Return Out	out	退货给供应商
+profit	盘盈	Profit	in	盘点多出来
+loss	盘亏	Loss	out	盘点少了
+transfer_in	调拨入库	Transfer In	in	从其他仓库调入
+transfer_out	调拨出库	Transfer Out	out	调往其他仓库
+gift_in	赠送入库	Gift In	in	赠送、补偿入库
+gift_out	赠送出库	Gift Out	out	赠送、样品出库
+adjustment_in	调整入库	Adjustment In	in	人工调整增加
+adjustment_out	调整出库	Adjustment Out	out	人工调整减少
+sale	销售出库	Sale	out	订单销售出库
+cancel	订单取消	Cancel	in	订单取消释放库存
+damage	损耗	Damage	out	商品损坏报损
+missing	遗失	Missing	out	商品丢失
+6.2 【新建】reference_types 表（单据类型字典表）
+CREATE TABLE reference_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code VARCHAR(50) UNIQUE NOT NULL,      -- 单据类型代码
+  name VARCHAR(100) NOT NULL,             -- 中文名称
+  name_en VARCHAR(100),                   -- 英文名称
+  description TEXT,                        -- 说明
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+数据内容：
+code	name	name_en	说明
+init	初始化	Initialize	初始创建
+order	订单	Order	销售订单
+return	退货单	Return Order	退货单据
+check	盘点单	Check Order	盘点单据
+adjustment	调整单	Adjustment	人工调整单
+transfer	调拨单	Transfer	仓库调拨单
+purchase	采购单	Purchase Order	采购入库单
+gift	赠送单	Gift Order	赠送单据
+6.3 【新建】inventory 表（当前库存快照表）
+CREATE TABLE inventory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL UNIQUE,
+    product_name TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 0,
+    low_stock_threshold INTEGER DEFAULT 10,
+    status VARCHAR(20) DEFAULT 'in_stock',    -- 库存状态
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+status 库存状态枚举：
+status 值	中文名	条件
+in_stock	充足	quantity > 20
+limited	有限	0 < quantity <= 20
+low_stock	紧张	0 < quantity <= low_stock_threshold
+out_of_stock	缺货	quantity <= 0
+6.4 【新建】inventory_transactions 表（库存流水/日志表）
+CREATE TABLE inventory_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    product_name TEXT NOT NULL,
+    transaction_type VARCHAR(50) NOT NULL,      -- 关联 transaction_types.code
+    quantity_change INTEGER NOT NULL,
+    quantity_before INTEGER NOT NULL,
+    quantity_after INTEGER NOT NULL,
+    reason TEXT,
+    reference_type VARCHAR(50),                  -- 关联 reference_types.code
+    reference_id INTEGER,
+    operator_id INTEGER,
+    operator_name VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-字段:
-  - id: INTEGER PRIMARY KEY AUTOINCREMENT
-  - product_id: INTEGER NOT NULL UNIQUE REFERENCES products(id)
-  - product_name: TEXT NOT NULL  -- 冗余存储，便于查看
-  - quantity: INTEGER NOT NULL DEFAULT 0  -- 当前库存
-  - low_stock_threshold: INTEGER DEFAULT 10  -- 低库存预警阈值（每个商品可单独设置）
-  - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  - updated_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+6.5 【新建】inventory_checks 表（盘点单表）
+CREATE TABLE inventory_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    check_number VARCHAR(50) UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    total_products INTEGER DEFAULT 0,
+    profit_count INTEGER DEFAULT 0,
+    loss_count INTEGER DEFAULT 0,
+    profit_quantity INTEGER DEFAULT 0,
+    loss_quantity INTEGER DEFAULT 0,
+    operator_id INTEGER,
+    operator_name VARCHAR(100),
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-索引:
-  - UNIQUE(product_id)
-  - INDEX(quantity)
-```
+6.6 【新建】inventory_check_items 表（盘点明细表）
+CREATE TABLE inventory_check_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    check_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    product_name TEXT NOT NULL,
+    system_quantity INTEGER DEFAULT 0,
+    actual_quantity INTEGER,
+    difference INTEGER,
+    difference_type VARCHAR(20),
+    reason TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    adjusted_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (check_id) REFERENCES inventory_checks(id)
+);
 
-### 3.2 【新建】inventory_transactions 表（库存流水/日志表）
+6.7 【保留并增强】inventory_alerts 表（库存预警表）
+CREATE TABLE inventory_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    alert_type VARCHAR(50) NOT NULL,           -- low_stock/out_of_stock
+    current_stock INTEGER NOT NULL,
+    threshold INTEGER NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',      -- pending/resolved
+    old_status VARCHAR(20),
+    new_status VARCHAR(20),
+    is_resolved INTEGER DEFAULT 0,
+    resolved_at TIMESTAMP,
+    resolution_note TEXT,
+    handled_by VARCHAR(100),
+    handled_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-```
-用途: 记录所有库存变动，替代现有的inventory_logs
+6.8 【保留但废弃】products.stock 字段
+保留原因: 向后兼容，现有数据迁移后不再使用
+注意: 所有代码不再读取此字段，库存唯一来源是 inventory 表
 
-字段:
-  - id: INTEGER PRIMARY KEY AUTOINCREMENT
-  - product_id: INTEGER NOT NULL REFERENCES products(id)
-  - product_name: TEXT NOT NULL  -- 冗余存储，便于查看
-  - transaction_type: VARCHAR(50) NOT NULL  -- 变动类型
-  - quantity_change: INTEGER NOT NULL  -- 变动数量（正=入库，负=出库）
-  - quantity_before: INTEGER NOT NULL  -- 变动前库存
-  - quantity_after: INTEGER NOT NULL  -- 变动后库存
-  - reason: TEXT  -- 变动原因
-  - reference_type: VARCHAR(50)  -- 关联单据类型: order/return/adjustment/check
-  - reference_id: INTEGER  -- 关联单据ID
-  - operator_id: INTEGER REFERENCES users(id)
-  - operator_name: VARCHAR(100)
-  - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+七、业务场景与类型对应关系
+业务场景	transaction_type	reference_type	reference_id
+产品初始化	init	init	NULL
+销售订单	sale	order	订单号
+订单取消	cancel	order	订单号
+客户退货	return_in	return	退货单号
+退货给供应商	return_out	return	退货单号
+盘点-盘盈	profit	check	盘点单号
+盘点-盘亏	loss	check	盘点单号
+人工调整增加	adjustment_in	adjustment	调整单号
+人工调整减少	adjustment_out	adjustment	调整单号
+仓库调入	transfer_in	transfer	调拨单号
+仓库调出	transfer_out	transfer	调拨单号
+采购入库	purchase	purchase	采购单号
+赠送入库	gift_in	gift	赠送单号
+赠送出库	gift_out	gift	赠送单号
+商品损耗	damage	adjustment	调整单号
+商品遗失	missing	adjustment	调整单号
+八、不同业务场景下的数据变化
+场景1：销售出库（用户下单购买）
+1. 查询 inventory 表
+   → 检查 quantity >= 购买数量
 
-索引:
-  - INDEX(product_id)
-  - INDEX(transaction_type)
-  - INDEX(created_at)
-  - INDEX(reference_type, reference_id)
-```
+2. 扣减库存
+   UPDATE inventory SET quantity = quantity - 10 WHERE product_id = 1
+   同时计算新的 status 并更新
 
-### 3.3 【新建】inventory_checks 表（盘点单表）
+3. 写入流水
+   INSERT INTO inventory_transactions (
+     product_id: 1,
+     transaction_type: 'sale',        -- 从 transaction_types 表读取
+     quantity_change: -10,
+     quantity_before: 100,
+     quantity_after: 90,
+     reference_type: 'order',         -- 从 reference_types 表读取
+     reference_id: 123
+   )
 
-```
-用途: 记录盘点批次
+4. 检查是否触发预警
+   如果新的 quantity <= low_stock_threshold
+   且没有未解决的 low_stock 预警
+   → 创建 inventory_alerts 记录
+场景2：退货入库（用户退货）
+1. 增加库存
+   UPDATE inventory SET quantity = quantity + 10 WHERE product_id = 1
+   同时计算新的 status 并更新
 
-字段:
-  - id: INTEGER PRIMARY KEY AUTOINCREMENT
-  - check_number: VARCHAR(50) UNIQUE NOT NULL  -- 盘点单号
-  - status: VARCHAR(20) DEFAULT 'pending'  -- pending/in_progress/completed/cancelled
-  - total_products: INTEGER  -- 盘点商品数
-  - profit_count: INTEGER  -- 盘盈商品数
-  - loss_count: INTEGER  -- 盘亏商品数
-  - profit_quantity: INTEGER  -- 盘盈总数量
-  - loss_quantity: INTEGER  -- 盘亏总数量
-  - operator_id: INTEGER REFERENCES users(id)
-  - operator_name: VARCHAR(100)
-  - completed_at: TIMESTAMP
-  - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  - updated_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-```
+2. 写入流水
+   INSERT INTO inventory_transactions (
+     transaction_type: 'return_in',
+     quantity_change: +10,
+     quantity_before: 90,
+     quantity_after: 100,
+     reference_type: 'return',
+     reference_id: 45
+   )
 
-### 3.4 【新建】inventory_check_items 表（盘点明细表）
+3. 如果之前有未解决的 low_stock 预警
+   现在库存充足了，预警可以标记为已解决或自动消失
+场景3：盘点（手动调整库存）
+1. 创建盘点单
+   INSERT INTO inventory_checks (check_number, status: 'pending')
 
-```
-用途: 记录盘点明细
+2. 录入实际库存
+   INSERT INTO inventory_check_items (每个商品)
 
-字段:
-  - id: INTEGER PRIMARY KEY AUTOINCREMENT
-  - check_id: INTEGER NOT NULL REFERENCES inventory_checks(id)
-  - product_id: INTEGER NOT NULL REFERENCES products(id)
-  - product_name: TEXT NOT NULL
-  - system_quantity: INTEGER  -- 系统库存
-  - actual_quantity: INTEGER  -- 实际库存
-  - difference: INTEGER  -- 差异数量 (actual - system)
-  - difference_type: VARCHAR(20)  -- profit(盘盈)/loss(盘亏)/ok(无差异)
-  - reason: TEXT  -- 差异原因
-  - status: VARCHAR(20) DEFAULT 'pending'  -- pending/confirmed/adjusted
-  - adjusted_at: TIMESTAMP  -- 调整时间
-  - created_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  - updated_at: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-```
+3. 确认盘点后，调整库存
+   对于每个有差异的商品：
+   - UPDATE inventory SET quantity = 实际数量
+   - 写入 inventory_transactions (type: 'profit' 或 'loss')
 
-### 3.5 【保留并增强】inventory_alerts 表（库存预警表）
+九、查询库存时怎么用
+前端展示库存状态
+SELECT product_name, quantity, status FROM inventory WHERE product_id = 1
+→ 返回：石瓢紫砂壶, 15, 'limited'
+前端直接显示 limited 对应的中文名称 有限，不需要自己判断。
+查看库存流水（后台管理）
+SELECT * FROM inventory_transactions WHERE product_id = 1 ORDER BY created_at DESC
+查看预警列表
+SELECT * FROM inventory_alerts WHERE status = 'pending'
 
-```
-用途: 库存预警记录
-
-新增字段:
-  - alert_type: VARCHAR(50) NOT NULL  -- low_stock/out_of_stock/overstock
-  - old_status: VARCHAR(20)  -- 旧状态
-  - new_status: VARCHAR(20)  -- 新状态
-  - is_resolved: BOOLEAN DEFAULT false  -- 是否已处理
-  - resolved_at: TIMESTAMP  -- 处理时间
-  - resolution_note: TEXT  -- 处理备注
-
-保留字段: id, product_id, current_stock, threshold, created_at
-
-删除字段: 无
-```
-
-### 3.6 【保留】products.stock 字段
-
-```
-保留原因: 向后兼容，现有API仍在使用
-注意: 后续新API统一从inventory表读取库存
-```
-
----
-
-## 四、库存操作类型
-
-### 4.1 入库类（正数 quantity_change）
-
-| 类型代码 | 中文名 | 说明 |
-|---------|--------|------|
-| `init` | 初始化 | 产品创建时初始化库存 |
-| `purchase` | 采购入库 | 供应商送货入库 |
-| `return` | 退货入库 | 客户退货入库 |
-| `return_out` | 退货出库 | 退货给供应商 |
-| `profit` | 盘盈 | 盘点发现多了 |
-| `transfer_in` | 调拨入库 | 从其他仓库调入 |
-| `gift` | 赠送入库 | 赠送、补偿等 |
-| `adjustment` | 调整入库 | 人工调整增加 |
-
-### 4.2 出库类（负数 quantity_change）
-
-| 类型代码 | 中文名 | 说明 |
-|---------|--------|------|
-| `sale` | 销售出库 | 订单支付成功 |
-| `cancel` | 订单取消 | 取消订单释放库存（正数回滚） |
-| `loss` | 盘亏 | 盘点发现少了 |
-| `damage` | 损耗 | 商品损坏报损 |
-| `missing` | 遗失 | 商品丢失 |
-| `transfer_out` | 调拨出库 | 调往其他仓库 |
-| `gift_out` | 赠送出库 | 赠送、样品等 |
-| `adjustment` | 调整出库 | 人工调整减少 |
-
----
-
-## 五、盘点功能实现
-
-### 5.1 盘点业务流程（简单模式：无审核）
-
-```
+十、盘点功能实现
+10.1 盘点业务流程（简单模式：无审核）
 1. 创建盘点单 (inventory_checks)
    └── 状态: pending
 
@@ -1598,11 +1710,7 @@ products 表的 stock 字段:
 5. 执行库存调整
    └── quantity_before → quantity_after
    └── 记录 inventory_transactions (profit/loss)
-```
-
-### 5.2 盘点详细流程
-
-```
+10.2 盘点详细流程
 Step 1: 创建盘点单
 POST /api/inventory/checks
 {
@@ -1632,143 +1740,122 @@ POST /api/inventory/checks/:id/complete
   product_id: 1 → inventory_transactions (type: loss, quantity_change: -5)
   product_id: 2 → inventory_transactions (type: loss, quantity_change: -2)
   product_id: 3 → 无变动
-```
-
-### 5.3 盘点API清单
-
-| API | 方法 | 说明 |
-|-----|------|------|
-| `/api/inventory/checks` | GET | 获取盘点单列表 |
-| `/api/inventory/checks` | POST | 创建盘点单 |
-| `/api/inventory/checks/:id` | GET | 获取盘点单详情 |
-| `/api/inventory/checks/:id/items` | POST | 录入实际库存 |
-| `/api/inventory/checks/:id/complete` | POST | 确认盘点并调整库存 |
-| `/api/inventory/checks/:id` | DELETE | 删除/取消盘点单 |
-
----
-
-## 六、数据库操作汇总
-
-### 6.1 表操作清单
-
-| 操作 | 表名 | SQL类型 | 详细说明 |
-|------|------|--------|---------|
-| **新建** | `inventory` | CREATE TABLE | 当前库存快照表 |
-| **新建** | `inventory_transactions` | CREATE TABLE | 库存流水日志（替代inventory_logs） |
-| **新建** | `inventory_checks` | CREATE TABLE | 盘点单表 |
-| **新建** | `inventory_check_items` | CREATE TABLE | 盘点明细表 |
-| **保留** | `inventory_alerts` | ALTER TABLE | 增加字段，保留预警功能 |
-| **删除** | `inventory_logs` | DROP TABLE | 数据迁移到inventory_transactions后删除 |
-| **保留** | `products.stock` | 无 | 保留字段，向后兼容 |
-
-### 6.2 新增字段明细
-
-#### inventory_alerts 表新增字段
-```sql
-ALTER TABLE inventory_alerts ADD COLUMN old_status VARCHAR(20);
-ALTER TABLE inventory_alerts ADD COLUMN new_status VARCHAR(20);
-ALTER TABLE inventory_alerts ADD COLUMN is_resolved BOOLEAN DEFAULT 0;
-ALTER TABLE inventory_alerts ADD COLUMN resolved_at TIMESTAMP;
-ALTER TABLE inventory_alerts ADD COLUMN resolution_note TEXT;
-```
-
-### 6.3 数据迁移SQL
-
-#### 从 products.stock 迁移到 inventory
-```sql
+10.3 盘点API清单
+API	方法	说明
+/api/inventory/checks	GET	获取盘点单列表
+/api/inventory/checks	POST	创建盘点单
+/api/inventory/checks/:id	GET	获取盘点单详情
+/api/inventory/checks/:id/items	POST	录入实际库存
+/api/inventory/checks/:id/complete	POST	确认盘点并调整库存
+/api/inventory/checks/:id	DELETE	删除/取消盘点单
+十一、数据库操作汇总
+11.1 表操作清单
+操作	表名	SQL类型	详细说明
+新建	transaction_types	CREATE TABLE	变动类型字典表
+新建	reference_types	CREATE TABLE	单据类型字典表
+新建	inventory	CREATE TABLE	当前库存快照表（需增加status字段）
+新建	inventory_transactions	CREATE TABLE	库存流水日志
+新建	inventory_checks	CREATE TABLE	盘点单表
+新建	inventory_check_items	CREATE TABLE	盘点明细表
+增强	inventory_alerts	ALTER TABLE	增加字段，保留预警功能
+废弃	products.stock	无修改	保留字段但代码不再访问
+11.2 需要执行的SQL
+给 inventory 表增加 status 字段
+ALTER TABLE inventory ADD COLUMN status VARCHAR(20) DEFAULT 'in_stock';
+创建 transaction_types 表
+CREATE TABLE transaction_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  name_en VARCHAR(100),
+  direction VARCHAR(10) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+创建 reference_types 表
+CREATE TABLE reference_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  name_en VARCHAR(100),
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+11.3 数据迁移SQL
+从 products.stock 迁移到 inventory
 INSERT INTO inventory (product_id, product_name, quantity, created_at, updated_at)
-SELECT id, name, stock, datetime('now'), datetime('now') FROM products;
-```
-
-#### 从 inventory_logs 迁移到 inventory_transactions
-```sql
+SELECT id, name, COALESCE(stock, 0), datetime('now'), datetime('now') FROM products;
+从 inventory_logs 迁移到 inventory_transactions
 INSERT INTO inventory_transactions (product_id, product_name, transaction_type, quantity_change, quantity_before, quantity_after, reason, operator_id, operator_name, created_at)
-SELECT il.product_id, p.name, il.change_type, il.quantity, il.before_stock, il.after_stock, il.reason, il.operator_id, il.operator_name, il.created_at
+SELECT il.product_id, COALESCE(p.name, 'Product #' || il.product_id), il.change_type, il.quantity, il.before_stock, il.after_stock, il.reason, il.operator_id, il.operator_name, il.created_at
 FROM inventory_logs il
-JOIN products p ON il.product_id = p.id;
-```
-
-#### 删除旧的 inventory_logs 表
-```sql
+LEFT JOIN products p ON il.product_id = p.id;
+删除旧的 inventory_logs 表
 DROP TABLE inventory_logs;
-```
 
----
+十二、API改造清单
+12.1 需要修改的API
+API	修改内容	优先级
+/api/products GET	返回 inventory.quantity 和 inventory.status	P0
+/api/products/[id] GET	返回 inventory.quantity 和 inventory.status	P0
+/api/products/[id] PUT	库存变化时写入 inventory 和 inventory_transactions	P0
+/api/cart POST	检查 inventory.quantity	P0
+/api/cart/merge POST	检查 inventory.quantity	P0
+/api/orders POST	写入 inventory_transactions + 更新 inventory	P0
+/api/products/deals GET	JOIN inventory 表	P1
+/api/promotions GET	JOIN inventory 表	P1
+/api/home GET	JOIN inventory 表	P1
+/api/products/seed POST	种子数据写入 inventory 表	P1
+/api/inventory GET	改为查询 inventory 和 inventory_transactions	P1
+/api/inventory POST	支持更多 transaction_type	P1
+12.2 需要新建的API
+API	方法	说明
+/api/inventory/init	POST	初始化产品库存
+/api/inventory/transactions	GET	库存流水查询
+/api/inventory/alerts	GET	库存预警列表
+/api/inventory/alerts/:id/resolve	POST	处理预警
+/api/inventory/checks	GET	盘点单列表
+/api/inventory/checks	POST	创建盘点单
+/api/inventory/checks/:id	GET	盘点单详情
+/api/inventory/checks/:id/items	POST	录入实际库存
+/api/inventory/checks/:id/complete	POST	确认盘点并调整
+/api/inventory/checks/:id	DELETE	取消盘点单
+/api/inventory/types	GET	获取所有变动类型
+/api/inventory/reference-types	GET	获取所有单据类型
+十三、实施步骤
+阶段一：数据库结构重建
+1. ⏳ 给 inventory 表增加 status 字段
+2. ⏳ 创建 transaction_types 字典表并插入数据
+3. ⏳ 创建 reference_types 字典表并插入数据
+4. ⏳ 删除 inventory_logs 表
+阶段二：API改造
+1. ⏳ 修改 /api/products GET - 读inventory表
+2. ⏳ 修改 /api/products/[id] GET - 读inventory表
+3. ⏳ 修改 /api/products/[id] PUT - 写inventory表
+4. ⏳ 修改 /api/cart - 检查inventory表
+5. ⏳ 修改 /api/cart/merge - 检查inventory表
+6. ⏳ 修改 /api/orders POST - 写inventory_transactions
+7. ⏳ 修改 /api/products/deals - JOIN inventory表
+8. ⏳ 修改 /api/promotions - JOIN inventory表
+9. ⏳ 修改 /api/home - JOIN inventory表
+10. ⏳ 修改 /api/products/seed - 写inventory表
+11. ⏳ 修改 /api/inventory - 支持新表和新类型
+阶段三：新功能开发
+1. ⏳ 开发 /api/inventory/init - 初始化API
+2. ⏳ 开发 /api/inventory/transactions - 流水查询
+3. ⏳ 开发 /api/inventory/alerts - 预警管理
+4. ⏳ 开发盘点相关API
+5. ⏳ 开发库存管理后台页面
+阶段四：前端修改
+1. ⏳ 修改 /src/components/FeaturedProducts.tsx - 删除前端库存判断逻辑，使用API返回的status
 
-## 七、API改造清单
-
-### 7.1 需要修改的API
-
-| API | 修改内容 | 优先级 |
-|-----|---------|--------|
-| `/api/products` GET | 返回 `inventory.quantity` 替代 `products.stock` | P0 |
-| `/api/cart` POST | 检查 `inventory.quantity` | P0 |
-| `/api/orders` POST | 写入 `inventory_transactions` | P0 |
-| `/api/inventory` GET | 改为查询 `inventory` 和 `inventory_transactions` | P1 |
-| `/api/inventory` POST | 支持更多 `transaction_type` | P1 |
-
-### 7.2 需要新建的API
-
-| API | 方法 | 说明 |
-|-----|------|------|
-| `/api/inventory/init` | POST | 初始化产品库存（从products迁移） |
-| `/api/inventory/transactions` | GET | 库存流水查询 |
-| `/api/inventory/alerts` | GET | 库存预警列表 |
-| `/api/inventory/alerts/:id/resolve` | POST | 处理预警 |
-| `/api/inventory/checks` | GET | 盘点单列表 |
-| `/api/inventory/checks` | POST | 创建盘点单 |
-| `/api/inventory/checks/:id` | GET | 盘点单详情 |
-| `/api/inventory/checks/:id/items` | POST | 录入实际库存 |
-| `/api/inventory/checks/:id/complete` | POST | 确认盘点并调整 |
-| `/api/inventory/checks/:id` | DELETE | 取消盘点单 |
-
----
-
-## 八、实施步骤
-
-### 阶段一：数据库结构重建
-
-1. 创建 `inventory` 表
-2. 创建 `inventory_transactions` 表
-3. 创建 `inventory_checks` 表
-4. 创建 `inventory_check_items` 表
-5. 修改 `inventory_alerts` 表（增加字段）
-6. 数据迁移：products.stock → inventory
-7. 数据迁移：inventory_logs → inventory_transactions
-8. 删除 `inventory_logs` 表
-
-### 阶段二：API改造
-
-1. 修改 `/api/products` GET - 读inventory表
-2. 修改 `/api/cart` - 检查inventory表
-3. 修改 `/api/orders` POST - 写inventory_transactions
-4. 修改 `/api/inventory` GET - 支持新表
-5. 修改 `/api/inventory` POST - 支持更多类型
-
-### 阶段三：新功能开发
-
-1. 开发 `/api/inventory/init` - 初始化API
-2. 开发 `/api/inventory/transactions` - 流水查询
-3. 开发 `/api/inventory/alerts` - 预警管理
-4. 开发盘点相关API
-5. 开发库存管理后台页面
-
----
-
-## 九、库存预警功能
-
-### 9.1 预警触发条件
-
-```
+十四、库存预警功能
+14.1 预警触发条件
 当 inventory.quantity <= inventory.low_stock_threshold 时:
   → 创建/更新 inventory_alerts 记录
   → alert_type = 'low_stock'
   → status = 'pending'
-```
-
-### 9.2 预警处理流程
-
-```
+14.2 预警处理流程
 1. 系统自动检测库存低于阈值
    ↓
 2. 创建预警记录
@@ -1780,42 +1867,27 @@ DROP TABLE inventory_logs;
 5. 标记预警为已解决
    ↓
 6. 如果库存继续低于阈值，再次触发预警
-```
-
-### 9.3 预警相关API
-
-| API | 方法 | 说明 |
-|-----|------|------|
-| `/api/inventory/alerts` | GET | 获取预警列表 |
-| `/api/inventory/alerts/:id/resolve` | POST | 处理预警 |
-
----
-
-## 十、总结
-
-### 设计决策
-
-| 问题 | 决策 |
-|------|------|
-| 是否需要预留库存 | ❌ 不需要，简化设计 |
-| 盘点是否需要审核 | ❌ 不需要，盘点后直接调整 |
-| 库存预警阈值 | ✅ 每个商品单独设置 (low_stock_threshold) |
-| 删除inventory_logs时机 | ✅ 立即删除（数据已迁移） |
-
-### 新表结构
-
-1. `inventory` - 当前库存快照
-2. `inventory_transactions` - 库存流水日志
-3. `inventory_checks` - 盘点单
-4. `inventory_check_items` - 盘点明细
-5. `inventory_alerts` - 预警记录（增强）
-
-### 库存操作类型
-
-入库: init, purchase, return, return_out, profit, transfer_in, gift, adjustment
-出库: sale, cancel, loss, damage, missing, transfer_out, gift_out, adjustment
-
-### 盘点流程
-
-简单模式（无审核）:
-创建盘点单 → 录入实际库存 → 自动计算差异 → 确认并调整库存 → 完成
+14.3 预警相关API
+API	方法	说明
+/api/inventory/alerts	GET	获取预警列表
+/api/inventory/alerts/:id/resolve	POST	处理预警
+十五、总结
+设计决策
+问题	决策
+transaction_type	✅ 存数据库字典表 transaction_types
+reference_type	✅ 存数据库字典表 reference_types
+库存状态 status	✅ 存在 inventory.status 字段
+是否需要预留库存	❌ 不需要，简化设计
+盘点是否需要审核	❌ 不需要，盘点后直接调整
+库存预警阈值	✅ 每个商品单独设置 (low_stock_threshold)
+products.stock	✅ 保留字段但废弃代码访问
+核心原则
+单一数据源：inventory 表是库存的唯一真实来源 后端计算：所有库存状态、预警判断都在后端完成 前端渲染：前端只负责展示后端返回的数据 字典表管理：类型定义不硬编码，存数据库字典表
+表结构汇总
+1. transaction_types - 变动类型字典表（新建）
+2. reference_types - 单据类型字典表（新建）
+3. inventory - 当前库存快照（需增加status字段）
+4. inventory_transactions - 库存流水日志
+5. inventory_checks - 盘点单
+6. inventory_check_items - 盘点明细
+7. inventory_alerts - 预警记录（增强）

@@ -348,7 +348,12 @@ export default function CheckoutPage() {
               <button
                 onClick={handlePayment}
                 disabled={isLoading}
-                className="w-full py-3 bg-[#CA8A04] text-white rounded-lg hover:bg-[#B47C03] transition-colors disabled:opacity-50 font-['Noto_Sans_Arabic']"
+                className="w-full py-3 rounded-lg font-medium transition-all hover:opacity-90 disabled:opacity-50 font-['Noto_Sans_Arabic']"
+                style={{
+                  backgroundColor: 'var(--btn-primary-bg)',
+                  color: 'var(--btn-primary-text)',
+                  border: '1px solid var(--btn-primary-border)'
+                }}
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">

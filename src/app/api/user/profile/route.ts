@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
 
-    const user_id = authResult.user?.id;
+    const user_id = authResult.user?.userId;
 
     // Get user profile
     const result = await query(
@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest) {
       return authResult.response;
     }
 
-    const user_id = authResult.user?.id;
+    const user_id = authResult.user?.userId;
     const data = await request.json();
 
     // Exclude sensitive fields

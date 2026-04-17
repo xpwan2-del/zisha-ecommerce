@@ -197,6 +197,27 @@ export async function POST(request: NextRequest) {
           product.discount
         ]
       );
+
+      // 写入 inventory 表
+      const calculateSeedStatusId = (qty: number): number => {
+        if (qty <= 0) return 4;
+        if (qty <= 5) return 3;
+        if (qty <= 10) return 2;
+        return 1;
+      };
+      const seedStatusId = calculateSeedStatusId(product.stock || 0);
+      await query(
+        `INSERT INTO inventory (product_id, product_name, quantity, status_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`,
+        [product.id, product.name, product.stock || 0, seedStatusId]
+      );
+
+      // 写入 inventory_transactions 表
+      await query(
+        `INSERT INTO inventory_transactions (product_id, product_name, transaction_type, quantity_change, quantity_before, quantity_after, reason, operator_name, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        [product.id, product.name, 'init', product.stock || 0, 0, product.stock || 0, 'Seed data initialization', 'system']
+      );
     }
 
     // Commit transaction

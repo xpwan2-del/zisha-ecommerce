@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     const { product_id, rating, comment, comment_en, comment_ar, images } = data;
     
     // 从JWT中获取user_id
-    const user_id = authResult.user?.id;
+    const user_id = authResult.user?.userId;
     
     const result = await query(
       'INSERT INTO reviews (product_id, user_id, rating, comment, comment_en, comment_ar, images) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *',
