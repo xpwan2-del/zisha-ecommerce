@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Initialized ${insertedCount} configs`,
-      themes: [...new Set(allConfigs.map(c => c.theme))]
+      themes: Array.from(new Set(allConfigs.map(c => c.theme)))
     });
   } catch (error) {
     console.error("Failed to initialize configs:", error);
