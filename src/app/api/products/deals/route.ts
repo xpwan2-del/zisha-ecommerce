@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
 
       const calculateFinalPrice = (originalPrice: number, promos: any[]) => {
         if (promos.length === 0) return originalPrice;
-        const exclusive = promos.find(p => p.can_stack === 0);
+        const exclusive = promos.find(p => p.can_stack === 1);
         if (exclusive) {
           return originalPrice * (1 - exclusive.discount_percent / 100);
         }
@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
 
       const calculateDiscount = (promos: any[]) => {
         if (promos.length === 0) return { discount: 0, formula: '' };
-        const exclusive = promos.find(p => p.can_stack === 0);
+        const exclusive = promos.find(p => p.can_stack === 1);
         if (exclusive) {
           return {
             discount: exclusive.discount_percent,

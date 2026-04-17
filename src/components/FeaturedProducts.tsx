@@ -231,15 +231,12 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     const promos = product.promotions || [];
 
     if (promos.length > 0) {
-      // 检查是否有独占促销（can_stack=0）
-      const exclusive = promos.find((p: any) => p.can_stack === 0);
+      const exclusive = promos.find((p: any) => p.can_stack === 1);
       let totalDiscount;
       let formula = '';
 
       if (exclusive) {
-        // 有独占促销，只用priority最小的（优先级最高）的那个
-        // 按priority排序，选择最小的
-        const sortedExclusives = promos.filter((p: any) => p.can_stack === 0).sort((a: any, b: any) => a.priority - b.priority);
+        const sortedExclusives = promos.filter((p: any) => p.can_stack === 1).sort((a: any, b: any) => a.priority - b.priority);
         const topExclusive = sortedExclusives[0];
         totalDiscount = topExclusive.discount_percent;
         formula = `${topExclusive.discount_percent}%`;
