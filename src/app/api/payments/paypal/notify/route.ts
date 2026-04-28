@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
 import { PaymentService } from '@/lib/payment/PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
+import { getPaymentErrorMapping, resolvePaymentError } from '@/lib/payment/errorCodeMapper';
 
 /**
  * ============================================================
@@ -122,28 +123,24 @@ async function capturePayPalOrder(accessToken: string, orderId: string, isSandbo
  * getPayPalErrorMessage - 从数据库获取错误提示
  */
 async function getPayPalErrorMessage(errorCode: string, lang: string): Promise<{ code: string; type: string; message: string }> {
-  const result = await query(
-    'SELECT original_code, unified_code, error_type, message_zh, message_en, message_ar FROM payment_error_codes WHERE platform = ? AND original_code = ? AND is_active = 1',
-    ['paypal', errorCode]
-  );
-
-  if (result.rows.length > 0) {
-    const row = result.rows[0];
-    const langField = `message_${lang}` as 'message_zh' | 'message_en' | 'message_ar';
+  const mapping = await getPaymentErrorMapping('paypal', errorCode);
+  if (!mapping) {
     return {
-      code: row.unified_code,
-      type: row.error_type,
-      message: (row[langField] as string) || row.message_zh
+      code: 'UNKNOWN_ERROR',
+      type: 'fail',
+      message: lang === 'zh' ? '支付失败，请稍后重试' :
+              lang === 'ar' ? 'فشل الدفع، يرجى المحاولة لاحقًا' :
+              'Payment failed, please retry later'
     };
   }
 
-  return {
-    code: 'UNKNOWN_ERROR',
-    type: 'fail',
-    message: lang === 'zh' ? '支付失败，请稍后重试' :
-            lang === 'ar' ? 'فشل الدفع، يرجى المحاولة لاحقًا' :
-            'Payment failed, please retry later'
-  };
+  const msg = lang === 'zh'
+    ? (mapping.messageZh || mapping.messageEn || mapping.messageAr || mapping.originalCode)
+    : lang === 'ar'
+      ? (mapping.messageAr || mapping.messageEn || mapping.messageZh || mapping.originalCode)
+      : (mapping.messageEn || mapping.messageZh || mapping.messageAr || mapping.originalCode);
+
+  return { code: mapping.unifiedCode, type: mapping.errorType, message: msg };
 }
 
 /**
@@ -324,21 +321,6 @@ export async function POST(request: NextRequest) {
     const responseStatus = captureResponse.status;
     const responseData = await captureResponse.json();
 
-    // 保存支付日志
-    await savePayPalLog(
-      order.id,
-      order_number,
-      platformOrderId,
-      responseStatus,
-      responseData.name || null,
-      responseData.details?.[0]?.issue || null,
-      responseData.details?.[0]?.description || responseData.message || null,
-      JSON.stringify(responseData),
-      false,
-      parseFloat(order.final_amount),
-      'USD'
-    );
-
     logMonitor('PAYMENTS', 'INFO', {
       action: 'PAYPAL_RESPONSE',
       httpStatus: responseStatus,
@@ -346,41 +328,45 @@ export async function POST(request: NextRequest) {
       errorIssue: responseData.details?.[0]?.issue
     });
 
-    // 检查支付状态并处理
-    const errorIssue = responseData.details?.[0]?.issue;
-    let errorCode = 'UNKNOWN_ERROR';
-    let isSuccess = false;
+    const issues: Array<{ issue: string; description?: string }> = Array.isArray(responseData?.details)
+      ? responseData.details.map((d: any) => ({ issue: d.issue, description: d.description }))
+      : [];
 
-    // 根据 PayPal 返回的 issue 确定错误码
-    if (errorIssue === 'ORDER_ALREADY_CAPTURED') {
-      // 订单已支付成功
-      isSuccess = true;
-      errorCode = 'ORDER_ALREADY_CAPTURED';
-    } else if (responseStatus === 200 || responseStatus === 201 || responseData.status === 'COMPLETED') {
-      // 支付成功
-      isSuccess = true;
-      errorCode = 'COMPLETED';
-    } else if (errorIssue === 'ORDER_NOT_APPROVED') {
-      errorCode = 'ORDER_NOT_APPROVED';
-    } else if (errorIssue === 'INSTRUMENT_DECLINED') {
-      errorCode = 'INSTRUMENT_DECLINED';
-    } else if (errorIssue === 'PAYER_CANNOT_PAY') {
-      errorCode = 'PAYER_CANNOT_PAY';
-    } else if (errorIssue === 'TRANSACTION_REFUSED' || errorIssue === 'PAYER_RISK') {
-      errorCode = errorIssue === 'PAYER_RISK' ? 'TRANSACTION_REFUSED_BY_PAYER_RISK' : 'TRANSACTION_REFUSED';
-    } else if (errorIssue === 'PAYER_ACTION_REQUIRED') {
-      errorCode = 'PAYER_ACTION_REQUIRED';
-    } else if (responseStatus === 422) {
-      errorCode = 'HTTP_422';
-    } else if (responseStatus === 500 || responseStatus === 502 || responseStatus === 503) {
-      errorCode = 'HTTP_500';
-    } else if (responseStatus === 401) {
-      errorCode = 'HTTP_401';
-    } else if (responseStatus === 403) {
-      errorCode = 'HTTP_403';
-    } else if (responseStatus === 404) {
-      errorCode = 'HTTP_404';
-    }
+    const errorIssue = issues[0]?.issue;
+    const alreadyCaptured = issues.some((i) => i.issue === 'ORDER_ALREADY_CAPTURED');
+    const isSuccess = responseStatus === 200 ||
+      responseStatus === 201 ||
+      responseData.status === 'COMPLETED' ||
+      alreadyCaptured;
+
+    const errorCode = isSuccess
+      ? (alreadyCaptured ? 'ORDER_ALREADY_CAPTURED' : 'COMPLETED')
+      : 'UNKNOWN_ERROR';
+
+    const resolved = isSuccess
+      ? null
+      : await resolvePaymentError({
+          platform: 'paypal',
+          lang: (lang as any) || 'zh',
+          httpStatus: responseStatus,
+          name: responseData?.name,
+          issues,
+          messageEn: responseData?.message
+        });
+
+    await savePayPalLog(
+      order.id,
+      order_number,
+      platformOrderId,
+      responseStatus,
+      responseData.name || null,
+      resolved?.originalCode || null,
+      responseData.details?.[0]?.description || responseData.message || null,
+      JSON.stringify(responseData),
+      isSuccess,
+      parseFloat(order.final_amount),
+      'USD'
+    );
 
     // 如果支付成功，更新订单状态
     if (isSuccess) {
@@ -465,24 +451,35 @@ export async function POST(request: NextRequest) {
     }
 
     // 支付失败，获取错误提示
-    const errorInfo = await getPayPalErrorMessage(errorCode, lang);
+    if (!resolved) {
+      const errorInfo = await getPayPalErrorMessage('UNKNOWN_ERROR', lang);
+      return NextResponse.json({
+        success: false,
+        status: 'fail',
+        error_code: 'UNKNOWN_ERROR',
+        message: errorInfo.message
+      }, { status: 500 });
+    }
+
+    const errorInfo = await getPayPalErrorMessage(resolved.originalCode, lang);
 
     logMonitor('PAYMENTS', 'PAYMENT_FAILED', {
       action: 'PAYMENT_FAILED',
       orderId: order.id,
       order_number,
-      errorCode,
+      originalCode: resolved.originalCode,
+      unifiedCode: resolved.unifiedCode,
       errorIssue
     });
 
     return NextResponse.json({
       success: false,
       status: 'fail',
-      error_code: errorCode,
+      error_code: resolved.unifiedCode,
       message: errorInfo.message,
-      message_zh: (await getPayPalErrorMessage(errorCode, 'zh')).message,
-      message_en: (await getPayPalErrorMessage(errorCode, 'en')).message,
-      message_ar: (await getPayPalErrorMessage(errorCode, 'ar')).message
+      message_zh: (await getPayPalErrorMessage(resolved.originalCode, 'zh')).message,
+      message_en: (await getPayPalErrorMessage(resolved.originalCode, 'en')).message,
+      message_ar: (await getPayPalErrorMessage(resolved.originalCode, 'ar')).message
     }, { status: 400 });
 
   } catch (error: any) {

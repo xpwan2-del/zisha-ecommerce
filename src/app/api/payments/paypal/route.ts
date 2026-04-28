@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { PaymentService } from '@/lib/payment/PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
+import { resolvePaymentError } from '@/lib/payment/errorCodeMapper';
 
 const PAYPAL_API_BASE_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_BASE_LIVE = 'https://api-m.paypal.com';
@@ -23,31 +24,6 @@ function getPayPalConfig() {
     clientSecret: configJson.client_secret || '',
     isSandbox: config.is_sandbox,
     apiBase: config.is_sandbox ? PAYPAL_API_BASE_SANDBOX : PAYPAL_API_BASE_LIVE
-  };
-}
-
-async function getPayPalErrorInfo(errorCode: string, lang: string): Promise<{ errorType: string; message: string }> {
-  const result = await query(
-    'SELECT error_type, message_zh, message_en, message_ar FROM paypal_error_codes WHERE error_code = ? AND is_active = 1',
-    [errorCode]
-  );
-
-  if (result.rows?.length > 0) {
-    const row = result.rows[0];
-    const messages: Record<string, string> = {
-      zh: row.message_zh,
-      en: row.message_en,
-      ar: row.message_ar
-    };
-    return {
-      errorType: row.error_type,
-      message: messages[lang] || messages['zh'] || errorCode
-    };
-  }
-
-  return {
-    errorType: 'fail',
-    message: errorCode
   };
 }
 
@@ -309,37 +285,30 @@ export async function POST(req: NextRequest) {
       error: String(error)
     });
 
-    let errorCode = 'UNKNOWN_ERROR';
-    let errorType = 'fail';
-    let errorMessage = '支付创建失败';
-
-    if (error.status && error.error) {
-      const httpStatusCode = `HTTP_${error.status}`;
-      errorCode = error.error.name || httpStatusCode;
-
-      const errorInfo = await getPayPalErrorInfo(errorCode, lang);
-      errorType = errorInfo.errorType;
-      errorMessage = errorInfo.message;
-
-      if (error.error.details && error.error.details.length > 0) {
-        errorMessage += ` (${error.error.details.map((d: any) => `${d.field}: ${d.issue}`).join(', ')})`;
-      }
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
+    const resolved = await resolvePaymentError({
+      platform: 'paypal',
+      lang: (lang as any) || 'zh',
+      httpStatus: error?.status,
+      name: error?.error?.name,
+      issues: Array.isArray(error?.error?.details)
+        ? error.error.details.map((d: any) => ({ issue: d.issue, description: d.description }))
+        : [],
+      messageEn: error?.error?.message || error?.message
+    });
 
     logMonitor('PAYMENTS', 'ERROR', {
       action: 'PAYPAL_ERROR_INFO',
-      errorCode,
-      errorType,
-      errorMessage
+      originalCode: resolved.originalCode,
+      unifiedCode: resolved.unifiedCode,
+      errorType: resolved.errorType,
+      message: resolved.message
     });
 
     return NextResponse.json({
       success: false,
-      error: errorCode,
-      error_type: errorType,
-      message: errorMessage
+      error: resolved.unifiedCode,
+      error_type: resolved.errorType,
+      message: resolved.message
     }, { status: error.status || 500 });
   }
 }

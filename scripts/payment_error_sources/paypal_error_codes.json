@@ -1,0 +1,18 @@
+[
+  { "code_kind": "ISSUE", "code": "INSTRUMENT_DECLINED", "unified_code": "CARD_DECLINED", "error_type": "fail", "priority": 40, "message_en": "Payment method declined, please change card." },
+  { "code_kind": "ISSUE", "code": "ORDER_NOT_APPROVED", "unified_code": "PAYMENT_NOT_COMPLETED", "error_type": "fail", "priority": 50, "message_en": "Payment not completed, please retry." },
+  { "code_kind": "ISSUE", "code": "ORDER_ALREADY_CAPTURED", "unified_code": "SUCCESS", "error_type": "success", "priority": 90, "message_en": "Order already paid." },
+  { "code_kind": "ISSUE", "code": "PAYER_ACTION_REQUIRED", "unified_code": "RETRY", "error_type": "retry", "priority": 60, "message_en": "Buyer action required, please refresh." },
+  { "code_kind": "ISSUE", "code": "PAYER_CANNOT_PAY", "unified_code": "ACCOUNT_ERROR", "error_type": "fail", "priority": 30, "message_en": "Account cannot complete payment, contact PayPal support." },
+  { "code_kind": "ISSUE", "code": "TRANSACTION_REFUSED", "unified_code": "TRANSACTION_DECLINED", "error_type": "fail", "priority": 20, "message_en": "Transaction refused, please retry later." },
+  { "code_kind": "ISSUE", "code": "PAYER_RISK", "unified_code": "RISK_CONTROL", "error_type": "fail", "priority": 15, "message_en": "Transaction risk detected, please change payment method." },
+  { "code_kind": "ISSUE", "code": "USER_CANCEL", "unified_code": "USER_CANCEL", "error_type": "cancel", "priority": 5, "message_en": "User cancelled payment." },
+
+  { "code_kind": "NAME", "code": "UNPROCESSABLE_ENTITY", "unified_code": "INVALID_REQUEST", "error_type": "fail", "priority": 10, "message_en": "The requested action could not be performed, semantically incorrect, or failed business validation." },
+  { "code_kind": "NAME", "code": "INVALID_REQUEST", "unified_code": "INVALID_REQUEST", "error_type": "fail", "priority": 10, "message_en": "Request is not well-formed, syntactically incorrect, or violates schema." },
+  { "code_kind": "NAME", "code": "AUTHENTICATION_FAILURE", "unified_code": "CONFIG_ERROR", "error_type": "fail", "priority": 1, "message_en": "Authentication failed. Check client credentials." },
+  { "code_kind": "NAME", "code": "PERMISSION_DENIED", "unified_code": "PERMISSION_ERROR", "error_type": "fail", "priority": 1, "message_en": "Permission denied. Check merchant account permissions." },
+  { "code_kind": "NAME", "code": "INTERNAL_SERVER_ERROR", "unified_code": "SERVER_ERROR", "error_type": "retry", "priority": 5, "message_en": "PayPal server error, please retry later." },
+  { "code_kind": "NAME", "code": "SERVICE_UNAVAILABLE", "unified_code": "SERVER_ERROR", "error_type": "retry", "priority": 5, "message_en": "Service unavailable, please retry later." }
+]
+
