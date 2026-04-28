@@ -18,6 +18,9 @@ interface ProductInfo {
   discount_amount: number;
   currency: string;
   price_usd: number;
+  price_cny?: number;
+  price_aed?: number;
+  original_price_usd?: number;
   stock: number;
 }
 
@@ -54,8 +57,8 @@ interface PriceData {
   total_aed: number;
   total_usd: number;
   total_cny: number;
-  display_currency: string;
-  display_total: number;
+  display_currency?: string;
+  display_total?: number;
   address?: Address;
   coupon?: {
     ids: number[];
@@ -74,7 +77,7 @@ interface PriceData {
     discount: number;
     percent: number;
   }>;
-  payment_method: string;
+  payment_method?: string;
 }
 
 function QuickOrderContent() {
@@ -169,7 +172,7 @@ function QuickOrderContent() {
           setClaimableCoupons(data.data.coupons?.claimable || []);
           setOrderStatus(data.data.order_status || 'pending');
 
-          const defaultAddress = data.data.addresses.find((a: Address) => a.is_default === 1 || a.is_default === true);
+          const defaultAddress = data.data.addresses.find((a: Address) => a.is_default === 1);
           if (defaultAddress) {
             setSelectedAddressId(defaultAddress.id);
           } else if (data.data.addresses.length > 0) {
@@ -189,7 +192,6 @@ function QuickOrderContent() {
               total_cny: d.price_cny ?? 652.1,
               total_aed: d.price_aed ?? 310,
               coupon: undefined,
-              details: [],
               promotions: d.product_promotions || []
             });
           }
@@ -241,7 +243,6 @@ function QuickOrderContent() {
             total_cny: d.total_cny ?? d.price_cny ?? 652.1,
             total_aed: d.total_aed ?? d.price_aed ?? 310,
             coupon: d.coupon,
-            details: d.coupon?.details || [],
             promotions: d.product_promotions || []
           });
         }

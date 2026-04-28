@@ -330,7 +330,6 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
 
   const handleAddNewAddress = () => {
     setShowNewAddressForm(true);
-    setErrors({});
   };
 
   const handleCancelEdit = () => {

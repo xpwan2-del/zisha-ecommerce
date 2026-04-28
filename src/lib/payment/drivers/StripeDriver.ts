@@ -40,12 +40,22 @@ export class StripeDriver implements IPaymentDriver {
 
   async processCallback(params: Record<string, string>): Promise<CallbackResult> {
     try {
+      let orderNumber: string | undefined;
+      if (params.metadata) {
+        try {
+          const meta = JSON.parse(params.metadata) as { order_number?: string };
+          orderNumber = meta.order_number;
+        } catch {
+          orderNumber = undefined;
+        }
+      }
+
       return {
         success: params.status === 'succeeded',
-        orderNumber: params.metadata?.order_number,
+        orderNumber: orderNumber || params.order_number || params.orderNumber,
         transactionId: params.id,
         status: params.status,
-        amount: (params.amount_received || 0) / 100
+        amount: Number(params.amount_received || params.amount || 0) / 100
       };
     } catch (error: any) {
       return { success: false, error: error.message };

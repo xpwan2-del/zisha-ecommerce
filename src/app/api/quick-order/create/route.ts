@@ -297,7 +297,9 @@ export async function POST(request: NextRequest) {
     const address = addressResult.rows[0];
     const shippingFee = await calculateShipping(address.city);
 
-    const subtotal = order.total_amount || 0;
+    const subtotal = Number(order.total_amount) || 0;
+    const originalTotal = Number(order.total_original_price) || 0;
+    const productDiscount = Math.max(0, originalTotal - subtotal);
     let couponDiscount = 0;
     let couponIdsJson = '[]';
 

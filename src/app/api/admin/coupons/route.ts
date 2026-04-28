@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       [code.trim()]
     );
 
-    if (checkResult.rows.length > 0) {
+    if ((checkResult.rows?.length || 0) > 0) {
       logMonitor('ORDERS', 'VALIDATION_FAILED', { reason: 'Coupon code already exists', code });
       return createErrorResponse('DUPLICATE_CODE', 400);
     }

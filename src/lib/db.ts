@@ -101,7 +101,7 @@ export async function query(sql: string, params: any[] = []) {
   if (sqlUpper === 'BEGIN' || sqlUpper.startsWith('BEGIN ') ||
       sqlUpper === 'COMMIT' || sqlUpper === 'ROLLBACK' || sqlUpper === 'END') {
     // sql.js 内存数据库自动保存，跳过事务控制语句
-    return { changes: 0, lastInsertRowid: null };
+    return { rows: [], changes: 0, lastInsertRowid: null };
   }
 
   // 判断操作类型
