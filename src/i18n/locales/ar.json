@@ -1,0 +1,213 @@
+{
+  "hero": {
+    "title": "فخار زيشا الأصلي",
+    "subtitle": "أدوات شاي عالية الجودة من الصين",
+    "cta": "تسوق الآن",
+    "description": "تجربتك فن ثقافة الشاي الصينية التقليدية مع فن خار زيشا الأصلي لدينا، المصنوع يدويًا بواسطة حرفيين خبراء ذوي تراث يمتد لقرون.",
+    "explore": "استكشف المجموعة"
+  },
+  "categories": {
+    "title": "الأقسام",
+    "items": ["إبوات الشاي", "أكواب", "إكسسوارات", "مجموعات"]
+  },
+  "products": {
+    "title": "المنتجات المميزة",
+    "viewAll": "عرض الكل",
+    "no_products": "لم يتم العثور على منتجات",
+    "next": "التالي",
+    "prev": "السابق",
+    "all": "الكل",
+    "search": "بحث",
+    "search_placeholder": "البحث عن المنتجات...",
+    "sort": "ترتيب",
+    "stock": "في المخزون: {{count}}",
+    "view": "عرض",
+    "limited_offer": "عرض محدود",
+    "sold": "تم بيع {{count}}",
+    "filters": "مرشحات",
+    "price_range": "نطاق السعر",
+    "materials": "المواد",
+    "capacity": "السعة",
+    "apply_filters": "تطبيق المرشحات",
+    "specifications": "المواصفات",
+    "service_commitments": "التعهدات الخدمية",
+    "7day_return": "استرداد لمدة 7 أيام",
+    "free_shipping": "شحن مجاني",
+    "authentic_guarantee": "ضمان أصالة",
+    "secure_payment": "دفع آمن",
+    "shipping_info": "معلومات الشحن",
+    "after_sale": "بعد البيع",
+    "weight": "الوزن",
+    "size": "الحجم",
+    "color": "اللون",
+    "other": "آخر",
+    "leave_review": "اترك تقييمًا",
+    "rating": "التقييم",
+    "comment": "التعليق",
+    "add_to_cart": "أضف إلى السلة",
+    "buy_now": "اشتر الآن",
+    "description": "الوصف",
+    "reviews": "التقييمات"
+  },
+  "about": {
+    "title": "عن فخار زيشا",
+    "description": "فخار زيشا هو شكل فني صيني تقليدي يعود إلى أكثر من 600 عام. مصنوع من طين أرجواني خاص يوجد فقط في إي شينغ، مقاطعة جيانغ سو، تُقدر هذه الإبوات بخصائصها الفريدة التي تعزز نكهة الشاي."
+  },
+  "testimonials": {
+    "title": "آراء العملاء",
+    "items": [
+      {
+        "name": "علي",
+        "location": "دبي",
+        "text": "جودة إبوة زيشا استثنائية. قد улучزت بشكل كبير تجربتي في شرب الشاي."
+      },
+      {
+        "name": "سارة",
+        "location": "أبو ظبي",
+        "text": "حرفية جميلة وتسليم سريع. نوصي به بشدة!"
+      }
+    ]
+  },
+  "contact": {
+    "title": "اتصل بنا",
+    "form": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "message": "الرسالة",
+      "submit": "إرسال الرسالة"
+    }
+  },
+  "footer": {
+    "links": {
+      "home": "الرئيسية",
+      "shop": "المتجر",
+      "about": "عنّا",
+      "contact": "اتصل بنا"
+    },
+    "copyright": "© 2024 فخار زيشا. جميع الحقوق محفوظة."
+  },
+  "login": {
+    "title": "تسجيل الدخول إلى حسابك",
+    "subtitle": "مرحبا بعودتك! يرجى تسجيل الدخول للمتابعة",
+    "email": "عنوان البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "remember": "تذكرني",
+    "forgot_password": "نسيت كلمة المرور؟",
+    "sign_in": "تسجيل الدخول",
+    "no_account": "ليس لديك حساب؟",
+    "sign_up": "إنشاء حساب",
+    "or": "أو استمرار باستخدام"
+  },
+  "register": {
+    "title": "إنشاء حسابك",
+    "subtitle": "انضم إلى مجتمعنا وابدأ التسوق",
+    "name": "الاسم الكامل",
+    "email": "عنوان البريد الإلكتروني",
+    "phone": "رقم الهاتف",
+    "password": "كلمة المرور",
+    "confirm_password": "تأكيد كلمة المرور",
+    "terms": "أوافق على الشروط والظروف",
+    "sign_up": "إنشاء حساب",
+    "have_account": "هل لديك حساب بالفعل؟",
+    "sign_in": "تسجيل الدخول"
+  },
+  "account": {
+    "title": "حسابي",
+    "profile": "الملف الشخصي",
+    "orders": "الطلبات",
+    "custom_orders": "الطلبات المخصصة",
+    "referral": "برنامج الإحالة",
+    "addresses": "العناوين",
+    "logout": "تسجيل الخروج",
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "level": "مستوى العضوية",
+    "level_regular": "عادي",
+    "level_silver": "فضي",
+    "level_gold": "ذهبي",
+    "level_platinum": "بلاتينيوم",
+    "points": "نقاط مكافأة",
+    "total_spent": "إجمالي الإنفاق",
+    "edit_profile": "تحرير الملف الشخصي",
+    "order_number": "طلب #{{number}}",
+    "order_date": "تاريخ: {{date}}",
+    "status_completed": "مكتمل",
+    "status_pending": "قيد الانتظار",
+    "status_cancelled": "ملغي",
+    "status_producing": "قيد الإنتاج",
+    "status_designing": "قيد التصميم",
+    "items": "{{count}} عناصر",
+    "view_order": "عرض الطلب",
+    "pay_now": "ادفع الآن",
+    "custom_order_number": "طلب مخصص #{{number}}",
+    "customization": "تخصيص",
+    "teapot_type": "نوع الإبوة",
+    "material": "المادة",
+    "capacity": "السعة",
+    "estimated_delivery": "تقدير التسليم: {{date}}",
+    "track_order": "تتبع الطلب",
+    "referral_program": "برنامج الإحالة",
+    "referral_description": "أوصي بأصدقائك وأسرتك بزيارة متجرنا، وستحصل على مكافأة لكل إحالة ناجحة!",
+    "your_referral_code": "كود الإحالة الخاص بك",
+    "referral_link": "رابط الإحالة",
+    "copy": "نسخ",
+    "referral_stats": "إحصائيات الإحالة",
+    "referred_users": "المستخدمين الم引荐",
+    "successful_orders": "الطلبات الناجحة",
+    "earned_rewards": "المكافآت المكتسبة"
+  },
+  "cart": {
+    "title": "عربة التسوق",
+    "empty": "عربتك فارغة",
+    "empty_description": "يبدو أنك لم تضف أي عناصر إلى عربة التسوق بعد.",
+    "shop_now": "تسوق الآن",
+    "items": "العناصر",
+    "continue_shopping": "استمر في التسوق",
+    "clear_cart": "مسح العربة",
+    "order_summary": "ملخص الطلب",
+    "subtotal": "الاجمالي الفرعي",
+    "shipping": "التوصيل",
+    "tax": "الضريبة",
+    "total": "الاجمالي",
+    "checkout": "الذهاب إلى الدفع",
+    "processing": "جاري المعالجة...",
+    "secure_checkout": "دفع آمن، دفع مشفر",
+    "discount": "كود الخصم",
+    "enter_code": "أدخل كود الخصم",
+    "apply": "تطبيق"
+  },
+  "checkout": {
+    "title": "الدفع",
+    "shipping_address": "عنوان التوصيل",
+    "payment_method": "طريقة الدفع",
+    "order_summary": "ملخص الطلب",
+    "name": "الاسم الكامل",
+    "email": "عنوان البريد الإلكتروني",
+    "address": "العنوان",
+    "enter_address": "أدخل عنوانك",
+    "city": "المدينة",
+    "enter_city": "أدخل مدينتك",
+    "country": "الدولة",
+    "subtotal": "الاجمالي الفرعي",
+    "shipping": "التوصيل",
+    "tax": "الضريبة",
+    "total": "الاجمالي",
+    "pay_now": "ادفع {{amount}} درهم",
+    "processing": "جاري المعالجة...",
+    "success": {
+      "title": "الدفع ناجح!",
+      "description": "شكرًا لتأكيدك. لقد تلقينا دفعك وسنقوم بمعالجة طلبك في أسرع وقت ممكن.",
+      "order_number": "رقم الطلب",
+      "email": "تم إرسال بريد تأكيد إلى بريدك الإلكتروني.",
+      "continue_shopping": "استمر في التسوق",
+      "view_order": "عرض الطلب"
+    },
+    "cancel": {
+      "title": "تم إلغاء الدفع",
+      "description": "تم إلغاء دفعك. يمكنك إعادة المحاولة أو اختيار طريقة دفع أخرى.",
+      "return_cart": "العودة إلى عربة التسوق",
+      "shop_home": "العودة إلى الصفحة الرئيسية"
+    }
+  }
+}

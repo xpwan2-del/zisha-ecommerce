@@ -1,0 +1,526 @@
+/* Import fonts - Luxury Design System */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 按钮样式变量 - 由JavaScript从数据库动态设置，初始为fallback值 */
+  --btn-primary-bg: #1A237E;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-border: #D4AF37;
+  --btn-primary-shadow: 0 4px 14px rgba(26, 35, 126, 0.3);
+  --btn-primary-hover-bg: #151E63;
+  --btn-primary-hover-text: #FFFFFF;
+  --btn-primary-hover-border: #E6C250;
+  --btn-primary-hover-transform: scale(1.05);
+  --btn-primary-hover-shadow: 0 6px 20px rgba(26, 35, 126, 0.4);
+
+  /* 加载动画颜色 */
+  --loading-color: #1A237E;
+
+  /* 状态颜色变量 - fallback默认值 */
+  --color-red: #DC2626;
+  --color-green: #16A34A;
+  --color-blue: #2563EB;
+  --color-yellow: #EAB308;
+  --color-orange: #F97316;
+
+  /* 其他变量 */
+  --gold-gradient: linear-gradient(135deg, #CA8A04 0%, #F59E0B 50%, #CA8A04 100%);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --foreground-rgb: 12, 10, 9;
+  --background-rgb: 250, 250, 249;
+
+  /* 字体变量 - 由JavaScript从数据库动态设置 */
+  --heading-font: 'Cormorant', serif;
+  --body-font: 'Inter', sans-serif;
+
+  /* 颜色变量 - 由JavaScript从数据库动态设置 */
+  --primary: #1A237E;
+  --secondary: #D4AF37;
+  --accent: #5D3B6D;
+  --accent-hover: #7B4B8D;
+  --dark: #1C1C1C;
+  --light: #F9F5E9;
+  --background: #F9F5E9;
+  --background-alt: #F0E6D2;
+  --text: #1C1C1C;
+  --text-muted: #6B7280;
+  --border: #E5E7EB;
+  --card: #FFFFFF;
+  --primary-rgb: 26, 35, 126;
+  --accent-rgb: 93, 59, 109;
+  --border-rgb: 229, 231, 235;
+}
+
+body {
+  color: var(--text);
+  background: var(--background);
+  font-family: var(--body-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 主要按钮样式 */
+.btn-primary {
+  @apply text-white font-medium py-2 px-4 rounded transition-colors duration-200 text-center hover:shadow-md;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border: 1px solid var(--btn-primary-border);
+  box-shadow: var(--btn-primary-shadow);
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: var(--btn-primary-hover-bg);
+  color: var(--btn-primary-hover-text);
+  border: 1px solid var(--btn-primary-hover-border);
+  transform: var(--btn-primary-hover-transform);
+  box-shadow: var(--btn-primary-hover-shadow);
+}
+
+/* 次要按钮样式 */
+.btn-secondary {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--primary);
+  color: white;
+}
+
+/* 加载动画样式 */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--loading-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 导航栏样式 */
+.navbar {
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 0;
+}
+
+.navbar-link {
+  color: var(--text);
+  transition: all 0.3s ease;
+  padding: 0.5rem 1rem;
+}
+
+.navbar-link:hover {
+  color: var(--accent);
+}
+
+.navbar-link.active {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+
+/* 页脚样式 */
+.footer {
+  background: var(--dark);
+  color: var(--light);
+  padding: 2rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.footer-link {
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.footer-link:hover {
+  color: var(--accent);
+}
+
+/* 卡片样式 */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+/* 模态框样式 */
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  padding: 2rem;
+}
+
+.modal-title {
+  font-family: var(--heading-font);
+  color: var(--text);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+/* 分页样式 */
+.pagination {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 2rem 0;
+}
+
+.pagination-item {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.pagination-item:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pagination-item.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* 标签页样式 */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+
+.tab-item {
+  padding: 0.75rem 1.5rem;
+  color: var(--text);
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.tab-item:hover {
+  color: var(--accent);
+}
+
+.tab-item.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* 表单控件样式 */
+.form-control {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--text);
+  transition: all 0.3s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.5rem 0;
+  }
+  
+  .navbar-link {
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .card {
+    padding: 1rem;
+  }
+  
+  .modal {
+    padding: 1.5rem;
+  }
+}
+
+h1 {
+  font-size: 3rem;
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 2.25rem;
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
+p {
+  font-family: 'Montserrat', 'Noto Sans Arabic', sans-serif;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+/* Arabic text direction */
+.ar {
+  direction: rtl;
+  text-align: right;
+}
+
+/* English and Chinese text direction */
+.en, .zh {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Luxury Button Styles */
+.luxury-btn {
+  @apply text-white font-medium py-3 px-8 rounded-sm transition-all duration-300;
+  background: var(--accent);
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.3);
+}
+
+.luxury-btn:hover {
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.4);
+  transform: translateY(-1px);
+}
+
+.luxury-btn-outline {
+  @apply border-2 py-3 px-8 rounded-sm font-medium transition-all duration-300;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.luxury-btn-outline:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.luxury-btn-outline:hover {
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.3);
+}
+
+/* Luxury Card Style */
+.luxury-card {
+  @apply bg-white rounded-sm border border-gray-200 p-6 transition-all duration-300;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.luxury-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Luxury Input Style */
+.luxury-input {
+  @apply border border-gray-200 rounded-sm px-4 py-3 bg-white transition-all duration-300;
+}
+
+.luxury-input:focus {
+  @apply outline-none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.1);
+}
+
+/* Luxury Price Style */
+.luxury-price {
+  @apply text-2xl font-semibold;
+  color: var(--accent);
+  font-family: 'Cormorant', serif;
+}
+
+.luxury-price-original {
+  @apply text-lg text-gray-500 line-through;
+}
+
+/* Luxury Rating */
+.luxury-rating {
+  @apply flex items-center gap-1;
+}
+
+.luxury-star {
+  color: var(--accent);
+}
+
+/* Smooth transitions - selective */
+.transition-luxury {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Glass Effect - Premium */
+.glass-luxury {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Gold Accent Border */
+.border-gold {
+  border-color: var(--accent);
+}
+
+/* Gold Text Gradient */
+.text-gold-gradient {
+  background: var(--accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Section Divider - Luxury */
+.divider-luxury {
+  @apply w-24 h-px bg-accent mx-auto;
+}
+
+/* Activity Badge - Discount */
+.badge-discount {
+  @apply px-3 py-1 text-xs font-medium text-white rounded-sm;
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+/* Activity Badge - Status */
+.badge-status {
+  @apply px-3 py-1 text-xs font-medium rounded-sm;
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+}
+
+/* Activity Badge - Special */
+.badge-special {
+  @apply px-3 py-1 text-xs font-medium text-white rounded-sm;
+  background: var(--accent);
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2rem;
+  }
+  h2 {
+    font-size: 1.75rem;
+  }
+  h3 {
+    font-size: 1.25rem;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .transition-luxury {
+    transition: none;
+  }
+}
+
+/* Focus states - Luxury */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Cursor for clickable elements */
+button, a, [role="button"] {
+  cursor: pointer;
+}
+
+/* Animation classes */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 30s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Shimmer Effect for Loading */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Hover Lift Effect */
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* Gold Underline Effect */
+.gold-underline {
+  position: relative;
+}
+
+.gold-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--gold-gradient);
+  transition: width 0.3s ease;
+}
+
+.gold-underline:hover::after {
+  width: 100%;
+}

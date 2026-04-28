@@ -1,0 +1,447 @@
+### 一、涉及的表结构
+表名 用途 核心字段 products 商品主表 id, name, name_en, name_ar, price, price_usd, price_ae, image, images, category_id, is_limited, display_mode, specifications, shipping, after_sale categories 商品分类 id, name, name_en, name_ar, slug, description, image, priority inventory 库存 product_id, product_name, quantity, status_id inventory_status 库存状态 id, name, name_en, name_ar, color, threshold_min, threshold_max promotions 促销活动 id, name, name_en, name_ar, type, discount_percent, status, icon, color product_promotions 商品-促销关联 product_id, promotion_id, original_price, start_time, end_time, priority, can_stack activity_categories 活动分类 id, name, name_en, name_ar, icon, color, status product_activities 商品-活动关联 product_id, activity_category_id, start_time, end_time
+
+### 二、API 设计总览
+API 方法 路径 功能 获取商品列表（管理后台） GET /api/admin/products 搜索+筛选+分页 获取商品详情（管理后台） GET /api/admin/products/[id] 获取单个商品完整信息 新增商品 POST /api/admin/products 创建商品+库存+促销+活动 更新商品 PUT /api/admin/products/[id] 更新商品+关联信息 删除商品 DELETE /api/admin/products/[id] 删除商品及关联
+
+### 三、API 详细设计 API 1：GET /api/admin/products（获取商品列表）
+功能 ：管理后台商品列表，支持搜索、筛选、分页
+
+请求参数 ：
+
+```
+{
+  search?: string,        // 名称模糊搜索（搜索 name, name_en, name_ar）
+  categoryId?: number,    // 分类筛选
+  minPrice?: number,      // 最低价格
+  maxPrice?: number,      // 最高价格
+  page?: number,          // 页码，默认1
+  limit?: number,         // 每页数量，默认20
+  sort?: string,          // 排序：newest|price_asc|price_desc|stock
+}
+```
+返回数据 ：
+
+```
+{
+  "success": true,
+  "data": {
+    "products": [
+      {
+        "id": 1,
+        "name": "经典石瓢壶",
+        "name_en": "Classic Zisha Teapot",
+        "name_ar": "إبوة زيشا الكلاسيكية",
+        "price": 899,
+        "price_usd": 245,
+        "price_ae": 899,
+        "image": "https://...",
+        "category_id": 1,
+        "category_name": "紫砂壶",
+        "category_name_en": "Zisha Teapots",
+        "category_name_ar": "إبوة زيشا",
+        "is_limited": 1,
+        "display_mode": "normal",
+        "quantity": 50,
+        "stock_status_id": 1,
+        "stock_status_name": "有货",
+        "stock_status_color": "#22c55e",
+        "promotions": [
+          {
+            "id": 1,
+            "name": "今日特惠",
+            "name_en": "Today's Special",
+            "name_ar": "عرض اليوم",
+            "discount_percent": 20,
+            "original_price": 1124,
+            "promotion_price": 899
+          }
+        ],
+        "activities": [
+          {
+            "id": 1,
+            "name": "新品上市",
+            "name_en": "New Arrival",
+            "name_ar": "منتج جديد",
+            "icon": "star.svg",
+            "color": "#22c55e"
+          }
+        ]
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 100,
+      "total_pages": 5
+    }
+  }
+}
+```
+SQL 查询逻辑 ：
+
+```
+SELECT 
+  p.id, p.name, p.name_en, p.name_ar,
+  p.price, p.price_usd, p.price_ae,
+  p.image, p.category_id, p.is_limited, p.display_mode,
+  c.name as category_name, c.name_en as category_name_en, c.name_ar 
+  as category_name_ar,
+  COALESCE(i.quantity, 0) as quantity,
+  i.status_id as stock_status_id,
+  ins.name as stock_status_name,
+  ins.color as stock_status_color
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN inventory i ON p.id = i.product_id
+LEFT JOIN inventory_status ins ON i.status_id = ins.id
+WHERE 1=1
+  AND (p.name LIKE '%keyword%' OR p.name_en LIKE '%keyword%' OR p.
+  name_ar LIKE '%keyword%')  -- 模糊搜索
+  AND p.category_id = ?  -- 分类筛选
+  AND p.price >= ? AND p.price <= ?  -- 价格区间
+ORDER BY p.id DESC
+LIMIT ? OFFSET ?
+``` API 2：GET /api/admin/products/[id]（获取商品详情）
+功能 ：获取单个商品的完整信息，包含所有关联数据
+
+返回数据 ：
+
+```
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "经典石瓢壶",
+    "name_en": "Classic Zisha Teapot",
+    "name_ar": "...",
+    "description": "...",
+    "description_en": "...",
+    "description_ar": "...",
+    "price": 899,
+    "price_usd": 245,
+    "price_ae": 899,
+    "image": "https://...",
+    "images": ["https://...", "https://..."],
+    "video": "",
+    "category_id": 1,
+    "category_name": "紫砂壶",
+    "is_limited": 1,
+    "display_mode": "normal",
+    "specifications": "{}",
+    "shipping": "...",
+    "after_sale": "...",
+    "created_at": "2026-04-01",
+    "updated_at": "2026-04-15",
+    "inventory": {
+      "product_id": 1,
+      "product_name": "经典石瓢壶",
+      "quantity": 50,
+      "status_id": 1,
+      "status_name": "有货",
+      "status_color": "#22c55e"
+    },
+    "promotions": [
+      {
+        "id": 1,
+        "promotion_id": 1,
+        "name": "今日特惠",
+        "name_en": "Today's Special",
+        "discount_percent": 20,
+        "original_price": 1124,
+        "start_time": "2026-04-01",
+        "end_time": "2026-04-30",
+        "priority": 1,
+        "can_stack": 1
+      }
+    ],
+    "activities": [
+      {
+        "id": 1,
+        "activity_category_id": 1,
+        "name": "新品上市",
+        "name_en": "New Arrival",
+        "icon": "star.svg",
+        "color": "#22c55e",
+        "start_time": "2026-04-01",
+        "end_time": "2026-04-30"
+      }
+    ]
+  }
+}
+``` API 3：POST /api/admin/products（新增商品）
+功能 ：创建商品，同时创建库存、促销、活动关联
+
+请求参数 ：
+
+```
+{
+  // 基本信息（必需）
+  name: string,
+  name_en: string,
+  name_ar: string,
+  price: number,
+  price_usd: number,
+  price_ae: number,
+  category_id: number,
+  
+  // 基本信息（可选）
+  description?: string,
+  description_en?: string,
+  description_ar?: string,
+  image?: string,
+  images?: string[],
+  video?: string,
+  is_limited?: number,      // 0=普通, 1=限量
+  display_mode?: string,     // normal/featured
+  specifications?: string,   // JSON 字符串
+  shipping?: string,
+  after_sale?: string,
+  
+  // 库存（必需）
+  quantity: number,
+  
+  // 促销活动（可选）
+  promotions: [
+    {
+      promotion_id: number,
+      original_price: number,  // 促销前的原价
+      start_time?: string,       // ISO 日期，默认当前时间
+      end_time?: string,         // ISO 日期，默认无限
+      priority?: number,         // 默认2
+      can_stack?: number         // 0=可叠加, 1=独占，默认1
+    }
+  ],
+  
+  // 活动标签（可选）
+  activities: [
+    {
+      activity_category_id: number,
+      start_time?: string,
+      end_time?: string
+    }
+  ]
+}
+```
+业务逻辑 ：
+
+```
+1. 参数校验
+   ├── 必需字段检查（name, price, category_id, quantity）
+   └── 价格 > 0, quantity >= 0
+
+2. 创建商品
+   ├── INSERT products
+   └── 获取 product_id
+
+3. 创建库存
+   ├── 根据 quantity 计算 status_id
+   │   ├── quantity > 10 → status_id = 1 (有货)
+   │   ├── quantity > 5  → status_id = 2 (库存有限)
+   │   ├── quantity > 0  → status_id = 3 (库存紧张)
+   │   └── quantity <= 0 → status_id = 4 (缺货)
+   ├── INSERT inventory
+   └── INSERT inventory_transactions (type: self_estock)
+
+4. 创建促销关联（如果提供了 promotions）
+   ├── DELETE 旧关联（如果更新时）
+   └── INSERT product_promotions (批量)
+
+5. 创建活动关联（如果提供了 activities）
+   ├── DELETE 旧关联（如果更新时）
+   └── INSERT product_activities (批量)
+
+6. 记录日志
+   └── INSERT product_logs
+
+7. 返回成功响应
+```
+返回数据 ：
+
+```
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "经典石瓢壶",
+    "message": "商品创建成功"
+  }
+}
+``` API 4：PUT /api/admin/products/[id]（更新商品）
+功能 ：更新商品信息，支持部分更新
+
+请求参数 ：
+
+```
+{
+  // 基本信息（可选，全部或部分）
+  name?: string,
+  name_en?: string,
+  name_ar?: string,
+  price?: number,
+  price_usd?: number,
+  price_ae?: number,
+  category_id?: number,
+  description?: string,
+  description_en?: string,
+  description_ar?: string,
+  image?: string,
+  images?: string[],
+  video?: string,
+  is_limited?: number,
+  display_mode?: string,
+  specifications?: string,
+  shipping?: string,
+  after_sale?: string,
+  
+  // 库存更新（可选）
+  // 如果提供 quantity，表示手动调整库存
+  quantity?: number,
+  
+  // 促销活动（可选）
+  // 如果提供，覆盖更新
+  promotions?: [
+    {
+      promotion_id: number,
+      original_price: number,
+      start_time?: string,
+      end_time?: string,
+      priority?: number,
+      can_stack?: number
+    }
+  ],
+  
+  // 活动标签（可选）
+  // 如果提供，覆盖更新
+  activities?: [
+    {
+      activity_category_id: number,
+      start_time?: string,
+      end_time?: string
+    }
+  ]
+}
+```
+业务逻辑 ：
+
+```
+1. 参数校验
+   └── 检查商品是否存在
+
+2. 更新商品基本信息（如果提供了）
+   └── UPDATE products
+
+3. 更新库存（如果提供了 quantity）
+   ├── 计算新的 status_id
+   ├── UPDATE inventory
+   └── INSERT inventory_transactions (type: adjustment)
+
+4. 更新促销关联（如果提供了 promotions）
+   ├── DELETE 旧关联
+   └── INSERT 新关联
+
+5. 更新活动关联（如果提供了 activities）
+   ├── DELETE 旧关联
+   └── INSERT 新关联
+
+6. 记录日志
+   └── INSERT product_logs (记录每个字段的变更)
+
+7. 返回成功响应
+```
+返回数据 ：
+
+```
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "message": "商品更新成功"
+  }
+}
+```
+### 四、数据库操作汇总 新增商品涉及的操作
+顺序 表 操作 关键字段 1 products INSERT name, price, category_id, ... 2 inventory INSERT product_id, quantity, status_id 3 inventory_transactions INSERT product_id, transaction_type_id='self_estock' 4 product_promotions INSERT (批量) product_id, promotion_id, original_price, ... 5 product_activities INSERT (批量) product_id, activity_category_id, ... 6 product_logs INSERT product_id, action='update', ...
+ 更新商品涉及的操作
+顺序 表 操作 触发条件 1 products UPDATE 任何基本信息变化 2 inventory UPDATE quantity 变化 3 inventory_transactions INSERT quantity 变化时，记录 adjustment 4 product_promotions DELETE + INSERT promotions 参数提供 5 product_activities DELETE + INSERT activities 参数提供 6 product_logs INSERT 记录每个字段的 old_value → new_value
+
+### 五、下拉框数据来源
+下拉框 数据来源 API 返回字段 分类 GET /api/categories id, name, name_en, name_ar 库存状态 GET /api/inventory/status id, name, name_en, name_ar, color 促销活动 GET /api/promotions id, name, name_en, name_ar, discount_percent 活动标签 GET /api/activity-categories id, name, name_en, name_ar, icon, color
+
+### 六、页面 Tab 结构设计 Tab 1：新增商品
+```
+┌─────────────────────────────────────────────────────────┐
+│  [新增商品]  [更新商品]                                   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  基本信息                                                │
+│  ├── 名称 (zh) [________________]                       │
+│  ├── 名称 (en) [________________]                       │
+│  ├── 名称 (ar) [________________]                       │
+│  ├── 分类   [下拉框________________]                    │
+│  ├── 价格   [________] USD [________] AED              │
+│  ├── 主图   [________________] [上传]                   │
+│  ├── 详情图 [________________] [上传]                   │
+│  ├── 描述   [________________]                          │
+│  ├── 售后服务 [________________]                        │
+│  └── is_limited [是] [否]                              │
+│                                                         │
+│  库存信息                                                │
+│  └── 数量   [________] (自动计算状态)                    │
+│                                                         │
+│  促销活动                                                │
+│  └── [多选下拉框] 已选择: 今日特惠(x), 新品上市(y)       │
+│                                                         │
+│  活动标签                                                │
+│  └── [多选下拉框] 已选择: 新品上市(x), 环保材料(y)       │
+│                                                         │
+│  [取消]  [保存并发布]                                    │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+``` Tab 2：更新商品
+```
+┌─────────────────────────────────────────────────────────┐
+│  [新增商品]  [更新商品]                                   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  搜索 & 筛选                                            │
+│  ├── 名称搜索 [_____________] [搜索]                    │
+│  ├── 分类   [全部________]  价格区间 [__]-[__]          │
+│  └── [搜索重置]                                         │
+│                                                         │
+│  ┌─────┬──────────┬──────┬──────┬────────┬──────────┐  │
+│  │ ID  │ 商品名称   │ 分类  │ 价格  │ 库存   │ 操作     │  │
+│  ├─────┼──────────┼──────┼──────┼────────┼──────────┤  │
+│  │ 1   │ 经典石瓢壶 │ 紫砂壶 │ 899  │ 50 有货│ [编辑]  │  │
+│  │ 2   │ 西施壶    │ 紫砂壶 │ 699  │ 30 有货│ [编辑]  │  │
+│  │ ... │ ...      │ ...  │ ...  │ ...   │ ...     │  │
+│  └─────┴──────────┴──────┴──────┴────────┴──────────┘  │
+│                                                         │
+│  分页: [< 1 2 3 ... 10 >] 每页 [20__]                  │
+│                                                         │
+│  ─────────────────────────────────────────────────────  │
+│                                                         │
+│  商品详情 (选中 ID:1)                                   │
+│  ├── 基本信息                                            │
+│  │   ├── 名称 (zh) [经典石瓢壶________]                   │
+│  │   ├── 名称 (en) [Classic Zisha___]                    │
+│  │   ├── 名称 (ar) [إبوة زيشا______]                    │
+│  │   ├── 分类   [紫砂壶__________]                     │
+│  │   ├── 价格   [899] USD [245] AED                     │
+│  │   └── ...                                            │
+│  ├── 库存信息                                            │
+│  │   └── 数量   [50] 状态 [有货________]               │
+│  ├── 促销活动                                            │
+│  │   └── [多选下拉框] 已选择: 今日特惠(x), 新品上市(y)    │
+│  └── 活动标签                                            │
+│      └── [多选下拉框] 已选择: 新品上市(x)               │
+│                                                         │
+│  [取消]  [保存修改]                                      │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+### 七、错误处理
+错误码 说明 场景 PRODUCT_NOT_FOUND 商品不存在 更新/删除时 ID 不存在 CATEGORY_NOT_FOUND 分类不存在 category_id 无效 PROMOTION_NOT_FOUND 促销活动不存在 promotion_id 无效 ACTIVITY_NOT_FOUND 活动不存在 activity_category_id 无效 INSUFFICIENT_STOCK 库存不足 数量为负数 DUPLICATE_PRODUCT 商品已存在 同名商品（可选校验） INVALID_PRICE 价格无效 price <= 0
+
+### 八、需要创建的文件
+文件 方法 功能 src/app/api/admin/products/route.ts GET, POST 列表+新增 src/app/api/admin/products/[id]/route.ts GET, PUT, DELETE 详情+更新+删除
