@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { getMessage, getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
+import { applyPromotions } from '@/lib/pricing/cartPricing';
 
 /**
  * ============================================================
@@ -166,63 +167,55 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    let total = 0;
+    const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
+
+    let total_usd = 0;
+    let total_cny = 0;
+    let total_aed = 0;
     let total_items = 0;
     const items = result.rows.map((item: any) => {
-      let currentPrice = parseFloat(item.original_price) || 0;
+      const originalPriceUsd = parseFloat(item.price_usd) || 0;
+      const originalPriceCny = parseFloat(item.price_cny) || 0;
+      const originalPriceAed = parseFloat(item.price_aed) || 0;
+
+      let finalPriceUsd = originalPriceUsd;
+      let finalPriceCny = originalPriceCny;
+      let finalPriceAed = originalPriceAed;
       let promotion = null;
       let promotions: any[] = [];
 
       const promos = promotionsMap[item.product_id] || [];
       if (promos.length > 0) {
-        const exclusive = promos.find((p: any) => p.can_stack === 1);
-        let totalDiscountPercent = 0;
-        let finalPrice = parseFloat(item.original_price) || 0;
+        const sortedPromos = [...promos].sort((a: any, b: any) => a.priority - b.priority);
+        const exclusive = sortedPromos.find((p: any) => p.can_stack === 1);
+        const percentInfo = applyPromotions(100, promos);
+        const totalDiscountPercent = percentInfo.totalDiscountPercent || 0;
 
-        if (exclusive) {
-          totalDiscountPercent = exclusive.discount_percent || 0;
-          finalPrice = finalPrice * (100 - totalDiscountPercent) / 100;
-          currentPrice = finalPrice;
-          promotion = {
-            id: item.product_id,
-            promotion_id: exclusive.promotion_id,
-            name: lang === 'en' ? exclusive.promotion_name_en || exclusive.promotion_name :
-                  lang === 'ar' ? exclusive.promotion_name_ar || exclusive.promotion_name :
-                  exclusive.promotion_name,
-            discount_percent: totalDiscountPercent,
-            end_time: exclusive.end_time,
-            is_expired: false,
-            promotion_price: finalPrice,
-            original_price: parseFloat(item.original_price) || 0,
-            color: exclusive.promotion_color,
-            is_exclusive: true
-          };
-        } else {
-          const sortedPromos = [...promos].sort((a: any, b: any) => a.priority - b.priority);
-          let multiplier = 1;
-          sortedPromos.forEach((p: any) => {
-            multiplier *= (1 - (p.discount_percent || 0) / 100);
-          });
-          totalDiscountPercent = Math.round((1 - multiplier) * 10000) / 100;
-          finalPrice = finalPrice * multiplier;
-          currentPrice = finalPrice;
+        finalPriceUsd = applyPromotions(originalPriceUsd, promos).finalPrice;
+        finalPriceCny = applyPromotions(originalPriceCny, promos).finalPrice;
+        finalPriceAed = applyPromotions(originalPriceAed, promos).finalPrice;
 
-          const mainPromo = sortedPromos[0];
-          promotion = {
-            id: item.product_id,
-            promotion_id: mainPromo.promotion_id,
-            name: lang === 'en' ? mainPromo.promotion_name_en || mainPromo.promotion_name :
-                  lang === 'ar' ? mainPromo.promotion_name_ar || mainPromo.promotion_name :
-                  mainPromo.promotion_name,
-            discount_percent: totalDiscountPercent,
-            end_time: mainPromo.end_time,
-            is_expired: false,
-            promotion_price: finalPrice,
-            original_price: parseFloat(item.original_price) || 0,
-            color: mainPromo.promotion_color,
-            is_exclusive: false
-          };
-        }
+        const mainPromo = exclusive || sortedPromos[0];
+        promotion = {
+          id: item.product_id,
+          promotion_id: mainPromo.promotion_id,
+          name: lang === 'en' ? mainPromo.promotion_name_en || mainPromo.promotion_name :
+                lang === 'ar' ? mainPromo.promotion_name_ar || mainPromo.promotion_name :
+                mainPromo.promotion_name,
+          discount_percent: totalDiscountPercent,
+          end_time: mainPromo.end_time,
+          is_expired: false,
+          promotion_price: round2(finalPriceUsd),
+          promotion_price_usd: round2(finalPriceUsd),
+          promotion_price_cny: round2(finalPriceCny),
+          promotion_price_aed: round2(finalPriceAed),
+          original_price: originalPriceUsd,
+          original_price_usd: originalPriceUsd,
+          original_price_cny: originalPriceCny,
+          original_price_aed: originalPriceAed,
+          color: mainPromo.promotion_color,
+          is_exclusive: Boolean(exclusive)
+        };
 
         promotions = promos.map((p: any) => ({
           id: p.promotion_id,
@@ -236,8 +229,17 @@ export async function GET(request: NextRequest) {
         }));
       }
 
-      const item_total = currentPrice * item.quantity;
-      total += item_total;
+      finalPriceUsd = round2(finalPriceUsd);
+      finalPriceCny = round2(finalPriceCny);
+      finalPriceAed = round2(finalPriceAed);
+
+      const subtotal_usd = round2(finalPriceUsd * item.quantity);
+      const subtotal_cny = round2(finalPriceCny * item.quantity);
+      const subtotal_aed = round2(finalPriceAed * item.quantity);
+
+      total_usd = round2(total_usd + subtotal_usd);
+      total_cny = round2(total_cny + subtotal_cny);
+      total_aed = round2(total_aed + subtotal_aed);
       total_items += item.quantity;
 
       return {
@@ -248,12 +250,21 @@ export async function GET(request: NextRequest) {
         name: item.name,
         name_en: item.name_en,
         name_ar: item.name_ar,
-        price: currentPrice,
-        original_price: parseFloat(item.original_price) || 0,
+        price: finalPriceUsd,
+        original_price: originalPriceUsd,
+        price_usd: originalPriceUsd,
+        price_cny: originalPriceCny,
+        price_aed: originalPriceAed,
+        final_price_usd: finalPriceUsd,
+        final_price_cny: finalPriceCny,
+        final_price_aed: finalPriceAed,
         image: item.image,
         stock: item.stock,
         stock_status_id: item.stock_status_id,
-        subtotal: item_total,
+        subtotal: subtotal_usd,
+        subtotal_usd,
+        subtotal_cny,
+        subtotal_aed,
         promotion: promotion,
         promotions: promotions,
         total_discount_percent: promos.length > 0 ?
@@ -265,7 +276,7 @@ export async function GET(request: NextRequest) {
       action: 'GET_CART',
       userId: user_id,
       itemsCount: items.length,
-      total,
+      total_usd,
       total_items
     });
 
@@ -273,7 +284,10 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         items,
-        total,
+        total: total_usd,
+        total_usd,
+        total_cny,
+        total_aed,
         total_items
       }
     });

@@ -443,6 +443,18 @@ export async function POST(request: NextRequest) {
         ['success', order_number, orderId]
       );
 
+      // 支付成功后删除购物车中对应的商品项
+      const orderItemsResult = await query(
+        'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
+        [order.id]
+      );
+      for (const item of orderItemsResult.rows) {
+        await query(
+          `DELETE FROM cart_items WHERE user_id = ? AND product_id = ?`,
+          [order.user_id, item.product_id]
+        );
+      }
+
       return NextResponse.json({
         success: true,
         status: errorCode === 'ORDER_ALREADY_CAPTURED' ? 'already_paid' : 'captured',
