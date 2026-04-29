@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const orderResult = await query(
-      'SELECT id, order_number, final_amount, payment_status, order_status FROM orders WHERE order_number = ?',
+      'SELECT id, user_id, order_number, final_amount, payment_status, order_status FROM orders WHERE order_number = ?',
       [outTradeNo]
     );
 
