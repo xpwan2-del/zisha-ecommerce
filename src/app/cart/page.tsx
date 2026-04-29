@@ -594,23 +594,39 @@ export default function CartPage() {
 
     setIsSubmitting(true);
     try {
-      const createResp = await fetch('/api/cart/create-order', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'x-lang': i18n.language },
-        body: JSON.stringify({
-          cart_item_ids: selectedItems,
-          address_id: selectedAddressId,
-          coupon_ids: selectedCouponIds,
-          payment_method: selectedPaymentMethod
-        })
-      });
+      const createOrder = async (cartItemIds: number[]) => {
+        const resp = await fetch('/api/cart/create-order', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'x-lang': i18n.language },
+          body: JSON.stringify({
+            cart_item_ids: cartItemIds,
+            address_id: selectedAddressId,
+            coupon_ids: selectedCouponIds,
+            payment_method: selectedPaymentMethod
+          })
+        });
+        const data = await resp.json();
+        return { resp, data };
+      };
 
-      const createData = await createResp.json();
+      let { resp: createResp, data: createData } = await createOrder(selectedItems);
+
       if (!createResp.ok || !createData.success) {
         if (createData?.error === 'Cart items not found' || createData?.error === 'Some cart items not found') {
-          await fetchCartData();
+          const cartResp = await fetch('/api/cart', { credentials: 'include', headers: { 'x-lang': i18n.language } });
+          if (cartResp.ok) {
+            const cartJson = await cartResp.json();
+            const freshIds = (cartJson.data?.items || []).map((it: any) => it.id);
+            setSelectedItems(freshIds);
+            if (freshIds.length > 0) {
+              ({ resp: createResp, data: createData } = await createOrder(freshIds));
+            }
+          }
         }
+      }
+
+      if (!createResp.ok || !createData.success) {
         alert(createData.message || createData.error || '创建订单失败');
         return;
       }
