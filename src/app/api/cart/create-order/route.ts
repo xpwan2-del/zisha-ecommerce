@@ -358,26 +358,27 @@ export async function POST(request: NextRequest) {
         const productInfo = await query('SELECT name FROM products WHERE id = ?', [item.product_id]);
         const productName = productInfo.rows[0]?.name || 'Product';
 
+        const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['sales_creat']);
+        const transactionTypeId = typeResult.rows[0]?.id || 1;
+
         await query(
           `INSERT INTO inventory_transactions (
-            product_id, product_name, transaction_type, quantity_change,
-            quantity_before, quantity_after, reason,
-            reference_type, reference_id, operator_id, operator_name
-          ) VALUES (?, ?, ?, ?, ?,
-            (SELECT quantity FROM inventory WHERE product_id = ?),
-            ?, ?, ?, ?, ?)`,
+            product_id, product_name, transaction_type_id, quantity_change,
+            quantity_before, quantity_after, reason, reference_type, reference_id,
+            operator_id, operator_name, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
           [
             item.product_id,
             productName,
-            'sale',
+            transactionTypeId,
             -item.quantity,
             beforeStock,
-            item.product_id,
+            beforeStock - item.quantity,
             `Order ${orderNumber}`,
             'order',
             orderId,
             userId,
-            authResult.user?.name
+            authResult.user?.name || 'User'
           ]
         );
       }
@@ -436,4 +437,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to create order' }, { status: 500 });
   }
 }
-
