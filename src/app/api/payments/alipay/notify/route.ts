@@ -70,6 +70,18 @@ export async function POST(request: NextRequest) {
         ['paid', order.id]
       );
 
+      // 支付成功后删除购物车中对应的商品项
+      const orderItemsResult = await query(
+        'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
+        [order.id]
+      );
+      for (const item of orderItemsResult.rows) {
+        await query(
+          `DELETE FROM cart_items WHERE user_id = ? AND product_id = ?`,
+          [order.user_id, item.product_id]
+        );
+      }
+
       console.log('[Alipay Notify] Order updated to paid:', outTradeNo);
 
       return NextResponse.json('success');

@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     const alipayGateway = process.env.ALIPAY_GATEWAY_URL || 'https://openapi.alipaydev.com/gateway.do';
 
     if (!alipayPartner || !alipaySellerId || !alipayPrivateKey) {
-      const mockPaymentUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/quick-order/success?order_number=${order_number}&payment_method=alipay`;
+      const mockPaymentUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}&payment_method=alipay`;
 
       return NextResponse.redirect(mockPaymentUrl);
     }
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0],
       version: '1.0',
       notify_url: `${baseUrl}/api/payments/alipay/notify`,
-      return_url: `${baseUrl}/quick-order/success?order_number=${order_number}&trade_no={TRADE_NO}`,
+      return_url: `${baseUrl}/cart/success?order_number=${order_number}&trade_no={TRADE_NO}`,
       biz_content: bizContentStr
     };
 

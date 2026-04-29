@@ -397,11 +397,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      await query(
-        `DELETE FROM cart_items WHERE user_id = ? AND id IN (${placeholders})`,
-        [userId, ...cartItemIds]
-      );
-
       await query('COMMIT');
 
       return NextResponse.json({
