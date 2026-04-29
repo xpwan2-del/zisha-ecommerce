@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireAuth } from '@/lib/auth';
 
 // GET /api/user-logs - 查询用户操作日志（用户查看自己的，管理员查看所有）
 export async function GET(request: NextRequest) {
   try {
+    const authResult = requireAuth(request);
+    if (authResult.response) {
+      return authResult.response;
+    }
+
     const url = new URL(request.url);
-    const userId = url.searchParams.get('user_id');
     const actionType = url.searchParams.get('action_type');
     const isAdmin = url.searchParams.get('is_admin') === 'true';
     const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '20');
-
-    // 如果不是管理员，必须提供user_id且只能查看自己的日志
-    if (!isAdmin && !userId) {
-      return NextResponse.json(
-        { success: false, error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
+    const limit = parseInt(url.searchParams.get('limit') || '100');
+    const userId = authResult.user.userId;
 
     let whereClause = '';
     const params: any[] = [];
 
     // 普通用户只能查看自己的日志
-    if (!isAdmin && userId) {
+    if (!isAdmin) {
       whereClause = 'WHERE ul.user_id = ?';
       params.push(userId);
     }

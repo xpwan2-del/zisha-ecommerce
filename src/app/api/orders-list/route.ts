@@ -12,15 +12,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const order_status = searchParams.get('order_status');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const user_id = parseInt(searchParams.get('user_id') || '0');
-
-    if (!user_id || user_id <= 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'USER_ID_REQUIRED'
-      }, { status: 400 });
-    }
+    const limit = parseInt(searchParams.get('limit') || '100');
+    const user_id = authResult.user.userId;
 
     let ordersSql = `
       SELECT 

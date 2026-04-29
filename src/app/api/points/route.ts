@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireAuth } from '@/lib/auth';
 
 // 辅助函数：记录积分变动
 async function logPointsChange(
@@ -33,20 +34,17 @@ async function logPointsChange(
 // GET /api/points - 获取用户积分记录
 export async function GET(request: NextRequest) {
   try {
+    const authResult = requireAuth(request);
+    if (authResult.response) {
+      return authResult.response;
+    }
+
     const url = new URL(request.url);
-    const userId = url.searchParams.get('user_id');
     const changeType = url.searchParams.get('change_type');
     const isAdmin = url.searchParams.get('is_admin') === 'true';
     const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '20');
-
-    // 如果不是管理员，必须提供user_id且只能查看自己的记录
-    if (!isAdmin && !userId) {
-      return NextResponse.json(
-        { success: false, error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
+    const limit = parseInt(url.searchParams.get('limit') || '100');
+    const userId = authResult.user.userId;
 
     let whereClause = '';
     const params: any[] = [];

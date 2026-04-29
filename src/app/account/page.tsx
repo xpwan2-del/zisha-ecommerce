@@ -618,7 +618,7 @@ export default function AccountPage() {
     if (!user) return;
     setIsLoadingOrders(true);
     try {
-      const res = await fetch(`/api/orders-list?user_id=${user.id}&limit=50`, { credentials: 'include' });
+      const res = await fetch(`/api/orders-list?limit=200`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.data?.orders)) {
