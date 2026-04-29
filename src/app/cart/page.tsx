@@ -608,11 +608,18 @@ export default function CartPage() {
 
       const createData = await createResp.json();
       if (!createResp.ok || !createData.success) {
+        if (createData?.error === 'Cart items not found' || createData?.error === 'Some cart items not found') {
+          await fetchCartData();
+        }
         alert(createData.message || createData.error || '创建订单失败');
         return;
       }
 
       const { order_id, order_number, amount_usd, amount_cny, amount_aed, items } = createData.data;
+      setSelectedItems([]);
+      setSelectedCouponIds([]);
+      fetchCartData();
+      fetchCartCoupons();
 
       if (selectedPaymentMethod === 'paypal') {
         const paypalResp = await fetch('/api/payments/paypal', {
@@ -701,6 +708,8 @@ export default function CartPage() {
       alert('创建订单失败');
     } finally {
       setIsSubmitting(false);
+      await fetchCartData();
+      await fetchCartCoupons();
       refreshCart();
     }
   };
