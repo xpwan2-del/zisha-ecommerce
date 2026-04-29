@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
 
     // 查询本地订单
     let orderResult = await query(
-      'SELECT id, order_number, final_amount, payment_status, order_status FROM orders WHERE order_number = ?',
+      'SELECT id, user_id, order_number, final_amount, payment_status, order_status FROM orders WHERE order_number = ?',
       [order_number]
     );
 
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
         orderId: platformOrderId
       });
       orderResult = await query(
-        'SELECT id, order_number, final_amount, payment_status, order_status FROM orders WHERE reference_id = ?',
+        'SELECT id, user_id, order_number, final_amount, payment_status, order_status FROM orders WHERE reference_id = ?',
         [platformOrderId]
       );
     }
