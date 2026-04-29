@@ -158,7 +158,12 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
         const guestCart = getGuestCartFromCookie();
         const existingIndex = guestCart.findIndex((item: any) => item.id === product.id);
         if (existingIndex >= 0) guestCart[existingIndex].quantity += quantity;
-        else guestCart.push({ id: product.id, name: product.name, price: product.price, image: product.image, quantity });
+        else {
+          const price_usd = product.price_usd || 0;
+          const price_cny = product.price_cny || 0;
+          const price_aed = product.price_aed || 0;
+          guestCart.push({ id: product.id, name: product.name, price: price_usd, price_usd, price_cny, price_aed, image: product.image, quantity });
+        }
         setGuestCartToCookie(guestCart);
         setCartMessage({ type: 'success', text: t('cart.added_guest', '已添加到购物车，登录后合并到账号') });
       }

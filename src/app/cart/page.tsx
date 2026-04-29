@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { useCurrency } from '@/lib/contexts/CurrencyContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useCart } from '@/lib/contexts/CartContext';
 import { formatCurrency } from '@/lib/utils/currency';
+import { getDisplayPromotions } from '@/lib/pricing/promotionDisplay';
 import Image from 'next/image';
 
 interface CartItem {
@@ -17,6 +17,12 @@ interface CartItem {
   name_ar?: string;
   price: number;
   original_price?: number;
+  price_usd?: number;
+  price_cny?: number;
+  price_aed?: number;
+  final_price_usd?: number;
+  final_price_cny?: number;
+  final_price_aed?: number;
   quantity: number;
   image: string;
   stock: number;
@@ -52,6 +58,9 @@ interface CartItem {
 interface CartData {
   items: CartItem[];
   total: number;
+  total_usd?: number;
+  total_cny?: number;
+  total_aed?: number;
   total_items: number;
 }
 
@@ -62,10 +71,22 @@ interface StockStatusInfo {
   name_ar: string;
 }
 
+interface Coupon {
+  id: number;
+  coupon_id: number;
+  code: string;
+  name: string;
+  type: string;
+  discount_type: string;
+  value: number;
+  description: string;
+  expires_at: string;
+  is_stackable: number;
+}
+
 export default function CartPage() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
-  const { currency } = useCurrency();
   const { user, isAuthenticated } = useAuth();
   const { refreshCart } = useCart();
 
@@ -73,11 +94,22 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [couponCode, setCouponCode] = useState('');
-  const [couponApplied, setCouponApplied] = useState(false);
-  const [couponError, setCouponError] = useState('');
+  const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
+  const [unavailableCoupons, setUnavailableCoupons] = useState<Coupon[]>([]);
+  const [usedCoupons, setUsedCoupons] = useState<Coupon[]>([]);
+  const [expiredCoupons, setExpiredCoupons] = useState<Coupon[]>([]);
+  const [claimableCoupons, setClaimableCoupons] = useState<Coupon[]>([]);
+  const [myCouponsTab, setMyCouponsTab] = useState<'available' | 'expired' | 'used' | 'claimable'>('available');
+  const [selectedCouponIds, setSelectedCouponIds] = useState<number[]>([]);
+  const [couponDiscountUsd, setCouponDiscountUsd] = useState(0);
+  const [couponDiscountCny, setCouponDiscountCny] = useState(0);
+  const [couponDiscountAed, setCouponDiscountAed] = useState(0);
+  const [totalAfterCouponUsd, setTotalAfterCouponUsd] = useState(0);
+  const [totalAfterCouponCny, setTotalAfterCouponCny] = useState(0);
+  const [totalAfterCouponAed, setTotalAfterCouponAed] = useState(0);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [isCalculatingCoupons, setIsCalculatingCoupons] = useState(false);
 
   const fetchCartData = async () => {
     if (!isAuthenticated) {
@@ -108,6 +140,27 @@ export default function CartPage() {
   useEffect(() => {
     fetchCartData();
   }, [isAuthenticated, i18n.language]);
+
+  const fetchCartCoupons = async () => {
+    if (!isAuthenticated) return;
+    try {
+      const response = await fetch('/api/cart/coupons', { credentials: 'include' });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setAvailableCoupons(data.data.coupons?.available || []);
+        setUnavailableCoupons(data.data.coupons?.unavailable || []);
+        setUsedCoupons(data.data.coupons?.used || []);
+        setExpiredCoupons(data.data.coupons?.expired || []);
+        setClaimableCoupons(data.data.coupons?.claimable || []);
+      }
+    } catch (error) {
+      console.error('Error fetching cart coupons:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCartCoupons();
+  }, [isAuthenticated]);
 
   const getStockStatus = (item: CartItem): StockStatusInfo | null => {
     if (item.stock_status_info) {
@@ -337,11 +390,105 @@ export default function CartPage() {
     }
   };
 
-  const getSelectedTotal = (): number => {
-    return cartData.items
-      .filter(item => selectedItems.includes(item.id))
-      .reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const getSelectedTotals = (): { usd: number; cny: number; aed: number } => {
+    const selected = cartData.items.filter(item => selectedItems.includes(item.id));
+    const usd = selected.reduce((sum, item) => sum + (item.final_price_usd ?? item.price) * item.quantity, 0);
+    const cny = selected.reduce((sum, item) => sum + (item.final_price_cny ?? item.price_cny ?? 0) * item.quantity, 0);
+    const aed = selected.reduce((sum, item) => sum + (item.final_price_aed ?? item.price_aed ?? 0) * item.quantity, 0);
+    return { usd, cny, aed };
   };
+
+  const handleCouponSelect = (coupon: Coupon) => {
+    const isSelected = selectedCouponIds.includes(coupon.id);
+
+    if (isSelected) {
+      setSelectedCouponIds(prev => prev.filter(id => id !== coupon.id));
+      return;
+    }
+
+    const hasNonStackableSelected = selectedCouponIds.some(id => {
+      const existingCoupon = availableCoupons.find(c => c.id === id);
+      return existingCoupon && existingCoupon.is_stackable === 0;
+    });
+
+    if (hasNonStackableSelected) {
+      return;
+    }
+
+    if (coupon.is_stackable === 0) {
+      setSelectedCouponIds([coupon.id]);
+      return;
+    }
+
+    setSelectedCouponIds(prev => [...prev, coupon.id]);
+  };
+
+  const handleReceiveCoupon = async (couponId: number) => {
+    if (!user) return;
+    try {
+      const response = await fetch('/api/coupons', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': String(user.id)
+        },
+        body: JSON.stringify({ coupon_id: couponId })
+      });
+
+      if (response.ok) {
+        await fetchCartCoupons();
+        setMyCouponsTab('available');
+      }
+    } catch (err) {
+      console.error('Failed to receive coupon:', err);
+    }
+  };
+
+  useEffect(() => {
+    const calculateCoupons = async () => {
+      const totals = getSelectedTotals();
+      if (selectedCouponIds.length === 0 || selectedItems.length === 0) {
+        setCouponDiscountUsd(0);
+        setCouponDiscountCny(0);
+        setCouponDiscountAed(0);
+        setTotalAfterCouponUsd(totals.usd);
+        setTotalAfterCouponCny(totals.cny);
+        setTotalAfterCouponAed(totals.aed);
+        return;
+      }
+
+      setIsCalculatingCoupons(true);
+      try {
+        const response = await fetch('/api/cart/coupons/calculate', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            coupon_ids: selectedCouponIds,
+            subtotal_usd: totals.usd,
+            subtotal_cny: totals.cny,
+            subtotal_aed: totals.aed
+          })
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setCouponDiscountUsd(data.data.coupon_discount_usd || 0);
+          setCouponDiscountCny(data.data.coupon_discount_cny || 0);
+          setCouponDiscountAed(data.data.coupon_discount_aed || 0);
+          setTotalAfterCouponUsd(data.data.total_usd ?? totals.usd);
+          setTotalAfterCouponCny(data.data.total_cny ?? totals.cny);
+          setTotalAfterCouponAed(data.data.total_aed ?? totals.aed);
+        }
+      } catch (err) {
+        console.error('Failed to calculate coupons:', err);
+      } finally {
+        setIsCalculatingCoupons(false);
+      }
+    };
+
+    calculateCoupons();
+  }, [selectedCouponIds, selectedItems, cartData.items]);
 
   const handleCheckout = () => {
     if (!isAuthenticated) {
@@ -520,13 +667,17 @@ export default function CartPage() {
 
                           <div className="flex items-center mt-1">
                             <span className="text-lg sm:text-xl font-bold" style={{ color: 'var(--primary)' }}>
-                              {formatCurrency(item.price, currency)}
+                              {formatCurrency(item.final_price_usd ?? item.price, 'USD')}
                             </span>
-                            {item.original_price && item.original_price > item.price && (
+                            {item.original_price && item.original_price > (item.final_price_usd ?? item.price) && (
                               <span className="ml-2 text-sm line-through" style={{ color: 'var(--text-muted)' }}>
-                                {formatCurrency(item.original_price, currency)}
+                                {formatCurrency(item.original_price, 'USD')}
                               </span>
                             )}
+                          </div>
+                          <div className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+                            <div>≈ {formatCurrency(item.final_price_cny ?? item.price_cny ?? 0, 'CNY')}</div>
+                            <div>≈ {formatCurrency(item.final_price_aed ?? item.price_aed ?? 0, 'AED')}</div>
                           </div>
 
                           {item.promotion && !item.promotion.is_expired && (
@@ -538,7 +689,7 @@ export default function CartPage() {
                                 </span>
                               )}
                               {/* 每个促销的单独标签 */}
-                              {(item.promotions || []).map((promo: any) => {
+                              {getDisplayPromotions(item.promotions || [], item.promotion).map((promo: any) => {
                                 if (['今日特惠', '特惠商品'].includes(promo.name)) return null;
                                 return (
                                   <span key={`cart-promo-${promo.id}`} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: promo.color || 'var(--accent)' }}>
@@ -618,14 +769,18 @@ export default function CartPage() {
 
                         <div className="hidden sm:block text-right ml-4">
                           <p className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
-                            {formatCurrency(item.price * item.quantity, currency)}
+                            {formatCurrency((item.final_price_usd ?? item.price) * item.quantity, 'USD')}
                           </p>
+                          <div className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+                            <div>≈ {formatCurrency((item.final_price_cny ?? item.price_cny ?? 0) * item.quantity, 'CNY')}</div>
+                            <div>≈ {formatCurrency((item.final_price_aed ?? item.price_aed ?? 0) * item.quantity, 'AED')}</div>
+                          </div>
                         </div>
                       </div>
 
                       <div className="sm:hidden mt-3 flex justify-between items-center">
                         <span className="text-lg font-bold" style={{ color: 'var(--primary)' }}>
-                          {formatCurrency(item.price * item.quantity, currency)}
+                          {formatCurrency((item.final_price_usd ?? item.price) * item.quantity, 'USD')}
                         </span>
                       </div>
                     </div>
@@ -649,7 +804,11 @@ export default function CartPage() {
                     {i18n.language === 'ar' ? 'المجموع الفرعي' : i18n.language === 'en' ? 'Subtotal' : '小计'}
                     <span className="text-sm ml-1">({selectedItems.length} {i18n.language === 'ar' ? 'منتج' : i18n.language === 'en' ? 'items' : '件'})</span>
                   </span>
-                  <span style={{ color: 'var(--text)' }}>{formatCurrency(getSelectedTotal(), currency)}</span>
+                  <span style={{ color: 'var(--text)' }}>{formatCurrency(getSelectedTotals().usd, 'USD')}</span>
+                </div>
+                <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  <div>≈ {formatCurrency(getSelectedTotals().cny, 'CNY')}</div>
+                  <div>≈ {formatCurrency(getSelectedTotals().aed, 'AED')}</div>
                 </div>
 
                 <div className="flex justify-between">
@@ -662,11 +821,327 @@ export default function CartPage() {
                 </div>
 
                 <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+                  <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--text)' }}>
+                    {i18n.language === 'ar' ? 'قسائم' : i18n.language === 'en' ? 'Coupons' : '优惠券'}
+                  </h3>
+
+                  <div
+                    onClick={() => setSelectedCouponIds([])}
+                    className={`p-3 border rounded-lg transition-all mb-3 ${
+                      selectedCouponIds.length === 0
+                        ? 'border-[var(--accent)] bg-[var(--accent)]/5 cursor-pointer'
+                        : 'border-[var(--border)] hover:border-[var(--accent)]/40 cursor-pointer'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        selectedCouponIds.length === 0
+                          ? 'border-[var(--accent)] bg-[var(--accent)]'
+                          : 'border-[var(--border)]'
+                      }`}>
+                        {selectedCouponIds.length === 0 && (
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-[var(--text)]">{i18n.language === 'ar' ? 'بدون قسيمة' : i18n.language === 'en' ? 'No coupon' : '不使用优惠券'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex border-b mb-4" style={{ borderColor: 'var(--border)' }}>
+                    <button
+                      onClick={() => setMyCouponsTab('available')}
+                      className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                        myCouponsTab === 'available' ? 'border-[var(--accent)]' : 'border-transparent'
+                      }`}
+                      style={{ color: myCouponsTab === 'available' ? 'var(--accent)' : 'var(--text-muted)' }}
+                    >
+                      可用 ({availableCoupons.length})
+                    </button>
+                    <button
+                      onClick={() => setMyCouponsTab('expired')}
+                      className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                        myCouponsTab === 'expired' ? 'border-[var(--accent)]' : 'border-transparent'
+                      }`}
+                      style={{ color: myCouponsTab === 'expired' ? 'var(--accent)' : 'var(--text-muted)' }}
+                    >
+                      已过期 ({expiredCoupons.length})
+                    </button>
+                    <button
+                      onClick={() => setMyCouponsTab('used')}
+                      className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                        myCouponsTab === 'used' ? 'border-[var(--accent)]' : 'border-transparent'
+                      }`}
+                      style={{ color: myCouponsTab === 'used' ? 'var(--accent)' : 'var(--text-muted)' }}
+                    >
+                      已使用 ({usedCoupons.length})
+                    </button>
+                    <button
+                      onClick={() => setMyCouponsTab('claimable')}
+                      className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                        myCouponsTab === 'claimable' ? 'border-[var(--accent)]' : 'border-transparent'
+                      }`}
+                      style={{ color: myCouponsTab === 'claimable' ? 'var(--accent)' : 'var(--text-muted)' }}
+                    >
+                      未领取 ({claimableCoupons.length})
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {myCouponsTab === 'available' && (
+                      availableCoupons.length === 0 ? (
+                        <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
+                          <p style={{ color: 'var(--text-muted)' }}>暂无可用优惠券</p>
+                        </div>
+                      ) : (
+                        availableCoupons.map((coupon) => {
+                          const isSelected = selectedCouponIds.includes(coupon.id);
+                          const hasNonStackableSelected = selectedCouponIds.some(id => {
+                            const c = availableCoupons.find(ac => ac.id === id);
+                            return c && c.is_stackable === 0;
+                          });
+                          const hasStackableSelected = selectedCouponIds.some(id => {
+                            const c = availableCoupons.find(ac => ac.id === id);
+                            return c && c.is_stackable === 1;
+                          });
+                          const isDisabled = !isSelected && (coupon.is_stackable === 0 ? hasStackableSelected || hasNonStackableSelected : hasNonStackableSelected);
+
+                          const discountText = coupon.discount_type === 'percentage'
+                            ? `${coupon.value}%`
+                            : `${coupon.value}`;
+
+                          const daysLeft = Math.max(0, Math.ceil((new Date(coupon.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+
+                          return (
+                            <div
+                              key={coupon.id}
+                              onClick={() => !isDisabled && handleCouponSelect(coupon)}
+                              style={{ backgroundColor: 'var(--card)' }}
+                              className={`rounded-lg overflow-hidden transition-all duration-200 cursor-pointer border ${
+                                isSelected
+                                  ? 'border-[var(--accent)] shadow-lg'
+                                  : isDisabled
+                                  ? 'border-[var(--border)] opacity-50 cursor-not-allowed'
+                                  : 'border-[var(--border)] hover:border-[var(--accent)]/40 shadow-md'
+                              }`}
+                            >
+                              <div className="flex h-full">
+                                <div className={`w-[120px] shrink-0 p-2 flex flex-col items-center justify-center ${
+                                  isSelected
+                                    ? 'bg-gradient-to-br from-accent to-accent-hover'
+                                    : 'bg-gradient-to-br from-accent to-accent'
+                                }`}>
+                                  <span className="text-white text-[10px] font-bold text-center leading-tight">{coupon.name}</span>
+                                  <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
+                                    {coupon.is_stackable === 1 ? '可叠加' : '不可叠加'}
+                                  </span>
+                                </div>
+                                <div className="flex-1 p-2">
+                                  <div className="flex justify-between items-start mb-1">
+                                    <div>
+                                      <span className="text-[var(--accent)] font-bold">{discountText}</span>
+                                      <p className="text-[10px] text-[var(--text-muted)]">{coupon.code}</p>
+                                    </div>
+                                    {isSelected && (
+                                      <span className="bg-green-500 text-white text-[10px] px-1 py-0.5 rounded">
+                                        ✓
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] mb-1 text-[var(--text)] truncate">{coupon.description}</p>
+                                  <div className="flex flex-wrap gap-1 text-[10px]">
+                                    <span className="bg-gray-100 px-1 py-0.5 rounded text-[var(--text-muted)]">
+                                      剩{daysLeft}天
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )
+                    )}
+
+                    {myCouponsTab === 'expired' && (
+                      expiredCoupons.length === 0 ? (
+                        <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
+                          <p style={{ color: 'var(--text-muted)' }}>无已过期优惠券</p>
+                        </div>
+                      ) : (
+                        expiredCoupons.map((coupon) => {
+                          const discountText = coupon.discount_type === 'percentage'
+                            ? `${coupon.value}%`
+                            : `${coupon.value}`;
+
+                          return (
+                            <div
+                              key={coupon.id}
+                              className="rounded-lg overflow-hidden border border-[var(--border)] bg-gray-50 opacity-60"
+                            >
+                              <div className="flex h-full">
+                                <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-gray-400 to-gray-500">
+                                  <span className="text-white text-[10px] font-bold text-center leading-tight">已过期</span>
+                                  <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
+                                    {coupon.name}
+                                  </span>
+                                </div>
+                                <div className="flex-1 p-2">
+                                  <div className="flex justify-between items-start mb-1">
+                                    <div>
+                                      <span className="text-gray-500 font-bold">{discountText}</span>
+                                      <p className="text-[10px] text-[var(--text-muted)]">{coupon.code}</p>
+                                    </div>
+                                  </div>
+                                  <p className="text-[10px] mb-1 text-[var(--text)] truncate">{coupon.description}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )
+                    )}
+
+                    {myCouponsTab === 'used' && (
+                      usedCoupons.length === 0 ? (
+                        <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
+                          <p style={{ color: 'var(--text-muted)' }}>无已使用优惠券</p>
+                        </div>
+                      ) : (
+                        usedCoupons.map((coupon) => {
+                          const discountText = coupon.discount_type === 'percentage'
+                            ? `${coupon.value}%`
+                            : `${coupon.value}`;
+
+                          return (
+                            <div
+                              key={coupon.id}
+                              className="rounded-lg overflow-hidden border border-[var(--border)] bg-gray-50 opacity-60"
+                            >
+                              <div className="flex h-full">
+                                <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-gray-400 to-gray-500">
+                                  <span className="text-white text-[10px] font-bold text-center leading-tight">已使用</span>
+                                  <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
+                                    {coupon.name}
+                                  </span>
+                                </div>
+                                <div className="flex-1 p-2">
+                                  <div className="flex justify-between items-start mb-1">
+                                    <div>
+                                      <span className="text-gray-500 font-bold">{discountText}</span>
+                                      <p className="text-[10px] text-[var(--text-muted)]">{coupon.code}</p>
+                                    </div>
+                                  </div>
+                                  <p className="text-[10px] mb-1 text-[var(--text)] truncate">{coupon.description}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )
+                    )}
+
+                    {myCouponsTab === 'claimable' && (
+                      claimableCoupons.length === 0 ? (
+                        <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
+                          <p style={{ color: 'var(--text-muted)' }}>无可领取优惠券</p>
+                        </div>
+                      ) : (
+                        claimableCoupons.map((coupon) => {
+                          const discountText = coupon.discount_type === 'percentage'
+                            ? `${coupon.value}%`
+                            : `${coupon.value}`;
+
+                          return (
+                            <div
+                              key={coupon.coupon_id}
+                              className="rounded-lg overflow-hidden border border-[var(--border)] bg-green-50"
+                            >
+                              <div className="flex h-full">
+                                <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-green-500 to-green-600">
+                                  <span className="text-white text-[10px] font-bold text-center leading-tight">待领取</span>
+                                  <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
+                                    {coupon.name}
+                                  </span>
+                                </div>
+                                <div className="flex-1 p-2">
+                                  <div className="flex justify-between items-start mb-1">
+                                    <div>
+                                      <span className="text-green-600 font-bold">{discountText}</span>
+                                      <p className="text-[10px] text-[var(--text-muted)]">{coupon.code}</p>
+                                    </div>
+                                  </div>
+                                  <p className="text-[10px] mb-1 text-[var(--text)] truncate">{coupon.description}</p>
+                                  <button
+                                    onClick={() => handleReceiveCoupon(coupon.coupon_id)}
+                                    className="px-2 py-1 bg-gradient-to-r from-green-500 to-green-600 text-white rounded text-[10px] font-medium hover:from-green-600 hover:to-green-700 transition-all cursor-pointer"
+                                  >
+                                    领取
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )
+                    )}
+                  </div>
+
+                  {unavailableCoupons.length > 0 && myCouponsTab === 'available' && (
+                    <div className="space-y-3 mt-4 opacity-60">
+                      <h3 className="text-sm font-medium opacity-70">{t('quick_order.unavailable_coupons', '不可用优惠券')}</h3>
+                      {unavailableCoupons.map((coupon) => {
+                        const discountText = coupon.discount_type === 'percentage'
+                          ? `${coupon.value}%`
+                          : `${coupon.value}`;
+
+                        return (
+                          <div
+                            key={coupon.id}
+                            className="p-4 border border-[var(--border)] rounded-lg bg-gray-50"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center bg-gray-200">
+                                <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-[var(--accent)]">{discountText}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {i18n.language === 'ar' ? 'خصم القسيمة' : i18n.language === 'en' ? 'Coupon Discount' : '优惠券优惠'}
+                  </span>
+                  <span style={{ color: 'var(--text)' }}>
+                    {isCalculatingCoupons ? '...' : `-${formatCurrency(couponDiscountUsd, 'USD')}`}
+                  </span>
+                </div>
+                <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  <div>≈ -{formatCurrency(couponDiscountCny, 'CNY')}</div>
+                  <div>≈ -{formatCurrency(couponDiscountAed, 'AED')}</div>
+                </div>
+
+                <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
                   <div className="flex justify-between text-lg font-bold">
                     <span style={{ color: 'var(--text)' }}>
                       {i18n.language === 'ar' ? 'المجموع' : i18n.language === 'en' ? 'Total' : '合计'}
                     </span>
-                    <span style={{ color: 'var(--primary)' }}>{formatCurrency(getSelectedTotal(), currency)}</span>
+                    <span style={{ color: 'var(--primary)' }}>{formatCurrency(totalAfterCouponUsd, 'USD')}</span>
+                  </div>
+                  <div className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+                    <div>≈ {formatCurrency(totalAfterCouponCny, 'CNY')}</div>
+                    <div>≈ {formatCurrency(totalAfterCouponAed, 'AED')}</div>
                   </div>
                 </div>
 
@@ -690,36 +1165,6 @@ export default function CartPage() {
                   <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
                     {i18n.language === 'ar' ? 'دفع آمن' : i18n.language === 'en' ? 'Secure Payment' : '安全支付'}
                   </span>
-                </div>
-
-                <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder={i18n.language === 'ar' ? 'كود الخصم' : i18n.language === 'en' ? 'Coupon Code' : '优惠券代码'}
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-lg text-sm"
-                      style={{
-                        background: 'var(--background)',
-                        border: '1px solid var(--border)',
-                        color: 'var(--text)'
-                      }}
-                    />
-                    <button
-                      className="px-4 py-2 rounded-lg text-sm font-medium"
-                      style={{
-                        background: 'transparent',
-                        color: 'var(--primary)',
-                        border: '1px solid var(--primary)'
-                      }}
-                    >
-                      {i18n.language === 'ar' ? 'تطبيق' : i18n.language === 'en' ? 'Apply' : '应用'}
-                    </button>
-                  </div>
-                  {couponError && (
-                    <p className="text-sm mt-2" style={{ color: 'var(--color-red)' }}>{couponError}</p>
-                  )}
                 </div>
               </div>
             </div>

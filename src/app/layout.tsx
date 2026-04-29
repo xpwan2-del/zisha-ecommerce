@@ -23,17 +23,17 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider>
           <LanguageProvider>
-            <AuthProvider>
-              <CartProvider>
-                <CurrencyProvider>
+            <CurrencyProvider>
+              <AuthProvider>
+                <CartProvider>
                   <Navbar />
                   <main className="pt-16">
                     {children}
                   </main>
                   <Footer />
-                </CurrencyProvider>
-              </CartProvider>
-            </AuthProvider>
+                </CartProvider>
+              </AuthProvider>
+            </CurrencyProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>
