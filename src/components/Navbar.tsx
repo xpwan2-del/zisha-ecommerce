@@ -36,13 +36,13 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto flex justify-end items-center">
           <div className="flex items-center space-x-8">
             <a href="/reviews" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
-              用户评价
+              {t('nav.reviews')}
             </a>
             <a href="/about" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
-              关于我们
+              {t('nav.about')}
             </a>
             <a href="/contact" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
-              联系我们
+              {t('nav.contact')}
             </a>
           </div>
         </div>
@@ -63,16 +63,16 @@ export function Navbar() {
           {/* Navigation links - Luxury Style */}
           <div className="flex items-center space-x-10">
             <a href="/deals" className="text-sm font-medium text-accent border-b-2 border-accent pb-5 tracking-wide transition-all duration-300">
-              今日特惠
+              {t('nav.deals')}
             </a>
             <a href="/products" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
-              所有商品
+              {t('nav.products')}
             </a>
             <a href="/customize" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
-              定制服务
+              {t('nav.customize')}
             </a>
             <a href="/flash-sale" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
-              一元购
+              {t('nav.flash_sale')}
             </a>
           </div>
           
@@ -84,18 +84,18 @@ export function Navbar() {
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 className="border border-border border-r-0 rounded-l-sm px-4 py-2.5 text-sm bg-card text-dark focus:outline-none focus:border-accent transition-colors duration-300"
               >
-                <option value="全部">全部</option>
-                <option value="teapots">茶壶</option>
-                <option value="cups">茶杯</option>
-                <option value="accessories">配件</option>
-                <option value="sets">套装</option>
+                <option value="all">{t('categories.all')}</option>
+                <option value="teapots">{t('categories.items.0')}</option>
+                <option value="cups">{t('categories.items.1')}</option>
+                <option value="accessories">{t('categories.items.2')}</option>
+                <option value="sets">{t('categories.items.3')}</option>
               </select>
               <form onSubmit={handleSearch} className="flex">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="搜索商品..."
+                  placeholder={t('products.search_placeholder')}
                   className="border border-border px-4 py-2.5 text-sm w-64 text-dark placeholder-text-muted focus:outline-none focus:border-accent transition-colors duration-300"
                 />
                 <button 
@@ -114,7 +114,19 @@ export function Navbar() {
                 onClick={() => changeLanguage('zh')}
                 className="text-sm text-dark hover:text-accent transition-colors duration-300 tracking-wide"
               >
-                中文
+                {t('common.zh')}
+              </button>
+              <button 
+                onClick={() => changeLanguage('en')}
+                className="text-sm text-dark hover:text-accent transition-colors duration-300 tracking-wide"
+              >
+                {t('common.en')}
+              </button>
+              <button 
+                onClick={() => changeLanguage('ar')}
+                className="text-sm text-dark hover:text-accent transition-colors duration-300 tracking-wide"
+              >
+                {t('common.ar')}
               </button>
               <a href="/cart" className="relative group">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-dark group-hover:text-accent transition-colors duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -151,28 +163,28 @@ export function Navbar() {
                     {isAuthenticated ? (
                       <>
                         <a href="/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          个人中心
+                          {t('nav.account')}
                         </a>
                         <a href="/account?tab=orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          我的订单
+                          {t('nav.orders')}
                         </a>
                         <a href="/account?tab=settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          个人资料
+                          {t('account.profile')}
                         </a>
                         <button 
                           onClick={handleLogout}
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         >
-                          登出
+                          {t('nav.logout')}
                         </button>
                       </>
                     ) : (
                       <>
                         <a href="/login" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          登录
+                          {t('nav.login')}
                         </a>
                         <a href="/register" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          注册
+                          {t('nav.register')}
                         </a>
                       </>
                     )}
