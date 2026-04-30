@@ -61,16 +61,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         ins.name_ar as status_name_ar,
         ins.color as status_color,
         ins.color_name as status_color_name,
-        pp_usd.price as price_usd,
-        pp_cny.price as price_cny,
-        pp_aed.price as price_aed
+        pp_usd.price as price_usd
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN inventory i ON p.id = i.product_id
       LEFT JOIN inventory_status ins ON i.status_id = ins.id
       LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-      LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-      LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
       WHERE p.id = ?`,
       [productId]
     );
@@ -280,14 +276,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         p.id, p.name, p.name_en, p.name_ar,
         p.image,
         c.name as category_name,
-        pp_usd.price as price_usd,
-        pp_cny.price as price_cny,
-        pp_aed.price as price_aed
+        pp_usd.price as price_usd
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-       LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-       LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
        WHERE p.category_id = ? AND p.id != ?
        ORDER BY p.id DESC
        LIMIT 4`,
@@ -299,8 +291,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       name_en: p.name_en,
       name_ar: p.name_ar,
       price_usd: parseFloat(p.price_usd) || 0,
-      price_cny: parseFloat(p.price_cny) || 0,
-      price_aed: parseFloat(p.price_aed) || 0,
       image: p.image,
       category: { name: p.category_name }
     }));
@@ -315,11 +305,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       description_en: row.description_en,
       description_ar: row.description_ar,
       price_usd: parseFloat(row.price_usd) || 0,
-      price_cny: parseFloat(row.price_cny) || 0,
-      price_aed: parseFloat(row.price_aed) || 0,
       original_price_usd: parseFloat(row.price_usd) || 0,
-      original_price_cny: parseFloat(row.price_cny) || 0,
-      original_price_aed: parseFloat(row.price_aed) || 0,
       stock: parseInt(row.stock) || 0,
       stock_status_id: row.stock_status_id || 1,
       stock_status_info: row.status_id ? {
@@ -367,11 +353,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         priority: promotion.priority,
         can_stack: promotion.can_stack,
         original_price_usd: parseFloat(row.price_usd),
-        original_price_cny: parseFloat(row.price_cny),
-        original_price_aed: parseFloat(row.price_aed),
         promotion_price_usd: parseFloat(row.price_usd) * discountInfo.multiplier,
-        promotion_price_cny: parseFloat(row.price_cny) * discountInfo.multiplier,
-        promotion_price_aed: parseFloat(row.price_aed) * discountInfo.multiplier,
         start_time: promotion.start_time,
         end_time: promotion.end_time
       } : null,

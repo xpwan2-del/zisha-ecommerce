@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useCart } from '@/lib/contexts/CartContext';
-import { formatCurrency } from '@/lib/utils/currency';
+import { formatMultiPriceSync } from '@/lib/utils/currency';
 import { getDisplayPromotions } from '@/lib/pricing/promotionDisplay';
 import Image from 'next/image';
 
@@ -104,12 +104,13 @@ interface PaymentMethod {
 export default function CartPage() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { refreshCart } = useCart();
 
   const [cartData, setCartData] = useState<CartData>({ items: [], total: 0, total_items: 0 });
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const isFetchingCart = useRef(false);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
   const [unavailableCoupons, setUnavailableCoupons] = useState<Coupon[]>([]);
@@ -136,12 +137,8 @@ export default function CartPage() {
   const [isCalculatingCoupons, setIsCalculatingCoupons] = useState(false);
 
   const fetchCartData = async () => {
-    if (!isAuthenticated) {
-      setLoading(false);
-      return;
-    }
-
     try {
+      setLoading(true);
       const response = await fetch('/api/cart', {
         credentials: 'include',
         headers: {
@@ -151,8 +148,17 @@ export default function CartPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setCartData(data.data);
-        setSelectedItems(data.data.items.map((item: CartItem) => item.id));
+        setCartData(data.data || { items: [], total: 0, total_items: 0 });
+        if (data.data?.items) {
+          setSelectedItems(data.data.items.map((item: CartItem) => item.id));
+        }
+        if (data.data?.coupons) {
+          setAvailableCoupons(data.data.coupons.available || []);
+          setUnavailableCoupons(data.data.coupons.unavailable || []);
+          setUsedCoupons(data.data.coupons.used || []);
+          setExpiredCoupons(data.data.coupons.expired || []);
+          setClaimableCoupons(data.data.coupons.claimable || []);
+        }
       }
     } catch (error) {
       console.error('Error fetching cart:', error);
@@ -162,29 +168,13 @@ export default function CartPage() {
   };
 
   useEffect(() => {
-    fetchCartData();
-  }, [isAuthenticated, i18n.language]);
-
-  const fetchCartCoupons = async () => {
-    if (!isAuthenticated) return;
-    try {
-      const response = await fetch('/api/cart/coupons', { credentials: 'include' });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setAvailableCoupons(data.data.coupons?.available || []);
-        setUnavailableCoupons(data.data.coupons?.unavailable || []);
-        setUsedCoupons(data.data.coupons?.used || []);
-        setExpiredCoupons(data.data.coupons?.expired || []);
-        setClaimableCoupons(data.data.coupons?.claimable || []);
-      }
-    } catch (error) {
-      console.error('Error fetching cart coupons:', error);
+    if (!authLoading && isAuthenticated) {
+      fetchCartData();
+    } else if (!authLoading && !isAuthenticated) {
+      setCartData({ items: [], total: 0, total_items: 0 });
+      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchCartCoupons();
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const fetchAddresses = async () => {
     if (!isAuthenticated) return;
@@ -479,6 +469,42 @@ export default function CartPage() {
     return { usd, cny, aed };
   };
 
+  const getSelectedPromotionsDiscount = (): { usd: number; cny: number; aed: number; totalPercent: number } => {
+    const selected = cartData.items.filter(item => selectedItems.includes(item.id));
+    let usd = 0;
+    let cny = 0;
+    let aed = 0;
+    let totalPercent = 0;
+
+    for (const item of selected) {
+      if (item.promotion && item.total_discount_percent && item.total_discount_percent > 0) {
+        const originalUsd = (item.original_price ?? item.price_usd ?? item.price) * item.quantity;
+        const discountUsd = originalUsd * (item.total_discount_percent / 100);
+        usd += discountUsd;
+        totalPercent = Math.max(totalPercent, item.total_discount_percent);
+
+        if (item.price_cny) {
+          const originalCny = item.price_cny * item.quantity;
+          cny += originalCny * (item.total_discount_percent / 100);
+        }
+        if (item.price_aed) {
+          const originalAed = item.price_aed * item.quantity;
+          aed += originalAed * (item.total_discount_percent / 100);
+        }
+      }
+    }
+
+    return { usd: Math.round(usd * 100) / 100, cny: Math.round(cny * 100) / 100, aed: Math.round(aed * 100) / 100, totalPercent };
+  };
+
+  const getSelectedOriginalTotal = (): { usd: number; cny: number; aed: number } => {
+    const selected = cartData.items.filter(item => selectedItems.includes(item.id));
+    const usd = selected.reduce((sum, item) => sum + (item.original_price ?? item.price_usd ?? item.price) * item.quantity, 0);
+    const cny = selected.reduce((sum, item) => sum + (item.price_cny ?? 0) * item.quantity, 0);
+    const aed = selected.reduce((sum, item) => sum + (item.price_aed ?? 0) * item.quantity, 0);
+    return { usd, cny, aed };
+  };
+
   const handleCouponSelect = (coupon: Coupon) => {
     const isSelected = selectedCouponIds.includes(coupon.id);
 
@@ -518,7 +544,7 @@ export default function CartPage() {
       });
 
       if (response.ok) {
-        await fetchCartCoupons();
+        await fetchCartData();
         setMyCouponsTab('available');
       }
     } catch (err) {
@@ -635,7 +661,6 @@ export default function CartPage() {
       setSelectedItems([]);
       setSelectedCouponIds([]);
       fetchCartData();
-      fetchCartCoupons();
 
       if (selectedPaymentMethod === 'paypal') {
         const paypalResp = await fetch('/api/payments/paypal', {
@@ -725,7 +750,6 @@ export default function CartPage() {
     } finally {
       setIsSubmitting(false);
       await fetchCartData();
-      await fetchCartCoupons();
       refreshCart();
     }
   };
@@ -892,17 +916,8 @@ export default function CartPage() {
 
                         <div className="flex items-center mt-1">
                           <span className="text-lg sm:text-xl font-bold" style={{ color: 'var(--primary)' }}>
-                            {formatCurrency(item.final_price_usd ?? item.price, 'USD')}
+                            {formatMultiPriceSync(item.final_price_usd ?? item.price_usd ?? item.price)}
                           </span>
-                          {item.original_price && item.original_price > (item.final_price_usd ?? item.price) && (
-                            <span className="ml-2 text-sm line-through" style={{ color: 'var(--text-muted)' }}>
-                              {formatCurrency(item.original_price, 'USD')}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-                          <div>≈ {formatCurrency(item.final_price_cny ?? item.price_cny ?? 0, 'CNY')}</div>
-                          <div>≈ {formatCurrency(item.final_price_aed ?? item.price_aed ?? 0, 'AED')}</div>
                         </div>
 
                         {item.promotion && !item.promotion.is_expired && (
@@ -992,18 +1007,14 @@ export default function CartPage() {
 
                       <div className="hidden sm:block text-right ml-4">
                         <p className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
-                          {formatCurrency((item.final_price_usd ?? item.price) * item.quantity, 'USD')}
+                          {formatMultiPriceSync((item.final_price_usd ?? item.price_usd ?? item.price) * item.quantity)}
                         </p>
-                        <div className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-                          <div>≈ {formatCurrency((item.final_price_cny ?? item.price_cny ?? 0) * item.quantity, 'CNY')}</div>
-                          <div>≈ {formatCurrency((item.final_price_aed ?? item.price_aed ?? 0) * item.quantity, 'AED')}</div>
-                        </div>
                       </div>
                     </div>
 
                     <div className="sm:hidden mt-3 flex justify-between items-center">
                       <span className="text-lg font-bold" style={{ color: 'var(--primary)' }}>
-                        {formatCurrency((item.final_price_usd ?? item.price) * item.quantity, 'USD')}
+                        {formatMultiPriceSync((item.final_price_usd ?? item.price_usd ?? item.price) * item.quantity)}
                       </span>
                     </div>
                   </div>
@@ -1434,50 +1445,77 @@ export default function CartPage() {
               </h2>
             </div>
             <div className="p-6 space-y-4">
-              <div className="flex justify-between">
-                <span style={{ color: 'var(--text-muted)' }}>
-                  {i18n.language === 'ar' ? 'المجموع الفرعي' : i18n.language === 'en' ? 'Subtotal' : '小计'}
-                  <span className="text-sm ml-1">({selectedItems.length} {i18n.language === 'ar' ? 'منتج' : i18n.language === 'en' ? 'items' : '件'})</span>
-                </span>
-                <span style={{ color: 'var(--text)' }}>{formatCurrency(getSelectedTotals().usd, 'USD')}</span>
-              </div>
-              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                <div>≈ {formatCurrency(getSelectedTotals().cny, 'CNY')}</div>
-                <div>≈ {formatCurrency(getSelectedTotals().aed, 'AED')}</div>
-              </div>
+              {(() => {
+                const promoDiscount = getSelectedPromotionsDiscount();
+                const originalTotal = getSelectedOriginalTotal();
+                const hasPromotions = promoDiscount.totalPercent > 0;
+                return (
+                  <>
+                    {hasPromotions && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          {i18n.language === 'ar' ? 'السعر الأصلي' : i18n.language === 'en' ? 'Original Price' : '原价'}
+                        </span>
+                        <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                          {formatMultiPriceSync(originalTotal.usd)}
+                        </span>
+                      </div>
+                    )}
 
-              <div className="flex justify-between">
-                <span style={{ color: 'var(--text-muted)' }}>
-                  {i18n.language === 'ar' ? 'الشحن' : i18n.language === 'en' ? 'Shipping' : '运费'}
-                </span>
-                <span style={{ color: 'var(--color-green)' }}>
-                  {i18n.language === 'ar' ? 'مجاني' : i18n.language === 'en' ? 'Free' : '免费'}
-                </span>
-              </div>
+                    {hasPromotions && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--color-green)' }}>
+                          {i18n.language === 'ar' ? 'خصم العرض' : i18n.language === 'en' ? 'Promotion Discount' : '促销活动'}
+                          <span className="text-xs ml-1" style={{ color: 'var(--color-green)' }}>
+                            ({promoDiscount.totalPercent}% OFF)
+                          </span>
+                        </span>
+                        <span style={{ color: 'var(--color-green)' }}>
+                          -{formatMultiPriceSync(promoDiscount.usd)}
+                        </span>
+                      </div>
+                    )}
 
-              <div className="flex justify-between">
-                <span style={{ color: 'var(--text-muted)' }}>
-                  {i18n.language === 'ar' ? 'خصم القسيمة' : i18n.language === 'en' ? 'Coupon Discount' : '优惠券优惠'}
-                </span>
-                <span style={{ color: 'var(--text)' }}>
-                  {isCalculatingCoupons ? '...' : `-${formatCurrency(couponDiscountUsd, 'USD')}`}
-                </span>
-              </div>
-              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                <div>≈ -{formatCurrency(couponDiscountCny, 'CNY')}</div>
-                <div>≈ -{formatCurrency(couponDiscountAed, 'AED')}</div>
-              </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {i18n.language === 'ar' ? 'المجموع الفرعي' : i18n.language === 'en' ? 'Subtotal' : '小计'}
+                        <span className="text-sm ml-1">({selectedItems.length} {i18n.language === 'ar' ? 'منتج' : i18n.language === 'en' ? 'items' : '件'})</span>
+                      </span>
+                      <span style={{ color: 'var(--text)' }}>{formatMultiPriceSync(getSelectedTotals().usd)}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {i18n.language === 'ar' ? 'الشحن' : i18n.language === 'en' ? 'Shipping' : '运费'}
+                      </span>
+                      <span style={{ color: 'var(--color-green)' }}>
+                        {i18n.language === 'ar' ? 'مجاني' : i18n.language === 'en' ? 'Free' : '免费'}
+                      </span>
+                    </div>
+
+                    {selectedCouponIds.length > 0 && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          {i18n.language === 'ar' ? 'خصم القسيمة' : i18n.language === 'en' ? 'Coupon Discount' : '优惠券优惠'}
+                          <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>
+                            ({selectedCouponIds.length})
+                          </span>
+                        </span>
+                        <span style={{ color: couponDiscountUsd > 0 ? 'var(--color-green)' : 'var(--text)' }}>
+                          {isCalculatingCoupons ? '...' : `-${formatMultiPriceSync(couponDiscountUsd)}`}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
                 <div className="flex justify-between text-lg font-bold">
                   <span style={{ color: 'var(--text)' }}>
                     {i18n.language === 'ar' ? 'المجموع' : i18n.language === 'en' ? 'Total' : '合计'}
                   </span>
-                  <span style={{ color: 'var(--primary)' }}>{formatCurrency(totalAfterCouponUsd, 'USD')}</span>
-                </div>
-                <div className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-                  <div>≈ {formatCurrency(totalAfterCouponCny, 'CNY')}</div>
-                  <div>≈ {formatCurrency(totalAfterCouponAed, 'AED')}</div>
+                  <span style={{ color: 'var(--primary)' }}>{formatMultiPriceSync(totalAfterCouponUsd)}</span>
                 </div>
               </div>
             </div>

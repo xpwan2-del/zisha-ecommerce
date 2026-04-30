@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const orderId = parseInt(searchParams.get('order_id') || '0', 10);
     const amount = searchParams.get('amount');
-    const currency = searchParams.get('currency') || 'CNY';
+    const currency = searchParams.get('currency') || 'USD';
     const order_number = searchParams.get('order_number');
 
     if (!orderId || !amount) {

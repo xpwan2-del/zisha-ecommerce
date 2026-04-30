@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/contexts/AuthContext";
 import { useCart } from "@/lib/contexts/CartContext";
 import { useCurrency } from "@/lib/contexts/CurrencyContext";
 import { useTheme } from "@/components/ThemeProvider";
-import { formatMultiCurrency, formatCurrency } from "@/lib/utils/currency";
+import { formatMultiCurrency, formatCurrency, formatMultiPriceSync } from "@/lib/utils/currency";
 import ImageModal from "@/components/ImageModal";
 
 // 辅助函数：从 Cookie 获取访客购物车
@@ -392,34 +392,14 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                 {(() => {
                   const hasPromotion = product.promotion && product.promotion.promotion_price_usd;
                   const priceUSD = hasPromotion ? product.promotion.promotion_price_usd : product.price_usd;
-                  const priceCNY = hasPromotion ? product.promotion.promotion_price_cny : product.price_cny;
-                  const priceAED = hasPromotion ? product.promotion.promotion_price_aed : product.price_aed;
-                  const originalPriceUSD = product.promotion?.original_price_usd || product.price_usd;
-                  const originalPriceCNY = product.promotion?.original_price_cny || product.price_cny;
-                  const originalPriceAED = product.promotion?.original_price_aed || product.price_aed;
-                  
-                  const prices = formatMultiCurrency(priceUSD, priceCNY, priceAED, themeColors);
-                  const originalPrices = formatMultiCurrency(originalPriceUSD, originalPriceCNY, originalPriceAED, themeColors);
                   
                   return (
                     <>
                       <div className="flex items-baseline gap-3">
                         <span className="text-3xl font-bold" style={{ color: 'var(--accent)' }}>
-                          {prices.usd}
+                          {formatMultiPriceSync(priceUSD)}
                         </span>
-                        {hasPromotion && (
-                          <span className="text-lg line-through opacity-60">{originalPrices.usd}</span>
-                        )}
                       </div>
-                      <div className="flex items-baseline text-sm text-gray-500 mt-1">
-                        <span className="mr-3">≈ {prices.cny}</span>
-                        <span>≈ {prices.aed}</span>
-                      </div>
-                      {hasPromotion && (
-                        <span className="text-sm font-medium mt-1 block" style={{ color: 'var(--accent)' }}>
-                          {t("products.save", "省")} {originalPrices.usd}
-                        </span>
-                      )}
                     </>
                   );
                 })()}
@@ -615,7 +595,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                     <img src={p.image} alt={p.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   </div>
                   <p className="text-sm line-clamp-2 group-hover:opacity-80" style={{ color: 'var(--text)' }}>{i18n.language === 'zh' ? p.name : i18n.language === 'ar' ? p.name_ar : p.name_en || p.name}</p>
-                  <p className="text-sm font-medium mt-1" style={{ color: 'var(--accent)' }}>{formatCurrency(p.price_usd || p.price || 0, 'USD', themeColors)}</p>
+                  <p className="text-sm font-medium mt-1" style={{ color: 'var(--accent)' }}>{formatMultiPriceSync(p.price_usd || p.price || 0)}</p>
                 </Link>
               ))}
             </div>

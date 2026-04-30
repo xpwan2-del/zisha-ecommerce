@@ -8,7 +8,7 @@ import { useCurrency } from '@/lib/contexts/CurrencyContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useCart } from '@/lib/contexts/CartContext';
 import { useTheme } from '@/components/ThemeProvider';
-import { formatMultiCurrency } from '@/lib/utils/currency';
+import { formatMultiCurrency, formatMultiPriceSync } from '@/lib/utils/currency';
 
 // 辅助函数：从 Cookie 获取访客购物车
 const getGuestCartFromCookie = (): any[] => {
@@ -523,27 +523,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                     )}
 
                     <div className="mb-3">
-                      {(() => {
-                        const prices = formatMultiCurrency(
-                          product.price_usd || 0,
-                          product.price_cny || 0,
-                          product.price_aed || 0,
-                          themeColors
-                        );
-                        return (
-                          <>
-                            <div className="flex items-baseline">
-                              <span className="text-lg font-bold" style={{ color: 'var(--accent)' }}>
-                                {prices.usd}
-                              </span>
-                            </div>
-                            <div className="flex items-baseline text-xs text-gray-500">
-                              <span className="mr-2">≈ {prices.cny}</span>
-                              <span>≈ {prices.aed}</span>
-                            </div>
-                          </>
-                        );
-                      })()}
+                      {formatMultiPriceSync(product.price_usd || 0)}
                     </div>
 
                     <div className="flex items-center text-xs text-gray-500 mb-3 min-h-[20px]">

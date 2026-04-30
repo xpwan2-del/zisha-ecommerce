@@ -319,14 +319,12 @@ export async function GET(request: NextRequest) {
       const orderResult = await query(`
         SELECT o.*, oi.product_id, oi.quantity, oi.price, oi.original_price, oi.promotion_ids,
                p.name, p.name_en, p.image, i.quantity as product_stock,
-               pp_usd.price as price_usd, pp_cny.price as price_cny, pp_aed.price as price_aed
+               pp_usd.price as price_usd
         FROM orders o
         JOIN order_items oi ON o.id = oi.order_id
         JOIN products p ON oi.product_id = p.id
         LEFT JOIN inventory i ON p.id = i.product_id
         LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-        LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-        LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
         WHERE o.order_number = ? AND o.user_id = ?
       `, [resolvedOrderNumber, userId]);
 
@@ -423,14 +421,10 @@ export async function GET(request: NextRequest) {
 
     const productResult = await query(`
       SELECT p.*, i.quantity as stock,
-             pp_usd.price as price_usd,
-             pp_cny.price as price_cny,
-             pp_aed.price as price_aed
+             pp_usd.price as price_usd
       FROM products p
       LEFT JOIN inventory i ON p.id = i.product_id
       LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-      LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-      LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
       WHERE p.id = ?
     `, [productId]);
     if (productResult.rows.length === 0) {
@@ -489,19 +483,13 @@ export async function GET(request: NextRequest) {
           name_ar: product.name_ar,
           image: product.image,
           price_usd: parseFloat(product.price_usd) || 0,
-          price_cny: parseFloat(product.price_cny) || 0,
-          price_aed: parseFloat(product.price_aed) || 0,
           original_price_usd: parseFloat(product.price_usd) || 0,
-          original_price_cny: parseFloat(product.price_cny) || 0,
-          original_price_aed: parseFloat(product.price_aed) || 0,
           discount_amount: discount,
           stock: product.stock ?? 0
         },
         quantity,
         subtotal_usd: subtotal,
         original_subtotal_usd: originalSubtotal,
-        subtotal_cny: parseFloat(product.price_cny) || 0,
-        original_subtotal_cny: parseFloat(product.price_cny) || 0,
         subtotal: subtotal,
         original_subtotal: originalSubtotal,
         original_price: parseFloat(product.price_usd) || 0,
@@ -511,8 +499,6 @@ export async function GET(request: NextRequest) {
         shipping_fee: 0,
         shipping_fee_usd: 0,
         total_usd: subtotal,
-        total_cny: parseFloat(product.price_cny) || 0,
-        total_aed: parseFloat(product.price_aed) || 0,
         display_currency: 'USD',
         display_total_usd: subtotal,
         addresses,

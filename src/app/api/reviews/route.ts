@@ -68,15 +68,11 @@ export async function GET(request: NextRequest) {
         p.name_en as product_name_en,
         p.name_ar as product_name_ar,
         p.image as product_image,
-        pp_usd.price as product_price_usd,
-        pp_cny.price as product_price_cny,
-        pp_aed.price as product_price_aed
+        pp_usd.price as product_price_usd
       FROM reviews r
       LEFT JOIN users u ON r.user_id = u.id
       LEFT JOIN products p ON r.product_id = p.id
       LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-      LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-      LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
     `;
 
     const params: any[] = [];

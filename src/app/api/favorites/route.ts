@@ -77,12 +77,10 @@ export async function GET(request: NextRequest) {
 
     const result = await query(
       `SELECT uf.id, uf.product_id, uf.created_at, p.name, p.name_en, p.name_ar, p.image,
-              pp_usd.price as price_usd, pp_cny.price as price_cny, pp_aed.price as price_aed
+              pp_usd.price as price_usd
        FROM user_favorites uf
        LEFT JOIN products p ON uf.product_id = p.id
        LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-       LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-       LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
        WHERE uf.user_id = ?
        ORDER BY uf.created_at DESC`,
       [user_id]

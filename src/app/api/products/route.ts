@@ -156,16 +156,12 @@ export async function GET(request: NextRequest) {
         ins.name_ar as status_name_ar,
         ins.color as status_color,
         ins.color_name as status_color_name,
-        pp_usd.price as price_usd,
-        pp_cny.price as price_cny,
-        pp_aed.price as price_aed
+        pp_usd.price as price_usd
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN inventory i ON p.id = i.product_id
       LEFT JOIN inventory_status ins ON i.status_id = ins.id
       LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-      LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-      LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
       ${whereClause}
       ${orderBy}
       LIMIT ? OFFSET ?
@@ -338,8 +334,6 @@ export async function GET(request: NextRequest) {
         description_en: row.description_en,
         description_ar: row.description_ar,
         price_usd: parseFloat(row.price_usd) || 0,
-        price_cny: parseFloat(row.price_cny) || 0,
-        price_aed: parseFloat(row.price_aed) || 0,
         stock: parseInt(row.stock) || 0,
         stock_status_id: row.stock_status_id || 1,
         stock_status_info: row.status_id ? {

@@ -191,14 +191,10 @@ export async function POST(request: NextRequest) {
     const productResult = await query(
       `SELECT p.id, p.name,
               COALESCE(i.quantity, 0) as stock,
-              pp_usd.price as price_usd,
-              pp_cny.price as price_cny,
-              pp_aed.price as price_aed
+              pp_usd.price as price_usd
        FROM products p
        LEFT JOIN inventory i ON p.id = i.product_id
        LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-       LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-       LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
        WHERE p.id = ?`,
       [product_id]
     );
@@ -282,7 +278,7 @@ export async function POST(request: NextRequest) {
     const promotionIds = activePromotionsResult.rows.map((row: any) => row.promotion_id);
     const promotionIdsJson = JSON.stringify(promotionIds);
 
-    const originalPrice = parseFloat(product.price) || 0;
+    const originalPrice = parseFloat(product.price_usd) || 0;
     let finalPrice = originalPrice;
 
     if (activePromotionsResult.rows.length > 0) {
@@ -309,7 +305,7 @@ export async function POST(request: NextRequest) {
 
     const orderInsertResult = await query(
       `INSERT INTO orders (
-        user_id, order_number, total_amount, total_original_price, shipping_fee,
+        user_id, order_number, total_after_promotions_amount, total_original_price, shipping_fee,
         order_final_discount_amount, payment_method, payment_status, order_status,
         shipping_address_id, coupon_ids, total_coupon_discount, final_amount,
         notes, created_at, updated_at
@@ -320,7 +316,7 @@ export async function POST(request: NextRequest) {
         totalAmount,
         totalOriginalPrice,
         0,
-        0,
+        discountAmount,
         '',
         'pending',
         'pending',
@@ -338,14 +334,12 @@ export async function POST(request: NextRequest) {
 
     await query(
       `INSERT INTO order_items (
-        order_id, product_id, quantity, price,
-        specifications, original_price, promotion_ids, discount_amount
-      ) VALUES (?, ?, ?, ?, '{}', ?, ?, ?)`,
+        order_id, product_id, quantity, specifications, original_price, promotion_ids, total_promotions_discount_amount
+      ) VALUES (?, ?, ?, '{}', ?, ?, ?)`,
       [
         orderId,
         product_id,
         quantity,
-        finalPrice,
         originalPrice,
         promotionIdsJson,
         productDiscount

@@ -167,17 +167,13 @@ export async function GET(request: NextRequest) {
         pr.color as promotion_color,
         pp.priority,
         pp.can_stack,
-        pp_usd.price as price_usd,
-        pp_cny.price as price_cny,
-        pp_aed.price as price_aed
+        pp_usd.price as price_usd
       FROM products p
       LEFT JOIN product_promotions pp ON p.id = pp.product_id
       LEFT JOIN promotions pr ON pp.promotion_id = pr.id
       LEFT JOIN inventory i ON p.id = i.product_id
       LEFT JOIN inventory_status ins ON i.status_id = ins.id
       LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-      LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-      LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
       WHERE (pp.end_time IS NULL OR (pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')))
       GROUP BY p.id
       ORDER BY p.id ASC

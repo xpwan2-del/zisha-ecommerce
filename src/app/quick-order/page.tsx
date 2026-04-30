@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useTheme } from '@/components/ThemeProvider';
-import { formatMultiCurrency } from '@/lib/utils/currency';
+import { formatMultiCurrency, formatMultiPriceSync } from '@/lib/utils/currency';
 import Image from 'next/image';
 
 interface ProductInfo {
@@ -602,19 +602,8 @@ function QuickOrderContent() {
                   )}
                   <div className="mt-2 flex items-center gap-3">
                     <span className="text-lg font-bold text-[var(--accent)]">
-                      {formatPrice(product.price_usd ?? 0, 'USD', themeColors)}
+                      {formatMultiPriceSync(product.price_usd ?? 0)}
                     </span>
-                    <span className="text-xs text-gray-500">≈ {formatPrice(product.price_cny ?? 0, 'CNY', themeColors)} ≈ {formatPrice(product.price_aed ?? 0, 'AED', themeColors)}</span>
-                    {(product.original_price_usd ?? 0) > (product.price_usd ?? 0) && (
-                      <>
-                        <span className="text-sm opacity-50 line-through">
-                          {formatPrice(product.original_price_usd ?? 0, 'USD', themeColors)}
-                        </span>
-                        <span className="text-xs bg-[var(--accent)]/10 text-[var(--accent)] px-2 py-1 rounded">
-                          -{Math.round((((product.original_price_usd ?? 0) - (product.price_usd ?? 0)) / (product.original_price_usd ?? 1)) * 100)}%
-                        </span>
-                      </>
-                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-center">
@@ -1102,7 +1091,7 @@ function QuickOrderContent() {
               <div className="p-6 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="opacity-70">{t('quick_order.original_price', '商品总价')}</span>
-                  <span className="line-through opacity-50">{formatPrice(priceData.original_subtotal ?? priceData.original_price ?? 0, 'USD')}</span>
+                  <span className="line-through opacity-50">{formatMultiPriceSync(priceData.original_subtotal ?? priceData.original_price ?? 0)}</span>
                 </div>
                 {priceData.product_discount > 0 && (
                   <>
@@ -1114,21 +1103,21 @@ function QuickOrderContent() {
                               <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">{promo.name}</span>
                               <span className="text-green-600">-{promo.percent}%</span>
                             </span>
-                            <span className="text-green-600">-{formatPrice(promo.discount, 'USD')}</span>
+                            <span className="text-green-600">-{formatMultiPriceSync(promo.discount)}</span>
                           </div>
                           <div className="text-xs text-green-600 pl-4 opacity-70">
-                            = {formatPrice(priceData.original_subtotal ?? 0, 'USD')} × {promo.percent}%
-                          </div>
+                              = {formatMultiPriceSync(priceData.original_subtotal ?? 0)} × {promo.percent}%
+                            </div>
                         </div>
                       ))
                     ) : (
                       <>
                         <div className="flex justify-between text-sm">
                           <span className="opacity-70">{t('quick_order.promotion_discount', '促销优惠')}</span>
-                          <span className="text-green-600">-{formatPrice(priceData.product_discount ?? 0, 'USD')}</span>
+                          <span className="text-green-600">-{formatMultiPriceSync(priceData.product_discount ?? 0)}</span>
                         </div>
                         <div className="text-xs text-green-600 pl-4 opacity-70">
-                          = {formatPrice(priceData.original_subtotal ?? 0, 'USD')} - {formatPrice(priceData.product_discount ?? 0, 'USD')}
+                          = {formatMultiPriceSync(priceData.original_subtotal ?? 0)} - {formatMultiPriceSync(priceData.product_discount ?? 0)}
                         </div>
                       </>
                     )}
@@ -1136,7 +1125,7 @@ function QuickOrderContent() {
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="opacity-70">{t('quick_order.after_promotion', '促销后小计')}</span>
-                  <span>{formatPrice(priceData.subtotal ?? priceData.total_usd ?? 0, 'USD')}</span>
+                  <span>{formatMultiPriceSync(priceData.subtotal ?? priceData.total_usd ?? 0)}</span>
                 </div>
                 {priceData.coupon_discount > 0 && (
                   <>
@@ -1150,9 +1139,9 @@ function QuickOrderContent() {
                         
                         let formula = '';
                         if (detail.type === 'percentage') {
-                          formula = `= ${formatPrice(prevRemaining, 'USD')} × ${detail.value}%`;
+                          formula = `= ${formatMultiPriceSync(prevRemaining)} × ${detail.value}%`;
                         } else {
-                          formula = `= ${formatPrice(prevRemaining, 'USD')} - ${detail.value}`;
+                          formula = `= ${formatMultiPriceSync(prevRemaining)} - ${formatMultiPriceSync(detail.discount ?? 0)}`;
                         }
                         
                         return (
@@ -1162,7 +1151,7 @@ function QuickOrderContent() {
                                 {detail.code || `券${detail.id}`}
                                 {detail.type === 'percentage' ? ` (${detail.value}%)` : ` (固定${detail.value})`}
                               </span>
-                              <span>-{formatPrice(detail.discount ?? 0, 'USD')}</span>
+                              <span>-{formatMultiPriceSync(detail.discount ?? 0)}</span>
                             </div>
                             <div className="text-xs text-green-600 pl-4 opacity-70">
                               {formula}
@@ -1174,21 +1163,21 @@ function QuickOrderContent() {
                     <div className="pt-2 border-t border-dashed border-[var(--border)]"></div>
                     <div className="flex justify-between text-sm text-green-600">
                       <span>{t('quick_order.coupon_discount', '优惠券优惠')}</span>
-                      <span>-{formatPrice(priceData.coupon_discount ?? 0, 'USD')}</span>
+                      <span>-{formatMultiPriceSync(priceData.coupon_discount ?? 0)}</span>
                     </div>
                     <div className="text-xs text-green-600 pl-4 opacity-70">
-                      = {formatPrice(priceData.subtotal ?? 0, 'USD')} - {formatPrice(priceData.coupon_discount ?? 0, 'USD')}
+                      = {formatMultiPriceSync(priceData.subtotal ?? 0)} - {formatMultiPriceSync(priceData.coupon_discount ?? 0)}
                     </div>
                   </>
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="opacity-70">{t('quick_order.after_coupon', '券后小计')}</span>
-                  <span>{formatPrice((priceData.subtotal ?? 0) - (priceData.coupon_discount ?? 0), 'USD')}</span>
+                  <span>{formatMultiPriceSync((priceData.subtotal ?? 0) - (priceData.coupon_discount ?? 0))}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="opacity-70">{t('quick_order.shipping_fee', '运费')}</span>
                   <span>
-                    {(priceData.shipping_fee ?? 0) > 0 ? formatPrice(priceData.shipping_fee, 'USD') : t('quick_order.free', '免费')}
+                    {(priceData.shipping_fee ?? 0) > 0 ? formatMultiPriceSync(priceData.shipping_fee) : t('quick_order.free', '免费')}
                   </span>
                 </div>
                 <div className="pt-3 border-t border-[var(--border)]">
@@ -1196,18 +1185,10 @@ function QuickOrderContent() {
                     <span className="font-medium">{t('quick_order.total', '合计')}</span>
                     <div className="text-right">
                       <span className="text-2xl font-bold text-[var(--accent)]">
-                        {paymentMethod === 'paypal'
-                          ? `$${(priceData.total_usd ?? 0).toFixed(2)}`
-                          : `¥${(priceData.total_cny ?? 0).toFixed(2)}`}
-                      </span>
-                      <span className="text-sm opacity-60 ml-1">
-                        ({paymentMethod === 'paypal' ? 'USD' : 'CNY'})
+                        {formatMultiPriceSync(priceData.total_usd ?? 0)}
                       </span>
                     </div>
                   </div>
-                  <p className="text-xs opacity-50 text-right mt-1">
-                    ≈ {formatPrice(priceData.total_aed ?? 0, 'AED')} AED
-                  </p>
                 </div>
               </div>
             </div>

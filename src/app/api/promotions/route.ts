@@ -96,17 +96,13 @@ export async function GET(request: NextRequest) {
               ins.color as status_color,
               ins.color_name as status_color_name,
               pr.discount_percent,
-              pp_usd.price as original_price_usd,
-              pp_cny.price as original_price_cny,
-              pp_aed.price as original_price_aed
+              pp_usd.price as original_price_usd
             FROM product_promotions pp
             JOIN products p ON pp.product_id = p.id
             JOIN promotions pr ON pp.promotion_id = pr.id
             LEFT JOIN inventory i ON p.id = i.product_id
             LEFT JOIN inventory_status ins ON i.status_id = ins.id
             LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
-            LEFT JOIN product_prices pp_cny ON p.id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-            LEFT JOIN product_prices pp_aed ON p.id = pp_aed.product_id AND pp_aed.currency = 'AED'
             WHERE pp.promotion_id = ? AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')
             ORDER BY pp.created_at DESC`,
             [promotion.id]
@@ -132,8 +128,6 @@ export async function GET(request: NextRequest) {
                 color_name: prod.status_color_name
               } : null,
               original_price_usd: originalPriceUSD,
-              original_price_cny: parseFloat(prod.original_price_cny),
-              original_price_aed: parseFloat(prod.original_price_aed),
               promotion_price_usd: promoPriceUSD,
               discount_amount_usd: originalPriceUSD - promoPriceUSD
             };

@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
     });
 
     const orderResult = await query(
-      `SELECT id, order_number, total_amount, total_original_price, order_final_discount_amount,
+      `SELECT id, order_number, total_after_promotions_amount, total_original_price, order_final_discount_amount,
               final_amount, shipping_address_id, shipping_fee, order_status
        FROM orders WHERE id = ? AND user_id = ?`,
       [order_id, userId]
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
     const address = addressResult.rows[0];
     const shippingFee = await calculateShipping(address.city);
 
-    const subtotal = Number(order.total_amount) || 0;
+    const subtotal = Number(order.total_after_promotions_amount) || 0;
     const originalTotal = Number(order.total_original_price) || 0;
     const productDiscount = Math.max(0, originalTotal - subtotal);
     let couponDiscount = 0;

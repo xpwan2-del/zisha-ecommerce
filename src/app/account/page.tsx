@@ -41,20 +41,40 @@ interface OrderItem {
   quantity: number;
 }
 
+interface MultiCurrency {
+  usd: number;
+  cny: number;
+  aed: number;
+}
+
 interface Order {
   id: number;
   order_number: string;
   order_status: string;
   payment_status: string;
-  subtotal: number;
-  discount_amount: number;
+  total_after_promotions_amount: number;
+  total_original_price: number;
+  order_final_discount_amount: number;
+  total_coupon_discount: number;
   shipping_fee: number;
   final_amount: number;
-  currency: string;
   created_at: string;
   items: OrderItem[];
   delivery_sub_status?: string;
   address?: { contact_name: string; phone: string; full_address: string };
+}
+
+interface OrderItem {
+  id: number;
+  product_id: number;
+  name: string;
+  name_en?: string;
+  name_ar?: string;
+  image: string;
+  quantity: number;
+  original_price: number;
+  promotion_ids: number[];
+  total_promotions_discount_amount: number;
 }
 
 function formatDiscount(type: 'percentage' | 'fixed', value: number): string {
@@ -62,6 +82,17 @@ function formatDiscount(type: 'percentage' | 'fixed', value: number): string {
     return `${value}% OFF`;
   }
   return `减 ${value} 元`;
+}
+
+function formatMultiCurrency(amount: MultiCurrency | number): string {
+  if (typeof amount === 'number') {
+    return `$${amount.toFixed(2)} / ¥${(amount * 7.19).toFixed(2)} / AED${(amount / 0.2722).toFixed(2)}`;
+  }
+  return `$${amount.usd.toFixed(2)} / ¥${amount.cny.toFixed(2)} / AED${amount.aed.toFixed(2)}`;
+}
+
+function formatPriceUSD(usdPrice: number): string {
+  return `$${usdPrice.toFixed(2)} / ¥${(usdPrice * 7.19).toFixed(2)} / AED${(usdPrice / 0.2722).toFixed(2)}`;
 }
 
 function getRemainingDays(expiresAt: string): number {
@@ -356,7 +387,7 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
               <img src={item.image || 'https://picsum.photos/80'} alt={item.name} className="w-12 h-12 object-cover rounded border" style={{ borderColor: 'var(--border)' }} />
               <div className="flex-1">
                 <h4 className="font-medium text-sm" style={{ color: 'var(--text)' }}>{item.name}</h4>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{order.currency} {item.price.toFixed(2)} × {item.quantity}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{formatPriceUSD(item.original_price)} × {item.quantity}</p>
               </div>
             </div>
           ))}
@@ -364,7 +395,7 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
         <div className="mt-3 flex items-center justify-between">
           <div>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>实付：</span>
-            <span className="text-base font-bold ml-1" style={{ color: 'var(--accent)' }}>{order.currency} {order.final_amount.toFixed(2)}</span>
+            <span className="text-base font-bold ml-1" style={{ color: 'var(--accent)' }}>{formatPriceUSD(order.final_amount)}</span>
           </div>
           <div className="flex gap-2 items-center">
             {getBtns()}
@@ -421,9 +452,9 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{item.name}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>单价：{order.currency} {item.price.toFixed(2)} × {item.quantity}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>单价：{formatPriceUSD(item.original_price)} × {item.quantity}</p>
                     </div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{order.currency} {(item.price * item.quantity).toFixed(2)}</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{formatPriceUSD(item.original_price * item.quantity)}</p>
                   </div>
                 ))}
               </div>
@@ -434,19 +465,19 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--text-muted)' }}>商品总价：</span>
-                  <span style={{ color: 'var(--text)' }}>{order.currency} {order.subtotal.toFixed(2)}</span>
+                  <span style={{ color: 'var(--text)' }}>{formatPriceUSD(order.total_original_price)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--text-muted)' }}>运费：</span>
-                  <span style={{ color: 'var(--text)' }}>{order.currency} {order.shipping_fee.toFixed(2)}</span>
+                  <span style={{ color: 'var(--text)' }}>{formatPriceUSD(order.shipping_fee)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--text-muted)' }}>优惠：</span>
-                  <span style={{ color: 'var(--accent)' }}>-{order.currency} {order.discount_amount.toFixed(2)}</span>
+                  <span style={{ color: 'var(--accent)' }}>-{formatPriceUSD(order.total_coupon_discount)}</span>
                 </div>
                 <div className="flex justify-between font-semibold pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
                   <span style={{ color: 'var(--text)' }}>实付金额：</span>
-                  <span style={{ color: 'var(--accent)' }}>{order.currency} {order.final_amount.toFixed(2)}</span>
+                  <span style={{ color: 'var(--accent)' }}>{formatPriceUSD(order.final_amount)}</span>
                 </div>
               </div>
             </div>

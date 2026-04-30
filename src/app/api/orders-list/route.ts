@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
         o.order_number,
         o.order_status,
         o.payment_status,
-        o.total_amount,
+        o.total_after_promotions_amount,
+        o.total_original_price,
         o.order_final_discount_amount,
         o.total_coupon_discount,
         o.final_amount,
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    ordersSql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
+    ordersSql += ' ORDER BY COALESCE(o.updated_at, o.created_at) DESC LIMIT ? OFFSET ?';
     params.push(limit, (page - 1) * limit);
 
     const ordersResult = await query(ordersSql, params);
@@ -68,7 +69,8 @@ export async function GET(request: NextRequest) {
     const orderIds = ordersResult.rows.map((o: any) => o.id);
 
     const itemsResult = await query(
-      `SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price,
+      `SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.original_price,
+              oi.promotion_ids, oi.total_promotions_discount_amount,
               p.name, p.name_en, p.name_ar, p.image
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
@@ -87,7 +89,9 @@ export async function GET(request: NextRequest) {
         name: item.name,
         name_en: item.name_en,
         image: item.image,
-        price: item.price,
+        original_price: item.original_price,
+        promotion_ids: item.promotion_ids ? JSON.parse(item.promotion_ids) : [],
+        total_promotions_discount_amount: item.total_promotions_discount_amount || 0,
         quantity: item.quantity
       });
     }
@@ -97,11 +101,12 @@ export async function GET(request: NextRequest) {
       order_number: o.order_number,
       order_status: o.order_status,
       payment_status: o.payment_status,
-      subtotal: o.total_amount,
-      discount_amount: o.order_final_discount_amount || 0,
+      total_after_promotions_amount: o.total_after_promotions_amount || 0,
+      total_original_price: o.total_original_price || 0,
+      order_final_discount_amount: o.order_final_discount_amount || 0,
+      total_coupon_discount: o.total_coupon_discount || 0,
       shipping_fee: o.shipping_fee || 0,
-      final_amount: o.final_amount,
-      currency: 'AED',
+      final_amount: o.final_amount || 0,
       created_at: o.created_at,
       address: {
         contact_name: o.contact_name || '',

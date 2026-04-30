@@ -148,11 +148,9 @@ export async function POST(request: NextRequest) {
         ci.product_id,
         ci.quantity,
         p.name,
-        p.image,
+                p.image,
         i.quantity as stock,
-        MAX(CASE WHEN pp.currency = 'USD' THEN pp.price END) as price_usd,
-        MAX(CASE WHEN pp.currency = 'CNY' THEN pp.price END) as price_cny,
-        MAX(CASE WHEN pp.currency = 'AED' THEN pp.price END) as price_aed
+        MAX(CASE WHEN pp.currency = 'USD' THEN pp.price END) as price_usd
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
       LEFT JOIN inventory i ON ci.product_id = i.product_id
@@ -205,11 +203,7 @@ export async function POST(request: NextRequest) {
     const items = cartItemsResult.rows.map((row: any) => {
       const promos = promotionsMap.get(row.product_id) || [];
       const originalUsd = parseFloat(row.price_usd) || 0;
-      const originalCny = parseFloat(row.price_cny) || 0;
-      const originalAed = parseFloat(row.price_aed) || 0;
       const finalUsd = round2(applyPromotions(originalUsd, promos).finalPrice);
-      const finalCny = round2(applyPromotions(originalCny, promos).finalPrice);
-      const finalAed = round2(applyPromotions(originalAed, promos).finalPrice);
       const promotionIds = promos.map((p: any) => p.id);
 
       return {
@@ -220,11 +214,7 @@ export async function POST(request: NextRequest) {
         quantity: row.quantity,
         stock: row.stock || 0,
         original_price_usd: originalUsd,
-        original_price_cny: originalCny,
-        original_price_aed: originalAed,
         price_usd: finalUsd,
-        price_cny: finalCny,
-        price_aed: finalAed,
         promotion_ids: promotionIds
       };
     });
@@ -250,22 +240,16 @@ export async function POST(request: NextRequest) {
     }
 
     const totalOriginalUsd = round2(items.reduce((sum, i) => sum + i.original_price_usd * i.quantity, 0));
-    const totalOriginalCny = round2(items.reduce((sum, i) => sum + i.original_price_cny * i.quantity, 0));
-    const totalOriginalAed = round2(items.reduce((sum, i) => sum + i.original_price_aed * i.quantity, 0));
     const subtotalUsd = round2(items.reduce((sum, i) => sum + i.price_usd * i.quantity, 0));
-    const subtotalCny = round2(items.reduce((sum, i) => sum + i.price_cny * i.quantity, 0));
-    const subtotalAed = round2(items.reduce((sum, i) => sum + i.price_aed * i.quantity, 0));
 
-    const { totalDiscount, couponDetails } = await applyMultipleCoupons(couponIds, subtotalAed, userId);
-    const couponDiscount = Math.min(round2(totalDiscount), subtotalAed);
+    const { totalDiscount, couponDetails } = await applyMultipleCoupons(couponIds, subtotalUsd, userId);
+    const couponDiscount = Math.min(round2(totalDiscount), subtotalUsd);
 
     const shippingFee = 0;
-    const finalAed = Math.max(0, round2(subtotalAed - couponDiscount + shippingFee));
-    const finalUsd = Math.max(0, round2(subtotalUsd - couponDiscount));
-    const finalCny = Math.max(0, round2(subtotalCny - couponDiscount));
+    const finalUsd = Math.max(0, round2(subtotalUsd - couponDiscount + shippingFee));
 
-    const productDiscountAed = Math.max(0, round2(totalOriginalAed - subtotalAed));
-    const orderFinalDiscountAmount = round2(productDiscountAed + couponDiscount);
+    const productDiscountUsd = Math.max(0, round2(totalOriginalUsd - subtotalUsd));
+    const orderFinalDiscountAmount = round2(productDiscountUsd + couponDiscount);
 
     const orderNumber = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
@@ -276,18 +260,18 @@ export async function POST(request: NextRequest) {
           user_id, order_number, payment_method, order_status,
           total_amount, total_original_price, total_coupon_discount,
           order_final_discount_amount, final_amount,
-          shipping_address_id, shipping_fee, coupon_ids
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          shipping_address_id, shipping_fee, coupon_ids, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
         [
           userId,
           orderNumber,
           paymentMethod,
           'pending',
-          subtotalAed,
-          totalOriginalAed,
+          subtotalUsd,
+          totalOriginalUsd,
           couponDiscount,
           orderFinalDiscountAmount,
-          finalAed,
+          finalUsd,
           addressId,
           shippingFee,
           JSON.stringify(couponIds)
@@ -297,7 +281,7 @@ export async function POST(request: NextRequest) {
       const orderId = orderInsert.lastInsertRowid;
 
       for (const item of items) {
-        const discountAmount = round2((item.original_price_aed - item.price_aed) * item.quantity);
+        const discountAmount = round2((item.original_price_usd - item.price_usd) * item.quantity);
 
         await query(
           `INSERT INTO order_items (order_id, product_id, quantity, price, specifications, original_price, promotion_ids, discount_amount)
@@ -306,9 +290,9 @@ export async function POST(request: NextRequest) {
             orderId,
             item.product_id,
             item.quantity,
-            item.price_aed,
+            item.price_usd,
             '{}',
-            item.original_price_aed,
+            item.original_price_usd,
             item.promotion_ids.length > 0 ? JSON.stringify(item.promotion_ids) : null,
             discountAmount
           ]
@@ -406,8 +390,6 @@ export async function POST(request: NextRequest) {
           order_number: orderNumber,
           payment_method: paymentMethod,
           amount_usd: finalUsd,
-          amount_cny: finalCny,
-          amount_aed: finalAed,
           coupon_discount: couponDiscount,
           coupon_details: couponDetails,
           items: items.map((i) => ({
@@ -416,8 +398,6 @@ export async function POST(request: NextRequest) {
             image: i.image,
             price: i.price_usd,
             price_usd: i.price_usd,
-            price_cny: i.price_cny,
-            price_aed: i.price_aed,
             quantity: i.quantity
           }))
         }

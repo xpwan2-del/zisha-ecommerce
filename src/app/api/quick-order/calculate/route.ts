@@ -38,15 +38,10 @@ interface CalculateRequest {
   payment_method: 'paypal' | 'alipay';
 }
 
-async function calculateProductPrice(productId: number): Promise<{ originalPrice: number; finalPrice: number; discount: number; priceUsd: number; priceCny: number; priceAed: number; promotions: Array<{id: number; name: string; discount: number; percent: number}> }> {
+async function calculateProductPrice(productId: number): Promise<{ originalPrice: number; finalPrice: number; discount: number; priceUsd: number; promotions: Array<{id: number; name: string; discount: number; percent: number}> }> {
   const productResult = await query(
-    `SELECT 
-      pp_usd.price as price_usd,
-      pp_cny.price as price_cny,
-      pp_aed.price as price_aed
+    `SELECT pp_usd.price as price_usd
     FROM product_prices pp_usd
-    LEFT JOIN product_prices pp_cny ON pp_usd.product_id = pp_cny.product_id AND pp_cny.currency = 'CNY'
-    LEFT JOIN product_prices pp_aed ON pp_usd.product_id = pp_aed.product_id AND pp_aed.currency = 'AED'
     WHERE pp_usd.product_id = ? AND pp_usd.currency = 'USD'`,
     [productId]
   );
@@ -109,8 +104,6 @@ async function calculateProductPrice(productId: number): Promise<{ originalPrice
     finalPrice: finalPriceUSD,
     discount,
     priceUsd: originalPriceUSD,
-    priceCny: parseFloat(product.price_cny) || 0,
-    priceAed: parseFloat(product.price_aed) || 0,
     promotions
   };
 }
@@ -316,7 +309,7 @@ export async function POST(request: NextRequest) {
       paymentMethod: payment_method
     });
 
-    const { originalPrice, finalPrice, discount: productDiscount, priceUsd, priceCny, priceAed, promotions } = await calculateProductPrice(product_id);
+    const { originalPrice, finalPrice, discount: productDiscount, priceUsd, promotions } = await calculateProductPrice(product_id);
 
     const subtotalUSD = finalPrice * quantity;
     const originalSubtotalUSD = originalPrice * quantity;
@@ -352,8 +345,6 @@ export async function POST(request: NextRequest) {
     let displayCurrency: string;
     let displayTotal: number;
 
-    const totalCNY = priceCny * quantity - couponDiscount + shippingFee;
-
     displayCurrency = 'USD';
     displayTotal = totalUSD;
 
@@ -367,9 +358,7 @@ export async function POST(request: NextRequest) {
       subtotalUSD: subtotalUSD,
       couponDiscountUSD: couponDiscount,
       shippingFeeUSD: shippingFee,
-      totalUSD: totalUSD,
-      totalCNY: totalCNY,
-      totalAED: totalUSD
+      totalUSD: totalUSD
     });
 
     return NextResponse.json({
@@ -378,26 +367,15 @@ export async function POST(request: NextRequest) {
         product: {
           id: product_id,
           price_usd: finalPrice,
-          price_cny: priceCny,
-          price_aed: priceAed,
           original_price_usd: originalPrice,
-          original_price_cny: priceCny,
-          original_price_aed: priceAed,
           quantity
         },
         subtotal_usd: subtotalUSD,
         original_subtotal_usd: originalSubtotalUSD,
-        subtotal_cny: priceCny * quantity,
-        original_subtotal_cny: priceCny * quantity,
         product_discount_usd: productDiscount,
-        product_discount_cny: productDiscount,
         coupon_discount_usd: couponDiscount,
-        coupon_discount_cny: couponDiscount,
         shipping_fee_usd: shippingFee,
-        shipping_fee_cny: shippingFee,
         total_usd: totalUSD,
-        total_cny: totalCNY,
-        total_aed: priceAed * quantity + shippingFee,
         display_currency: 'USD',
         display_total: totalUSD,
         address: addressInfo,
