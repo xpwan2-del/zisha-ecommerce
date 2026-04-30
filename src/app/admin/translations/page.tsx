@@ -1,323 +1,397 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-interface Translation {
-  id: number;
+interface TranslationData {
   key: string;
-  language: string;
-  value: string;
-  created_at: string;
-  updated_at: string;
+  zh?: string;
+  en?: string;
+  ar?: string;
+  updated_at?: string;
+}
+
+interface MissingStats {
+  total_keys: number;
+  complete: number;
+  missing: number;
+  by_language: {
+    zh: { total: number; missing: number };
+    en: { total: number; missing: number };
+    ar: { total: number; missing: number };
+  };
 }
 
 export default function TranslationsPage() {
-  const { t } = useTranslation();
-  const [translations, setTranslations] = useState<Translation[]>([]);
+  const { t, i18n } = useTranslation();
+  const [translations, setTranslations] = useState<TranslationData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Translation | null>(null);
-  const [newTranslation, setNewTranslation] = useState({
-    key: '',
-    language: 'en',
-    value: ''
-  });
+  const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState('');
-  const [languageFilter, setLanguageFilter] = useState('all');
+  const [namespaceFilter, setNamespaceFilter] = useState('all');
+  const [missingStats, setMissingStats] = useState<MissingStats | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<{ zh: string; en: string; ar: string }>({ zh: '', en: '', ar: '' });
 
-  // 加载翻译数据
-  useEffect(() => {
-    fetchTranslations();
-  }, []);
-
-  const fetchTranslations = async () => {
+  const fetchTranslations = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/translations');
       if (response.ok) {
         const data = await response.json();
-        // 将对象转换为数组格式
-        const translationsArray: Translation[] = [];
-        let idCounter = 1;
-        
-        const processObject = (obj: any, prefix: string = '', language: string = '') => {
+        const translationsArray: TranslationData[] = [];
+        const processObject = (obj: any, prefix: string = '') => {
           Object.keys(obj).forEach(key => {
             const value = obj[key];
             const fullKey = prefix ? `${prefix}.${key}` : key;
-            
+
             if (typeof value === 'string' && value) {
-              translationsArray.push({
-                id: idCounter++,
-                key: fullKey,
-                language: language,
-                value,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
+              const existing = translationsArray.find(t => t.key === fullKey);
+              if (existing) {
+                existing[data.key === fullKey ? data.key.split('.').pop() as string : ''] = value;
+              } else {
+                translationsArray.push({ key: fullKey, [data.key]: value });
+              }
             } else if (typeof value === 'object' && value !== null) {
-              processObject(value, fullKey, language);
+              processObject(value, fullKey);
             }
           });
         };
-        
+
         Object.keys(data).forEach(language => {
-          const languageData = data[language];
-          processObject(languageData, '', language);
+          processObject(data[language], '');
         });
-        
-        setTranslations(translationsArray);
+
+        const mergedTranslations: { [key: string]: TranslationData } = {};
+        translationsArray.forEach(item => {
+          const existing = mergedTranslations[item.key];
+          if (existing) {
+            Object.assign(existing, item);
+          } else {
+            mergedTranslations[item.key] = { ...item };
+          }
+        });
+
+        setTranslations(Object.values(mergedTranslations));
       }
     } catch (error) {
       console.error('Error fetching translations:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleEdit = (translation: Translation) => {
-    setEditing(translation);
-  };
-
-  const handleSave = async () => {
-    if (!editing) return;
-
+  const fetchMissingStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/translations', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(editing)
-      });
-
+      const response = await fetch('/api/translations/missing');
       if (response.ok) {
-        fetchTranslations();
-        setEditing(null);
+        const data = await response.json();
+        setMissingStats(data.data);
       }
     } catch (error) {
-      console.error('Error updating translation:', error);
+      console.error('Error fetching missing stats:', error);
     }
-  };
+  }, []);
 
-  const handleAdd = async () => {
-    if (!newTranslation.key || !newTranslation.value) return;
+  useEffect(() => {
+    fetchTranslations();
+    fetchMissingStats();
+  }, [fetchTranslations, fetchMissingStats]);
 
+  const handleSync = async () => {
+    setSyncing(true);
     try {
-      const response = await fetch('/api/translations', {
+      const response = await fetch('/api/translations/sync', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newTranslation)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'full' })
       });
 
       if (response.ok) {
+        const result = await response.json();
+        alert(`同步完成！新增: ${result.data.added}, 更新: ${result.data.updated}`);
         fetchTranslations();
-        setNewTranslation({ key: '', language: 'en', value: '' });
+        fetchMissingStats();
       }
     } catch (error) {
-      console.error('Error adding translation:', error);
+      console.error('Error syncing translations:', error);
+      alert('同步失败');
+    } finally {
+      setSyncing(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this translation?')) {
-      try {
-        const response = await fetch(`/api/translations?id=${id}`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          fetchTranslations();
-        }
-      } catch (error) {
-        console.error('Error deleting translation:', error);
+  const handleExport = async (format: 'json' | 'csv') => {
+    try {
+      const response = await fetch(`/api/translations/export?format=${format}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `translations-${Date.now()}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       }
+    } catch (error) {
+      console.error('Error exporting translations:', error);
     }
   };
 
-  // 过滤翻译
-  const filteredTranslations = translations.filter(translation => {
-    const matchesSearch = translation.key.toLowerCase().includes(search.toLowerCase()) ||
-                         translation.value.toLowerCase().includes(search.toLowerCase());
-    const matchesLanguage = languageFilter === 'all' || translation.language === languageFilter;
-    return matchesSearch && matchesLanguage;
+  const handleEdit = (item: TranslationData) => {
+    setEditingKey(item.key);
+    setEditValues({
+      zh: item.zh || '',
+      en: item.en || '',
+      ar: item.ar || ''
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingKey) return;
+
+    try {
+      const promises = [];
+      if (editValues.zh) {
+        promises.push(fetch('/api/translations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: editingKey, language: 'zh', value: editValues.zh })
+        }));
+      }
+      if (editValues.en) {
+        promises.push(fetch('/api/translations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: editingKey, language: 'en', value: editValues.en })
+        }));
+      }
+      if (editValues.ar) {
+        promises.push(fetch('/api/translations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: editingKey, language: 'ar', value: editValues.ar })
+        }));
+      }
+
+      await Promise.all(promises);
+      setEditingKey(null);
+      fetchTranslations();
+      fetchMissingStats();
+    } catch (error) {
+      console.error('Error saving translation:', error);
+    }
+  };
+
+  const getNamespaceFromKey = (key: string) => {
+    return key.split('.')[0];
+  };
+
+  const filteredTranslations = translations.filter(item => {
+    const matchesSearch = search === '' ||
+      item.key.toLowerCase().includes(search.toLowerCase()) ||
+      (item.zh && item.zh.includes(search)) ||
+      (item.en && item.en.toLowerCase().includes(search.toLowerCase())) ||
+      (item.ar && item.ar.includes(search));
+
+    const namespace = getNamespaceFromKey(item.key);
+    const matchesNamespace = namespaceFilter === 'all' || namespace === namespaceFilter;
+
+    return matchesSearch && matchesNamespace;
   });
 
-  return (
-    <div className="py-12 px-4">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Translation Management</h1>
+  const namespaces = Array.from(new Set(translations.map(t => getNamespaceFromKey(t.key))));
 
-        {/* Search and Filter */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <input
-            type="text"
-            placeholder="Search translations..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
-          />
-          <select
-            value={languageFilter}
-            onChange={(e) => setLanguageFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
-          >
-            <option value="all">All Languages</option>
-            <option value="en">English</option>
-            <option value="zh">Chinese</option>
-            <option value="ar">Arabic</option>
-          </select>
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {t('admin.translations.title', '翻译管理')}
+          </h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            {t('admin.translations.description', '管理系统UI文本翻译，支持中文、英文、阿拉伯文')}
+          </p>
         </div>
 
-        {/* Add New Translation */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow mb-8">
-          <h2 className="text-xl font-semibold mb-4">Add New Translation</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              placeholder="Translation Key"
-              value={newTranslation.key}
-              onChange={(e) => setNewTranslation({ ...newTranslation, key: e.target.value })}
-              className="px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-            <select
-              value={newTranslation.language}
-              onChange={(e) => setNewTranslation({ ...newTranslation, language: e.target.value })}
-              className="px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-              <option value="en">English</option>
-              <option value="zh">Chinese</option>
-              <option value="ar">Arabic</option>
-            </select>
-            <input
-              type="text"
-              placeholder="Translation Value"
-              value={newTranslation.value}
-              onChange={(e) => setNewTranslation({ ...newTranslation, value: e.target.value })}
-              className="px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
+        {/* Stats Cards */}
+        {missingStats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">总键值</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{missingStats.total_keys}</div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">完整翻译</div>
+              <div className="text-2xl font-bold text-green-600">{missingStats.complete}</div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">缺失翻译</div>
+              <div className="text-2xl font-bold text-red-600">{missingStats.missing}</div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">完成率</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {missingStats.total_keys > 0 ? Math.round((missingStats.complete / missingStats.total_keys) * 100) : 0}%
+              </div>
+            </div>
           </div>
-          <button
-            onClick={handleAdd}
-            className="mt-4 bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            Add Translation
-          </button>
+        )}
+
+        {/* Toolbar */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder={t('admin.translations.search_placeholder', '搜索键值或翻译内容...')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            <select
+              value={namespaceFilter}
+              onChange={(e) => setNamespaceFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              <option value="all">{t('admin.translations.all_namespaces', '所有分类')}</option>
+              {namespaces.map(ns => (
+                <option key={ns} value={ns}>{ns}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {syncing ? t('common.processing', '处理中...') : t('admin.translations.sync', '同步JSON')}
+            </button>
+            <button
+              onClick={() => handleExport('json')}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              {t('admin.translations.export_json', '导出JSON')}
+            </button>
+            <button
+              onClick={() => handleExport('csv')}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              {t('admin.translations.export_csv', '导出CSV')}
+            </button>
+          </div>
         </div>
 
         {/* Translations Table */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full">
-              <thead className="bg-gray-100 dark:bg-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Key
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-1/4">
+                    {t('admin.translations.key', '键值')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Language
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-1/4">
+                    中文 (ZH)
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Value
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-1/4">
+                    English (EN)
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Updated At
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-1/4">
+                    العربية (AR)
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-24">
+                    {t('admin.translations.actions', '操作')}
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center">
-                      Loading translations...
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                      {t('common.loading', '加载中...')}
                     </td>
                   </tr>
                 ) : filteredTranslations.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center">
-                      No translations found
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                      {t('common.no_data', '暂无数据')}
                     </td>
                   </tr>
                 ) : (
-                  filteredTranslations.map((translation) => (
-                    <tr key={translation.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {editing?.id === translation.id ? (
-                          <input
-                            type="text"
-                            value={editing.key}
-                            onChange={(e) => setEditing({ ...editing, key: e.target.value })}
-                            className="px-2 py-1 border border-gray-300 rounded"
+                  filteredTranslations.map((item) => (
+                    <tr key={item.key} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-4 py-3 text-sm font-mono text-gray-900 dark:text-white">
+                        {item.key}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {editingKey === item.key ? (
+                          <textarea
+                            value={editValues.zh}
+                            onChange={(e) => setEditValues({ ...editValues, zh: e.target.value })}
+                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700"
+                            rows={2}
                           />
                         ) : (
-                          translation.key
+                          <span className={item.zh ? 'text-gray-900 dark:text-white' : 'text-red-500'}>
+                            {item.zh || '❌'}
+                          </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {editing?.id === translation.id ? (
-                          <select
-                            value={editing.language}
-                            onChange={(e) => setEditing({ ...editing, language: e.target.value })}
-                            className="px-2 py-1 border border-gray-300 rounded"
+                      <td className="px-4 py-3 text-sm">
+                        {editingKey === item.key ? (
+                          <textarea
+                            value={editValues.en}
+                            onChange={(e) => setEditValues({ ...editValues, en: e.target.value })}
+                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700"
+                            rows={2}
+                          />
+                        ) : (
+                          <span className={item.en ? 'text-gray-900 dark:text-white' : 'text-red-500'}>
+                            {item.en || '❌'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm" dir="rtl">
+                        {editingKey === item.key ? (
+                          <textarea
+                            value={editValues.ar}
+                            onChange={(e) => setEditValues({ ...editValues, ar: e.target.value })}
+                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700"
+                            rows={2}
+                          />
+                        ) : (
+                          <span className={item.ar ? 'text-gray-900 dark:text-white' : 'text-red-500'}>
+                            {item.ar || '❌'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {editingKey === item.key ? (
+                          <>
+                            <button
+                              onClick={handleSaveEdit}
+                              className="text-green-600 hover:text-green-800 mr-2"
+                            >
+                              {t('common.save', '保存')}
+                            </button>
+                            <button
+                              onClick={() => setEditingKey(null)}
+                              className="text-gray-600 hover:text-gray-800"
+                            >
+                              {t('common.cancel', '取消')}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="text-blue-600 hover:text-blue-800"
                           >
-                            <option value="en">English</option>
-                            <option value="zh">Chinese</option>
-                            <option value="ar">Arabic</option>
-                          </select>
-                        ) : (
-                          translation.language.toUpperCase()
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {editing?.id === translation.id ? (
-                          <input
-                            type="text"
-                            value={editing.value}
-                            onChange={(e) => setEditing({ ...editing, value: e.target.value })}
-                            className="px-2 py-1 border border-gray-300 rounded w-full"
-                          />
-                        ) : (
-                          translation.value
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {new Date(translation.updated_at).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {editing?.id === translation.id ? (
-                          <>
-                            <button
-                              onClick={handleSave}
-                              className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 mr-3"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditing(null)}
-                              className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => handleEdit(translation)}
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-3"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(translation.id)}
-                              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                            >
-                              Delete
-                            </button>
-                          </>
+                            {t('common.edit', '编辑')}
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -326,6 +400,11 @@ export default function TranslationsPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Pagination info */}
+        <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+          {t('admin.translations.showing', '显示')} {filteredTranslations.length} / {translations.length} {t('admin.translations.items', '条记录')}
         </div>
       </div>
     </div>
