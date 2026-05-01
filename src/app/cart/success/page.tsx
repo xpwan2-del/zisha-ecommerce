@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { PaymentResultCard } from '@/components/payment';
+import { EnhancedPaymentResultCard } from '@/components/payment';
 
 function PaymentSuccessContent() {
   const router = useRouter();
@@ -21,6 +21,7 @@ function PaymentSuccessContent() {
   const paypalToken = searchParams.get('token');
   const alipayTradeNo = searchParams.get('trade_no');
   const stripeSessionId = searchParams.get('session_id');
+  const source = 'cart';
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -66,13 +67,15 @@ function PaymentSuccessContent() {
         if (data.success) {
           setPaymentStatus('success');
 
-          const orderResponse = await fetch(`/api/orders?order_number=${orderNumber}`, {
+          const orderResponse = await fetch(`/api/orders-list?order_number=${orderNumber}`, {
             credentials: 'include',
           });
           const orderData = await orderResponse.json();
 
-          if (orderData.success && orderData.data) {
-            setOrderInfo(orderData.data);
+          if (orderData.success && orderData.data?.orders?.[0]) {
+            setOrderInfo(orderData.data.orders[0]);
+          } else if (orderData.success && orderData.data?.orders) {
+            setOrderInfo(orderData.data.orders[0]);
           }
         } else {
           setPaymentStatus('fail');
@@ -105,9 +108,7 @@ function PaymentSuccessContent() {
   }, [orderNumber, paypalToken, alipayTradeNo, stripeSessionId, locale]);
 
   const handleViewOrder = () => {
-    if (orderNumber) {
-      router.push(`/account?tab=orders`);
-    }
+    router.push('/account?tab=orders');
   };
 
   const handleContinueShopping = () => {
@@ -140,15 +141,13 @@ function PaymentSuccessContent() {
   return (
     <div className="min-h-screen bg-[var(--background)] py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        <PaymentResultCard
+        <EnhancedPaymentResultCard
           type={paymentStatus}
           paymentMethod={paymentMethod}
-          orderNumber={orderNumber || orderInfo?.order_number}
-          amount={orderInfo?.final_amount}
-          currency={orderInfo?.currency || 'USD'}
-          productName={orderInfo?.items?.[0]?.product_name}
+          orderInfo={orderInfo}
           errorCode={errorInfo?.errorCode}
           errorMessage={errorInfo?.errorMessage}
+          source={source}
           onViewOrder={handleViewOrder}
           onContinueShopping={handleContinueShopping}
           onRetry={handleRetry}

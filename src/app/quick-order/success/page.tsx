@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { PaymentResultCard } from '@/components/payment';
+import { EnhancedPaymentResultCard } from '@/components/payment';
 
 function PaymentSuccessContent() {
   const router = useRouter();
@@ -21,6 +21,7 @@ function PaymentSuccessContent() {
   const paypalToken = searchParams.get('token');
   const alipayTradeNo = searchParams.get('trade_no');
   const stripeSessionId = searchParams.get('session_id');
+  const source = (searchParams.get('source') as 'quick-order' | 'cart') || 'quick-order';
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -66,13 +67,15 @@ function PaymentSuccessContent() {
         if (data.success) {
           setPaymentStatus('success');
 
-          const orderResponse = await fetch(`/api/orders?order_number=${orderNumber}`, {
+          const orderResponse = await fetch(`/api/orders-list?order_number=${orderNumber}`, {
             credentials: 'include',
           });
           const orderData = await orderResponse.json();
 
-          if (orderData.success && orderData.data) {
-            setOrderInfo(orderData.data);
+          if (orderData.success && orderData.data?.orders?.[0]) {
+            setOrderInfo(orderData.data.orders[0]);
+          } else if (orderData.success && orderData.data?.orders) {
+            setOrderInfo(orderData.data.orders[0]);
           }
         } else {
           setPaymentStatus('fail');
@@ -105,9 +108,7 @@ function PaymentSuccessContent() {
   }, [orderNumber, paypalToken, alipayTradeNo, stripeSessionId, locale]);
 
   const handleViewOrder = () => {
-    if (orderNumber) {
-      router.push(`/orders/${orderNumber}`);
-    }
+    router.push('/account?tab=orders');
   };
 
   const handleContinueShopping = () => {
@@ -115,11 +116,19 @@ function PaymentSuccessContent() {
   };
 
   const handleRetry = () => {
-    router.push(`/quick-order?order_id=${orderInfo?.id || ''}`);
+    if (source === 'cart') {
+      router.push('/cart');
+    } else {
+      if (orderInfo?.id) {
+        router.push(`/quick-order?order_id=${orderInfo.id}`);
+      } else {
+        router.push('/quick-order');
+      }
+    }
   };
 
   const handleChangePayment = () => {
-    router.push(`/quick-order?order_id=${orderInfo?.id || ''}`);
+    handleRetry();
   };
 
   if (isVerifying) {
@@ -127,7 +136,11 @@ function PaymentSuccessContent() {
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[var(--text-muted)]">正在验证支付状态...</p>
+          <p className="text-[var(--text-muted)]">
+            {locale === 'zh' ? '正在验证支付状态...' :
+             locale === 'ar' ? 'جارٍ التحقق من حالة الدفع...' :
+             'Verifying payment status...'}
+          </p>
         </div>
       </div>
     );
@@ -136,15 +149,13 @@ function PaymentSuccessContent() {
   return (
     <div className="min-h-screen bg-[var(--background)] py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        <PaymentResultCard
+        <EnhancedPaymentResultCard
           type={paymentStatus}
           paymentMethod={paymentMethod}
-          orderNumber={orderNumber || orderInfo?.order_number}
-          amount={orderInfo?.final_amount}
-          currency={orderInfo?.currency || 'USD'}
-          productName={orderInfo?.items?.[0]?.product_name}
+          orderInfo={orderInfo}
           errorCode={errorInfo?.errorCode}
           errorMessage={errorInfo?.errorMessage}
+          source={source}
           onViewOrder={handleViewOrder}
           onContinueShopping={handleContinueShopping}
           onRetry={handleRetry}
@@ -161,7 +172,7 @@ export default function PaymentSuccessPage() {
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">加载中...</p>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     }>
