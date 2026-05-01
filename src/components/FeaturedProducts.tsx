@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { Pagination } from "./Pagination";
 import { useCurrency } from '@/lib/contexts/CurrencyContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useCart } from '@/lib/contexts/CartContext';
 import { useTheme } from '@/components/ThemeProvider';
+import { useUITranslations } from '@/lib/hooks/useUITranslations';
 import { formatMultiCurrency, formatMultiPriceSync } from '@/lib/utils/currency';
 
 // 辅助函数：从 Cookie 获取访客购物车
@@ -60,6 +62,8 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
   const { refreshCart } = useCart();
   const { themeColors } = useTheme();
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const { t: uiT } = useUITranslations();
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +71,34 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
   const [totalPages, setTotalPages] = useState(1);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const productsPerPage = 12;
+
+  const getPromoName = (promo: any) => {
+    if (i18n.language === 'zh') return promo.name;
+    if (i18n.language === 'ar') return promo.name_ar;
+    return promo.name_en;
+  };
+
+  const getActivityName = (activity: any) => {
+    if (i18n.language === 'zh') return activity.name;
+    if (i18n.language === 'ar') return activity.name_ar;
+    return activity.name_en;
+  };
+
+  const getActivityBadgeColor = (activityId: number) => {
+    const colorMap: Record<number, string> = {
+      1: themeColors.activityBadge1,
+      2: themeColors.activityBadge2,
+      3: themeColors.activityBadge3,
+      4: themeColors.activityBadge4,
+      5: themeColors.activityBadge5,
+      6: themeColors.activityBadge6,
+      7: themeColors.activityBadge7,
+      8: themeColors.activityBadge8,
+      9: themeColors.activityBadge9,
+      10: themeColors.activityBadge10,
+    };
+    return colorMap[activityId] || 'var(--accent)';
+  };
 
 
 
@@ -226,7 +258,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
 
       badges.push({
         type: 'discount',
-        text: `最终折扣 ${totalDiscount}% OFF SALE`,
+        text: `${uiT('promotion.final_discount', '最终折扣')} ${totalDiscount}% ${uiT('promotion.off_sale', 'OFF SALE')}`,
         color: '#EF4444' // 固定红色
       });
     }
@@ -240,7 +272,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     if (product.isNew) {
       badges.push({
         type: 'new',
-        text: '新品',
+        text: uiT('product.new', '新品'),
         color: 'var(--color-green)'
       });
     }
@@ -264,13 +296,13 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     } else if (product.stock <= 0) {
       badges.push({
         type: 'outOfStock',
-        text: '缺货',
+        text: uiT('inventory.out_of_stock', '缺货'),
         color: 'var(--color-red)'
       });
     } else if (product.stock < 10 && product.stock > 0) {
       badges.push({
         type: 'limited',
-        text: '库存有限',
+        text: uiT('inventory.limited', '库存有限'),
         color: 'var(--color-orange)'
       });
     }
@@ -285,14 +317,15 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     // 处理promotions字段（多个促销数组）- 显示每个促销及折扣（优先显示）
     if (product.promotions && Array.isArray(product.promotions)) {
       product.promotions.forEach((promo: any) => {
-        if (promo.name && !addedNames.has(promo.name) && !['今日特惠', '特惠商品'].includes(promo.name)) {
+        const promoName = getPromoName(promo);
+        if (promoName && !addedNames.has(promoName) && !['今日特惠', '特惠商品'].includes(promoName)) {
           tags.push({
             id: `promo-${promo.id}` || product.id,
-            name: promo.name,
+            name: promoName,
             icon: promo.icon || 'tag',
             color: promo.color || 'var(--color-red)'
           });
-          addedNames.add(promo.name);
+          addedNames.add(promoName);
         }
       });
     }
@@ -300,14 +333,15 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     // 处理activities数组（来自activity_categories）
     if (product.activities && Array.isArray(product.activities)) {
       product.activities.forEach((act: any) => {
-        if (act.name && !addedNames.has(act.name)) {
+        const actName = getActivityName(act);
+        if (actName && !addedNames.has(actName)) {
           tags.push({
             id: `activity-${act.id}` || product.id,
-            name: act.name || act.name_en || act.name_ar || '活动',
+            name: actName,
             icon: act.icon_url || act.icon || 'tag',
-            color: act.color || 'var(--accent)'
+            color: act.color || getActivityBadgeColor(act.id)
           });
-          addedNames.add(act.name);
+          addedNames.add(actName);
         }
       });
     }
@@ -459,29 +493,23 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                     {/* 折扣标签 - 左上角 */}
                     <div className="absolute top-1 left-1 flex flex-col gap-1.5">
                       {discountBadges.slice(0, 3).map((badge, index) => (
-                        <div 
+                        <div
                           key={`discount-${badge.type}`}
-                          className="px-2 py-1 rounded-md shadow-md font-bold text-white text-[10px] sm:text-xs"
-                          style={{
-                            background: `linear-gradient(135deg, ${badge.color}, ${badge.color}99)`,
-                            boxShadow: `0 2px 4px rgba(0,0,0,0.2)`
-                          }}
+                          className="promotion-badge"
+                          style={{ background: `var(--promotion-badge-bg)` }}
                         >
                           {badge.text}
                         </div>
                       ))}
                     </div>
-                    
+
                     {/* 状态标签 - 右下角 */}
                     <div className="absolute bottom-1 right-1 flex flex-col gap-1.5">
                       {statusBadges.slice(0, 2).map((badge) => (
-                        <div 
+                        <div
                           key={`status-${badge.type}`}
-                          className="px-2 py-1 rounded-md shadow-md font-bold text-white text-[10px] sm:text-xs"
-                          style={{
-                            background: badge.color,
-                            boxShadow: `0 2px 4px rgba(0,0,0,0.2)`
-                          }}
+                          className={badge.type === 'outOfStock' ? 'activity-badge' : 'activity-badge'}
+                          style={{ backgroundColor: badge.color }}
                         >
                           {badge.text}
                         </div>
@@ -501,26 +529,57 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
                       {product.name}
                     </h3>
 
-                    {/* 普通活动标签 - 商品名称下方 */}
-                    {activityTags.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {activityTags.slice(0, 5).map((activity: any) => (
-                          <div
-                            key={activity.id}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[var(--accent)]/20 rounded-md shadow-sm hover:shadow-md transition-all duration-300"
-                            style={{ 
-                              background: `linear-gradient(135deg, ${activity.color}20, ${activity.color}10)`,
-                              borderColor: `${activity.color}40`
-                            }}
-                          >
-                            {getActivityIcon(activity.icon)}
-                            <span className="text-xs font-medium" style={{ color: activity.color }}>
-                              {activity.name}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {/* 复刻商品详情页的促销和活动标签 */}
+                    {(() => {
+                      const tags: Array<{type: string, content: React.ReactNode}> = [];
+                      const addedNames = new Set<string>();
+
+                      // 促销标签
+                      if (product.promotions && Array.isArray(product.promotions)) {
+                        product.promotions.forEach((promo: any) => {
+                          const promoName = getPromoName(promo);
+                          if (promoName && !addedNames.has(promoName) && !['今日特惠', '特惠商品'].includes(promoName)) {
+                            tags.push({
+                              type: 'promotion',
+                              content: (
+                                <span key={`promo-${promo.id}`} className="promotion-badge flex items-center gap-1" style={{ background: `var(--promotion-badge-bg)` }}>
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
+                                  </svg>
+                                  {promoName} - {promo.discount_percent}%
+                                </span>
+                              )
+                            });
+                            addedNames.add(promoName);
+                          }
+                        });
+                      }
+
+                      // 活动标签
+                      if (product.activities && Array.isArray(product.activities)) {
+                        product.activities.forEach((activity: any) => {
+                          const actName = getActivityName(activity);
+                          if (actName && !addedNames.has(actName)) {
+                            tags.push({
+                              type: 'activity',
+                              content: (
+                                <span key={`activity-${activity.id}`} className="activity-badge flex items-center gap-1" style={{ backgroundColor: activity.color || getActivityBadgeColor(activity.id) }}>
+                                  {activity.icon_url ? <img src={activity.icon_url} className="w-3 h-3" alt="" /> : null}
+                                  {actName}
+                                </span>
+                              )
+                            });
+                            addedNames.add(actName);
+                          }
+                        });
+                      }
+
+                      return tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {tags.map((tag, idx) => tag.content)}
+                        </div>
+                      ) : null;
+                    })()}
 
                     <div className="mb-3">
                       {formatMultiPriceSync(product.price_usd || 0)}

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('INVENTORY', 'REQUEST', { method: 'POST', action: 'QUICK_ORDER_INVENTORY' });
+    
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -14,6 +17,7 @@ export async function POST(request: NextRequest) {
     const userId = authResult.user.userId;
 
     if (!product_id || !action) {
+      logMonitor('INVENTORY', 'VALIDATION_FAILED', { error: 'Missing product_id or action' });
       return NextResponse.json(
         { success: false, error: 'Missing product_id or action' },
         { status: 400 }
@@ -21,6 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!['increment', 'decrement'].includes(action)) {
+      logMonitor('INVENTORY', 'VALIDATION_FAILED', { error: 'Invalid action' });
       return NextResponse.json(
         { success: false, error: 'Invalid action. Use increment or decrement' },
         { status: 400 }
@@ -79,6 +84,14 @@ export async function POST(request: NextRequest) {
         [product_id]
       );
 
+      logMonitor('INVENTORY', 'SUCCESS', { 
+        action: 'QUICK_ORDER_INVENTORY', 
+        operation: 'increment',
+        productId: product_id,
+        stockBefore: currentStock,
+        stockAfter: currentStock - 1
+      });
+
       return NextResponse.json({
         success: true,
         data: {
@@ -120,6 +133,14 @@ export async function POST(request: NextRequest) {
         [product_id]
       );
 
+      logMonitor('INVENTORY', 'SUCCESS', { 
+        action: 'QUICK_ORDER_INVENTORY', 
+        operation: 'decrement',
+        productId: product_id,
+        stockBefore: beforeStock,
+        stockAfter: beforeStock + 1
+      });
+
       return NextResponse.json({
         success: true,
         data: {
@@ -129,7 +150,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('INVENTORY', 'ERROR', { action: 'QUICK_ORDER_INVENTORY', error: error?.message || String(error) });
     console.error('Error in quick-order inventory:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update inventory' },

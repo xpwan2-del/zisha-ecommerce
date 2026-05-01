@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { logMonitor } from "@/lib/utils/logger";
 
 const initDatabase = async () => {
   try {
@@ -131,8 +132,11 @@ initDatabase();
 
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('THEME_COLORS', 'REQUEST', { method: 'GET', action: 'GET_THEME_COLORS' });
+    
     const tableExistsResult = await query("SELECT name FROM sqlite_master WHERE type='table' AND name='theme_color_configs'");
     if (!tableExistsResult.rows || tableExistsResult.rows.length === 0) {
+      logMonitor('THEME_COLORS', 'ERROR', { action: 'GET_THEME_COLORS', error: 'Table not initialized' });
       return NextResponse.json({ success: false, error: "Table not initialized" }, { status: 500 });
     }
 
@@ -163,11 +167,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    logMonitor('THEME_COLORS', 'SUCCESS', { action: 'GET_THEME_COLORS', theme: theme || 'all', configCount: Object.keys(configs).length });
+    
     return NextResponse.json({
       success: true,
       data: configs
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('THEME_COLORS', 'ERROR', { action: 'GET_THEME_COLORS', error: error?.message || String(error) });
     console.error("Failed to get theme colors:", error);
     return NextResponse.json({ success: false, error: "Failed to get theme colors" }, { status: 500 });
   }
@@ -175,15 +182,19 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    logMonitor('THEME_COLORS', 'REQUEST', { method: 'PUT', action: 'UPDATE_THEME_COLOR' });
+    
     const body = await request.json();
     const { theme_key, config_key, config_value } = body;
 
     if (!theme_key || !config_key || config_value === undefined) {
+      logMonitor('THEME_COLORS', 'VALIDATION_FAILED', { error: 'Missing required fields' });
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
     }
 
     const tableExistsResult = await query("SELECT name FROM sqlite_master WHERE type='table' AND name='theme_color_configs'");
     if (!tableExistsResult.rows || tableExistsResult.rows.length === 0) {
+      logMonitor('THEME_COLORS', 'ERROR', { action: 'UPDATE_THEME_COLOR', error: 'Table not initialized' });
       return NextResponse.json({ success: false, error: "Table not initialized" }, { status: 500 });
     }
 
@@ -193,8 +204,11 @@ export async function PUT(request: NextRequest) {
       [theme_key, config_key, config_value]
     );
 
+    logMonitor('THEME_COLORS', 'SUCCESS', { action: 'UPDATE_THEME_COLOR', theme_key, config_key });
+    
     return NextResponse.json({ success: true, message: "Config updated successfully" });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('THEME_COLORS', 'ERROR', { action: 'UPDATE_THEME_COLOR', error: error?.message || String(error) });
     console.error("Failed to update theme color:", error);
     return NextResponse.json({ success: false, error: "Failed to update" }, { status: 500 });
   }

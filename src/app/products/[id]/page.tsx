@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,7 @@ import { useCurrency } from "@/lib/contexts/CurrencyContext";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatMultiCurrency, formatCurrency, formatMultiPriceSync } from "@/lib/utils/currency";
 import ImageModal from "@/components/ImageModal";
+import { useUITranslations } from "@/lib/hooks/useUITranslations";
 
 // 辅助函数：从 Cookie 获取访客购物车
 const getGuestCartFromCookie = (): any[] => {
@@ -43,6 +44,46 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
   const { refreshCart } = useCart();
   const { currency } = useCurrency();
   const { themeColors } = useTheme();
+  const { t: uiT } = useUITranslations();
+
+  const getPromoName = useCallback((promo: any) => {
+    if (i18n.language === 'zh') return promo.name;
+    if (i18n.language === 'ar') return promo.name_ar;
+    return promo.name_en;
+  }, [i18n.language]);
+
+  const getActivityName = useCallback((activity: any) => {
+    if (i18n.language === 'zh') return activity.name;
+    if (i18n.language === 'ar') return activity.name_ar;
+    return activity.name_en;
+  }, [i18n.language]);
+
+  const getActivityBadgeColor = useCallback((activityId: number) => {
+    const colorMap: Record<number, string> = {
+      1: themeColors.activityBadge1,
+      2: themeColors.activityBadge2,
+      3: themeColors.activityBadge3,
+      4: themeColors.activityBadge4,
+      5: themeColors.activityBadge5,
+      6: themeColors.activityBadge6,
+      7: themeColors.activityBadge7,
+      8: themeColors.activityBadge8,
+      9: themeColors.activityBadge9,
+      10: themeColors.activityBadge10,
+    };
+    return colorMap[activityId] || 'var(--accent)';
+  }, [themeColors]);
+
+  const getStockStatusText = useCallback((statusInfo: any, stock: number) => {
+    if (!statusInfo) {
+      return stock > 0
+        ? `${stock} ${uiT('inventory.in_stock', '件有货')}`
+        : uiT('inventory.out_of_stock', '缺货');
+    }
+    if (i18n.language === 'zh') return statusInfo.name;
+    if (i18n.language === 'ar') return statusInfo.name_ar || statusInfo.name_en;
+    return statusInfo.name_en;
+  }, [i18n.language, uiT]);
   
   const [product, setProduct] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -335,18 +376,18 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                   return (
                     <>
                       {/* 总折扣标签 */}
-                      <span className="px-2 py-1 rounded-md shadow-md font-bold text-white text-[10px] sm:text-xs" style={{ background: 'linear-gradient(135deg, #EF4444, rgba(239, 68, 68, 0.6))', boxShadow: 'rgba(0, 0, 0, 0.2) 0px 2px 4px' }}>
-                        最终折扣 {totalDiscount}% OFF SALE
+                      <span className="promotion-final-badge">
+                        {uiT('promotion.final_discount', '最终折扣')} {totalDiscount}% {uiT('promotion.off_sale', 'OFF SALE')}
                       </span>
                       {/* 每个促销的单独标签 */}
                       {promos.map((promo: any) => {
                         if (promo.name === '今日特惠' || promo.name === '特惠商品') return null;
                         return (
-                          <span key={`promo-${promo.id}`} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: promo.color || 'var(--accent)' }}>
+                          <span key={`promo-${promo.id}`} className="promotion-badge flex items-center gap-1" style={{ background: `var(--promotion-badge-bg)` }}>
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
                             </svg>
-                            {promo.name} - {promo.discount_percent}%
+                            {getPromoName(promo)} - {promo.discount_percent}%
                           </span>
                         );
                       })}
@@ -355,13 +396,13 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                 })()}
                 {/* 活动标签 (activities) - 产品活动标签 */}
                 {(product.activities || []).length > 0 && (product.activities || []).map((activity: any) => (
-                  <span key={`activity-${activity.id}`} className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1" style={{ backgroundColor: activity.color || 'var(--accent)' }}>
+                  <span key={`activity-${activity.id}`} className="activity-badge flex items-center gap-1" style={{ backgroundColor: activity.color || getActivityBadgeColor(activity.id) }}>
                     {activity.icon_url ? <img src={activity.icon_url} className="w-3 h-3" alt="" /> : null}
-                    {activity.name}
+                    {getActivityName(activity)}
                   </span>
                 ))}
                 {product.is_limited && (
-                  <span className="text-white text-xs font-bold px-3 py-1 rounded-full" style={{ backgroundColor: 'var(--secondary)' }}>
+                  <span className="limited-badge">
                     {t("products.limited", "限量")}
                   </span>
                 )}
@@ -409,7 +450,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
               {product.promotions && product.promotions.length > 0 && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <div className="text-sm font-medium text-red-600">
-                    促销叠加计算：
+                    {uiT('promotion.calculation', '促销叠加计算')}：
                     {(() => {
                       const promos = product.promotions || [];
                       const exclusive = promos.find((p: any) => p.can_stack === 1);
@@ -417,10 +458,9 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       let totalDiscount = 0;
 
                       if (exclusive) {
-                        formula = `${exclusive.discount_percent}% (独占)`;
+                        formula = `${exclusive.discount_percent}% (${uiT('promotion.exclusive', '独占')})`;
                         totalDiscount = exclusive.discount_percent;
                       } else {
-                        // 按priority从小到大排序后叠加
                         const sortedPromos = [...promos].sort((a: any, b: any) => a.priority - b.priority);
                         const parts: string[] = [];
                         sortedPromos.forEach((p: any) => {
@@ -432,7 +472,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                       }
 
                       return (
-                        <div className="font-bold">最终折扣：{totalDiscount}% OFF ({formula})</div>
+                        <div className="font-bold">{uiT('promotion.final_discount', '最终折扣')}：{totalDiscount}% OFF ({formula})</div>
                       );
                     })()}
                   </div>
@@ -442,19 +482,19 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
               {/* 库存和配送 */}
               <div className="mb-6 space-y-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <span style={{ color: 'var(--text-muted)' }}>库存:</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{uiT('inventory.stock', '库存')}：</span>
                   {(() => {
                     const statusInfo = product.stock_status_info;
                     if (statusInfo) {
                       return (
                         <span style={{ color: statusInfo.color }}>
-                          {statusInfo.name} {product.stock > 0 ? `(${product.stock}件)` : ''}
+                          {getStockStatusText(statusInfo, product.stock)} {product.stock > 0 ? `(${product.stock}${uiT('inventory.in_stock', '件')})` : ''}
                         </span>
                       );
                     }
                     return (
                       <span style={{ color: product.stock > 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
-                        {product.stock > 0 ? `${product.stock} 件有货` : '缺货'}
+                        {getStockStatusText(null, product.stock)}
                       </span>
                     );
                   })()}

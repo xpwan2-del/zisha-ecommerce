@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { logMonitor } from '@/lib/utils/logger';
 
 const EXCHANGE_RATES = {
   aed: 1,
@@ -10,6 +11,8 @@ const EXCHANGE_RATES = {
 
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('PAYMENTS', 'REQUEST', { method: 'GET', action: 'ALIPAY_CREATE_PAYMENT' });
+    
     const { searchParams } = new URL(request.url);
     const orderId = parseInt(searchParams.get('order_id') || '0', 10);
     const amount = searchParams.get('amount');
@@ -17,6 +20,7 @@ export async function GET(request: NextRequest) {
     const order_number = searchParams.get('order_number');
 
     if (!orderId || !amount) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { error: 'Missing order_id or amount' });
       return NextResponse.json(
         { success: false, error: 'Missing order_id or amount' },
         { status: 400 }
@@ -25,6 +29,7 @@ export async function GET(request: NextRequest) {
 
     const authResult = requireAuth(request);
     if (authResult.response) {
+      logMonitor('PAYMENTS', 'AUTH_FAILED', { reason: 'Unauthorized' });
       return authResult.response;
     }
 
@@ -92,7 +97,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(paymentUrl);
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('PAYMENTS', 'ERROR', { action: 'ALIPAY_CREATE_PAYMENT', error: error?.message || String(error) });
     console.error('Error in Alipay payment API:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to process Alipay payment' },
@@ -112,10 +118,13 @@ function generateRSA2Sign(content: string, privateKey: string): string {
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('PAYMENTS', 'REQUEST', { method: 'POST', action: 'ALIPAY_CREATE_PAYMENT' });
+    
     const body = await request.json();
     const { order_id, amount, currency, order_number } = body;
 
     if (!order_id || !amount) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { error: 'Missing order_id or amount' });
       return NextResponse.json(
         { success: false, error: 'Missing order_id or amount' },
         { status: 400 }
@@ -124,6 +133,7 @@ export async function POST(request: NextRequest) {
 
     const authResult = requireAuth(request);
     if (authResult.response) {
+      logMonitor('PAYMENTS', 'AUTH_FAILED', { reason: 'Unauthorized' });
       return authResult.response;
     }
 
@@ -141,6 +151,15 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
+    logMonitor('PAYMENTS', 'SUCCESS', { 
+      action: 'ALIPAY_CREATE_PAYMENT', 
+      orderId: order_id,
+      orderNumber: order_number,
+      amount,
+      currency,
+      paymentMethod: 'alipay'
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -154,7 +173,8 @@ export async function POST(request: NextRequest) {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('PAYMENTS', 'ERROR', { action: 'ALIPAY_CREATE_PAYMENT', error: error?.message || String(error) });
     console.error('Error in Alipay payment API (POST):', error);
     return NextResponse.json(
       { success: false, error: 'Failed to process Alipay payment' },

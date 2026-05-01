@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 function parseJSON(value: any, defaultValue: any = []): any {
   if (!value) return defaultValue;
@@ -17,6 +18,8 @@ export async function GET(request: NextRequest) {
   const sort = url.searchParams.get('sort') || 'end_time';
 
   try {
+    logMonitor('PRODUCTS', 'REQUEST', { method: 'GET', action: 'GET_DEALS' });
+
     const offset = (page - 1) * limit;
 
     let orderBy = 'ORDER BY pp.end_time ASC';
@@ -53,6 +56,7 @@ export async function GET(request: NextRequest) {
     const productIds = (productsResult.rows || []).map((row: any) => row.id);
 
     if (productIds.length === 0) {
+      logMonitor('PRODUCTS', 'SUCCESS', { action: 'GET_DEALS', page, total: 0 });
       return NextResponse.json({
         success: true,
         data: {
@@ -317,6 +321,7 @@ export async function GET(request: NextRequest) {
 
     const totalPages = Math.ceil(total / limit);
 
+    logMonitor('PRODUCTS', 'SUCCESS', { action: 'GET_DEALS', page, limit, total, products_count: products.length });
     return NextResponse.json({
       success: true,
       data: {
@@ -330,7 +335,8 @@ export async function GET(request: NextRequest) {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('PRODUCTS', 'ERROR', { action: 'GET_DEALS', error: error?.message || String(error) });
     console.error('Error fetching deals:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch deals' },

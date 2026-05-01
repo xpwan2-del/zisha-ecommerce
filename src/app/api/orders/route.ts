@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth, requireAdmin } from '@/lib/auth';
 import { getMessage, getMessageWithParams } from '@/lib/messages';
+import { logMonitor } from '@/lib/utils/logger';
 
 function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||
@@ -25,6 +26,8 @@ function createErrorResponse(key: string, lang: string, status: number = 400) {
 // GET /api/orders - Get orders (user's own or all if admin)
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('ORDERS', 'REQUEST', { method: 'GET' });
+    
     const lang = getLangFromRequest(request);
 
     const authResult = requireAuth(request);
@@ -90,6 +93,14 @@ export async function GET(request: NextRequest) {
     const countResult = await query(countSql, countParams);
     const total = countResult.rows[0]?.total || 0;
 
+    logMonitor('ORDERS', 'SUCCESS', { 
+      action: 'GET_ORDERS', 
+      orderCount: result.rows?.length || 0,
+      total,
+      page,
+      limit 
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -102,7 +113,8 @@ export async function GET(request: NextRequest) {
         }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ORDERS', 'ERROR', { action: 'GET_ORDERS', error: error?.message || String(error) });
     console.error('Error fetching orders:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch orders' },
@@ -114,6 +126,8 @@ export async function GET(request: NextRequest) {
 // POST /api/orders - Create new order
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('ORDERS', 'REQUEST', { method: 'POST', action: 'CREATE_ORDER' });
+    
     const lang = getLangFromRequest(request);
 
     const authResult = requireAuth(request);
@@ -264,14 +278,12 @@ export async function POST(request: NextRequest) {
         const unit_price = promoInfo ? promoInfo.promotionPrice : parseFloat((await query('SELECT price FROM products WHERE id = ?', [item.product_id])).rows[0].price);
 
         await query(
-          `INSERT INTO order_items (order_id, product_id, quantity, price, specifications, original_price, promotion_ids, discount_amount)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO order_items (order_id, product_id, quantity, specifications, original_price, promotion_ids, discount_amount)
+           VALUES (?, ?, ?, '{}', ?, ?, ?)`,
           [
             order_id,
             item.product_id,
             item.quantity,
-            unit_price,
-            '{}',
             promoInfo ? promoInfo.originalPrice : unit_price,
             promoInfo && promoInfo.promotionIds.length > 0 ? JSON.stringify(promoInfo.promotionIds) : null,
             promoInfo ? promoInfo.discountAmount * item.quantity : 0
@@ -365,6 +377,15 @@ export async function POST(request: NextRequest) {
 
       await query('COMMIT');
 
+      logMonitor('ORDERS', 'SUCCESS', { 
+        action: 'CREATE_ORDER', 
+        orderId: order_id,
+        orderNumber: order_number,
+        totalAmount: total_amount,
+        finalAmount: final_amount,
+        itemCount: items.length
+      });
+
       return NextResponse.json(
         {
           success: true,
@@ -380,11 +401,12 @@ export async function POST(request: NextRequest) {
         },
         { status: 201 }
       );
-    } catch (error) {
+    } catch (error: any) {
       await query('ROLLBACK');
       throw error;
     }
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ORDERS', 'ERROR', { action: 'CREATE_ORDER', error: error?.message || String(error) });
     console.error('Error creating order:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to create order' },
@@ -396,6 +418,8 @@ export async function POST(request: NextRequest) {
 // PUT /api/orders - Update order status (admin only)
 export async function PUT(request: NextRequest) {
   try {
+    logMonitor('ORDERS', 'REQUEST', { method: 'PUT', action: 'UPDATE_ORDER_STATUS' });
+    
     // 验证管理员权限
     const adminResult = requireAdmin(request);
     if (adminResult.response) {
@@ -419,11 +443,18 @@ export async function PUT(request: NextRequest) {
       [status, new Date().toISOString(), orderId]
     );
 
+    logMonitor('ORDERS', 'SUCCESS', { 
+      action: 'UPDATE_ORDER_STATUS', 
+      orderId,
+      status 
+    });
+
     return NextResponse.json({
       success: true,
       data: { id: orderId, order_number: null, status }
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ORDERS', 'ERROR', { action: 'UPDATE_ORDER_STATUS', error: error?.message || String(error) });
     console.error('Error updating order:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update order' },

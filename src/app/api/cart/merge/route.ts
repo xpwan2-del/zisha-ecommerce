@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { getMessage, getMessageWithParams } from '@/lib/messages';
+import { logMonitor } from '@/lib/utils/logger';
 
 function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||
@@ -11,6 +12,8 @@ function getLangFromRequest(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('CART', 'REQUEST', { method: 'POST', action: 'MERGE_CART' });
+    
     const lang = getLangFromRequest(request);
 
     const authResult = requireAuth(request);
@@ -22,6 +25,7 @@ export async function POST(request: NextRequest) {
     const { guest_cart } = data;
 
     if (!guest_cart || !Array.isArray(guest_cart)) {
+      logMonitor('CART', 'VALIDATION_FAILED', { error: 'Invalid guest cart data' });
       return NextResponse.json(
         { success: false, error: 'Invalid guest cart data' },
         { status: 400 }
@@ -192,6 +196,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (failedItems.length > 0) {
+      logMonitor('CART', 'PARTIAL_SUCCESS', { mergedCount, failedCount: failedItems.length });
       return NextResponse.json({
         success: true,
         warning: true,
@@ -203,6 +208,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    logMonitor('CART', 'SUCCESS', { action: 'MERGE_CART', mergedCount });
+    
     return NextResponse.json({
       success: true,
       message: getMessage('CART_MERGE_SUCCESS', lang),
@@ -210,7 +217,8 @@ export async function POST(request: NextRequest) {
       message_ar: getMessage('CART_MERGE_SUCCESS', 'ar'),
       merged_count: mergedCount,
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('CART', 'ERROR', { action: 'MERGE_CART', error: error?.message || String(error) });
     console.error('Error merging cart:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to merge cart' },

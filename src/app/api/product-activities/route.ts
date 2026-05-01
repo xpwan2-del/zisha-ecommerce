@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('PRODUCT_ACTIVITIES', 'REQUEST', { method: 'GET', action: 'GET_PRODUCT_ACTIVITIES' });
+
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get('product_id');
 
@@ -39,8 +42,10 @@ export async function GET(request: NextRequest) {
       color: activity.color
     }));
 
+    logMonitor('PRODUCT_ACTIVITIES', 'SUCCESS', { action: 'GET_PRODUCT_ACTIVITIES', product_id: productId, count: formattedActivities.length });
     return NextResponse.json(formattedActivities);
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('PRODUCT_ACTIVITIES', 'ERROR', { action: 'GET_PRODUCT_ACTIVITIES', error: error?.message || String(error) });
     console.error('Error fetching product activities:', error);
     return NextResponse.json({ error: 'Failed to fetch activities' }, { status: 500 });
   }

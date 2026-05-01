@@ -317,7 +317,7 @@ export async function GET(request: NextRequest) {
 
     if (resolvedOrderNumber && !resolvedOrderNumber.startsWith('PRODUCT_')) {
       const orderResult = await query(`
-        SELECT o.*, oi.product_id, oi.quantity, oi.price, oi.original_price, oi.promotion_ids,
+        SELECT o.*, oi.product_id, oi.quantity, oi.original_price, oi.promotion_ids,
                p.name, p.name_en, p.image, i.quantity as product_stock,
                pp_usd.price as price_usd
         FROM orders o

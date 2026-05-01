@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 // GET /api/activity-categories - Get all activity categories with product counts
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('ACTIVITY_CATEGORIES', 'REQUEST', { method: 'GET', action: 'GET_ACTIVITY_CATEGORIES' });
+    
     const url = new URL(request.url);
     const withStats = url.searchParams.get('with_stats') === 'true';
 
@@ -47,16 +50,18 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: categoriesWithStats
+        data: categories
       });
     }
-
+    
+    logMonitor('ACTIVITY_CATEGORIES', 'SUCCESS', { action: 'GET_ACTIVITY_CATEGORIES', count: categories.length });
+    
     return NextResponse.json({
       success: true,
       data: categories
     });
-
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ACTIVITY_CATEGORIES', 'ERROR', { action: 'GET_ACTIVITY_CATEGORIES', error: error?.message || String(error) });
     console.error('Error getting activity categories:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to get activity categories' },
@@ -68,6 +73,8 @@ export async function GET(request: NextRequest) {
 // POST /api/activity-categories - Create new activity category
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('ACTIVITY_CATEGORIES', 'REQUEST', { method: 'POST', action: 'CREATE_ACTIVITY_CATEGORY' });
+    
     const data = await request.json();
     const { name, name_en, name_ar, icon_url, color, status = 'active' } = data;
 
@@ -93,6 +100,8 @@ export async function POST(request: NextRequest) {
       ]
     );
 
+    logMonitor('ACTIVITY_CATEGORIES', 'SUCCESS', { action: 'CREATE_ACTIVITY_CATEGORY', categoryId });
+    
     return NextResponse.json({
       success: true,
       data: {
@@ -106,7 +115,8 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 201 });
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ACTIVITY_CATEGORIES', 'ERROR', { action: 'CREATE_ACTIVITY_CATEGORY', error: error?.message || String(error) });
     console.error('Error creating activity category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to create activity category' },
@@ -118,9 +128,12 @@ export async function POST(request: NextRequest) {
 // PUT /api/activity-categories - Update activity category
 export async function PUT(request: NextRequest) {
   try {
+    logMonitor('ACTIVITY_CATEGORIES', 'REQUEST', { method: 'PUT', action: 'UPDATE_ACTIVITY_CATEGORY' });
+    
     const { id, name, name_en, name_ar, icon_url, color, status } = await request.json();
 
     if (!id) {
+      logMonitor('ACTIVITY_CATEGORIES', 'VALIDATION_FAILED', { error: 'Activity category ID is required' });
       return NextResponse.json(
         { success: false, error: 'Activity category ID is required' },
         { status: 400 }
@@ -141,6 +154,7 @@ export async function PUT(request: NextRequest) {
     );
 
     if (!updateResult.changes || updateResult.changes === 0) {
+      logMonitor('ACTIVITY_CATEGORIES', 'NOT_FOUND', { categoryId: id });
       return NextResponse.json(
         { success: false, error: 'Activity category not found' },
         { status: 404 }
@@ -161,12 +175,15 @@ export async function PUT(request: NextRequest) {
       ]
     );
 
+    logMonitor('ACTIVITY_CATEGORIES', 'SUCCESS', { action: 'UPDATE_ACTIVITY_CATEGORY', categoryId: id });
+    
     return NextResponse.json({
       success: true,
       data: { id, name, name_en, name_ar, icon_url, color, status }
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ACTIVITY_CATEGORIES', 'ERROR', { action: 'UPDATE_ACTIVITY_CATEGORY', error: error?.message || String(error) });
     console.error('Error updating activity category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update activity category' },
@@ -178,10 +195,13 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/activity-categories - Delete activity category
 export async function DELETE(request: NextRequest) {
   try {
+    logMonitor('ACTIVITY_CATEGORIES', 'REQUEST', { method: 'DELETE', action: 'DELETE_ACTIVITY_CATEGORY' });
+    
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
     if (!id) {
+      logMonitor('ACTIVITY_CATEGORIES', 'VALIDATION_FAILED', { error: 'Activity category ID is required' });
       return NextResponse.json(
         { success: false, error: 'Activity category ID is required' },
         { status: 400 }
@@ -215,18 +235,22 @@ export async function DELETE(request: NextRequest) {
     const deleteResult = await query('DELETE FROM activity_categories WHERE id = ?', [id]);
 
     if (!deleteResult.changes || deleteResult.changes === 0) {
+      logMonitor('ACTIVITY_CATEGORIES', 'NOT_FOUND', { categoryId: id });
       return NextResponse.json(
         { success: false, error: 'Activity category not found' },
         { status: 404 }
       );
     }
 
+    logMonitor('ACTIVITY_CATEGORIES', 'SUCCESS', { action: 'DELETE_ACTIVITY_CATEGORY', categoryId: id });
+    
     return NextResponse.json({
       success: true,
       data: { message: 'Activity category deleted successfully' }
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ACTIVITY_CATEGORIES', 'ERROR', { action: 'DELETE_ACTIVITY_CATEGORY', error: error?.message || String(error) });
     console.error('Error deleting activity category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete activity category' },

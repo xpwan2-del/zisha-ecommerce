@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
-    // 创建产品表
+    logMonitor('PRODUCTS', 'REQUEST', { method: 'POST', action: 'INIT_PRODUCTS' });
+
     await query(`
       CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +31,6 @@ export async function POST(request: NextRequest) {
       )
     `);
 
-    // 创建索引
     await query(`
       CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)
     `);
@@ -38,8 +39,10 @@ export async function POST(request: NextRequest) {
       CREATE INDEX IF NOT EXISTS idx_products_price ON products(price)
     `);
 
+    logMonitor('PRODUCTS', 'SUCCESS', { action: 'INIT_PRODUCTS' });
     return NextResponse.json({ message: 'Products table initialized successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('PRODUCTS', 'ERROR', { action: 'INIT_PRODUCTS', error: error?.message || String(error) });
     console.error('Error initializing products table:', error);
     return NextResponse.json({ error: 'Failed to initialize products table' }, { status: 500 });
   }

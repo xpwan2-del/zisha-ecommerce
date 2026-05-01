@@ -48,9 +48,7 @@ interface TranslationRow {
 
 interface TranslationMap {
   [key: string]: {
-    zh?: string;
-    en?: string;
-    ar?: string;
+    [lang: string]: string;
   };
 }
 

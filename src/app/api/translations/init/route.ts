@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('TRANSLATIONS', 'REQUEST', { method: 'POST', action: 'INIT_TRANSLATIONS' });
+    
     // 创建翻译表
     await query(`
       CREATE TABLE IF NOT EXISTS translations (
@@ -130,8 +133,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    logMonitor('TRANSLATIONS', 'SUCCESS', { action: 'INIT_TRANSLATIONS', status: 'initialized', count: translations.length });
+    
     return NextResponse.json({ message: 'Translations table initialized successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('TRANSLATIONS', 'ERROR', { action: 'INIT_TRANSLATIONS', error: error?.message || String(error) });
     console.error('Error initializing translations:', error);
     return NextResponse.json({ error: 'Failed to initialize translations' }, { status: 500 });
   }

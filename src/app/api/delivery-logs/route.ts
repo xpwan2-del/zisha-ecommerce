@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { DeliverySubStatus } from '@/lib/order-status-config';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('DELIVERY', 'REQUEST', { method: 'GET', action: 'GET_DELIVERY_LOGS' });
+
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('order_id');
 
@@ -21,6 +24,7 @@ export async function GET(request: NextRequest) {
       [orderId]
     );
 
+    logMonitor('DELIVERY', 'SUCCESS', { action: 'GET_DELIVERY_LOGS', order_id: orderId, logs_count: result.rows.length });
     return NextResponse.json({
       success: true,
       data: {
@@ -28,7 +32,8 @@ export async function GET(request: NextRequest) {
         current_status: result.rows.length > 0 ? result.rows[0].sub_status : null
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('DELIVERY', 'ERROR', { action: 'GET_DELIVERY_LOGS', error: error?.message || String(error) });
     console.error('[DeliveryLogs] GET error:', error);
     return NextResponse.json({
       success: false,
@@ -39,6 +44,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('DELIVERY', 'REQUEST', { method: 'POST', action: 'CREATE_DELIVERY_LOG' });
+
     const body = await request.json();
     const { order_id, sub_status, carrier, tracking_number, location, description, occurred_at } = body;
 
@@ -71,6 +78,7 @@ export async function POST(request: NextRequest) {
       ]
     );
 
+    logMonitor('DELIVERY', 'SUCCESS', { action: 'CREATE_DELIVERY_LOG', order_id, sub_status, log_id: result.lastInsertRowid });
     return NextResponse.json({
       success: true,
       data: {
@@ -79,7 +87,8 @@ export async function POST(request: NextRequest) {
         sub_status
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('DELIVERY', 'ERROR', { action: 'CREATE_DELIVERY_LOG', error: error?.message || String(error) });
     console.error('[DeliveryLogs] POST error:', error);
     return NextResponse.json({
       success: false,
@@ -90,6 +99,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    logMonitor('DELIVERY', 'REQUEST', { method: 'PUT', action: 'UPDATE_DELIVERY_LOG' });
+
     const body = await request.json();
     const { order_id, sub_status, carrier, tracking_number, location, description } = body;
 
@@ -115,11 +126,13 @@ export async function PUT(request: NextRequest) {
       ]
     );
 
+    logMonitor('DELIVERY', 'SUCCESS', { action: 'UPDATE_DELIVERY_LOG', order_id, sub_status });
     return NextResponse.json({
       success: true,
       data: { order_id, sub_status }
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('DELIVERY', 'ERROR', { action: 'UPDATE_DELIVERY_LOG', error: error?.message || String(error) });
     console.error('[DeliveryLogs] PUT error:', error);
     return NextResponse.json({
       success: false,

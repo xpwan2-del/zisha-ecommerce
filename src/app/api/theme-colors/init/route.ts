@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('THEME_COLORS', 'REQUEST', { method: 'POST', action: 'INIT_THEME_COLORS' });
     const tableExistsResult = await query("SELECT name FROM sqlite_master WHERE type='table' AND name='theme_color_configs'");
     if (tableExistsResult.rows && tableExistsResult.rows.length > 0) {
+      logMonitor('THEME_COLORS', 'SUCCESS', { action: 'INIT_THEME_COLORS', status: 'already_exists' });
       return NextResponse.json({ success: true, message: "Table already exists" });
     }
 
@@ -125,8 +128,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    logMonitor('THEME_COLORS', 'SUCCESS', { action: 'INIT_THEME_COLORS', status: 'initialized', configCount: defaultConfigs.length });
+    
     return NextResponse.json({ success: true, message: "Table created and initialized successfully" });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('THEME_COLORS', 'ERROR', { action: 'INIT_THEME_COLORS', error: error?.message || String(error) });
     console.error("Failed to initialize theme colors:", error);
     return NextResponse.json({ success: false, error: "Failed to initialize" }, { status: 500 });
   }

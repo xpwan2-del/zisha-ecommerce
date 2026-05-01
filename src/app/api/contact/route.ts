@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 // GET /api/contact - Get contact information
 export async function GET() {
   try {
+    logMonitor('CONTACT', 'REQUEST', { method: 'GET', action: 'GET_CONTACT' });
+
     const result = await query('SELECT * FROM contact LIMIT 1');
     
     let contact = result.rows[0];
     
     if (!contact) {
-      // Create default contact if not exists
       const defaultContact = {
         title: 'Contact Us',
         description: 'Get in touch with us for any inquiries',
@@ -43,8 +45,10 @@ export async function GET() {
       contact = newContact.rows[0];
     }
     
+    logMonitor('CONTACT', 'SUCCESS', { action: 'GET_CONTACT', has_contact: !!contact });
     return NextResponse.json(contact);
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('CONTACT', 'ERROR', { action: 'GET_CONTACT', error: error?.message || String(error) });
     console.error('Error getting contact information:', error);
     return NextResponse.json({ error: 'Failed to get contact information' }, { status: 500 });
   }
@@ -53,10 +57,11 @@ export async function GET() {
 // POST /api/contact - Update contact information
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('CONTACT', 'REQUEST', { method: 'POST', action: 'UPDATE_CONTACT' });
+
     const data = await request.json();
     const { title, description, images, videoUrl, address, email, phone, openingHours } = data;
     
-    // Use UPSERT logic - update if exists, insert if not
     const updateResult = await query(`
       INSERT INTO contact (title, description, images, video_url, address, email, phone, opening_hours)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -89,8 +94,10 @@ export async function POST(request: NextRequest) {
       openingHours
     ]);
 
+    logMonitor('CONTACT', 'SUCCESS', { action: 'UPDATE_CONTACT' });
     return NextResponse.json({ success: true, data: updateResult });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('CONTACT', 'ERROR', { action: 'UPDATE_CONTACT', error: error?.message || String(error) });
     console.error('Error updating contact information:', error);
     return NextResponse.json({ error: 'Failed to update contact information' }, { status: 500 });
   }

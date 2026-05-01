@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth, requireAdmin } from '@/lib/auth';
+import { logMonitor } from '@/lib/utils/logger';
 
 // GET /api/orders/[id] - Get order details
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    logMonitor('ORDERS', 'REQUEST', { method: 'GET', action: 'GET_ORDER_DETAIL' });
+    
     // 验证登录
     const authResult = requireAuth(request);
     if (authResult.response) {
@@ -67,6 +70,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       [orderId]
     );
 
+    logMonitor('ORDERS', 'SUCCESS', { 
+      action: 'GET_ORDER_DETAIL', 
+      orderId,
+      itemCount: itemsResult.rows?.length || 0 
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -75,7 +84,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         logistics: logisticsResult.rows || []
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ORDERS', 'ERROR', { action: 'GET_ORDER_DETAIL', error: error?.message || String(error) });
     console.error('Error fetching order details:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch order details' },

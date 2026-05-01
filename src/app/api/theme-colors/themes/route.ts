@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { logMonitor } from "@/lib/utils/logger";
 
 export async function GET() {
   try {
+    logMonitor('THEME_COLORS', 'REQUEST', { method: 'GET', action: 'GET_THEMES' });
+    
     const result = await query(
       "SELECT DISTINCT theme_key FROM theme_color_configs"
     );
@@ -24,11 +27,14 @@ export async function GET() {
       }
     }
 
+    logMonitor('THEME_COLORS', 'SUCCESS', { action: 'GET_THEMES', themeCount: Object.keys(themes).length });
+    
     return NextResponse.json({
       success: true,
       data: themes,
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('THEME_COLORS', 'ERROR', { action: 'GET_THEMES', error: error?.message || String(error) });
     console.error("Failed to get themes:", error);
     return NextResponse.json(
       { success: false, error: "Failed to get themes" },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 interface HomeModule {
   id: number;
@@ -143,6 +144,8 @@ const categories: Category[] = [
 
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('HOME', 'REQUEST', { method: 'GET', path: '/api/home' });
+    
     // 按顺序排序
     const sortedModules = [...homeModules].sort((a, b) => a.order - b.order);
     const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
@@ -286,8 +289,17 @@ export async function GET(request: NextRequest) {
       activities: activities
     };
     
+    logMonitor('HOME', 'SUCCESS', { 
+      action: 'GET_HOME_DATA', 
+      moduleCount: sortedModules.length,
+      categoryCount: sortedCategories.length,
+      productCount: products.length,
+      activityCount: activities.length
+    });
+
     return NextResponse.json(homeData);
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('HOME', 'ERROR', { action: 'GET_HOME_DATA', error: error?.message || String(error) });
     console.error('Error fetching home data:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: 'Failed to fetch home data', details: errorMessage }, { status: 500 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { logMonitor } from "@/lib/utils/logger";
 
 const initDatabase = async () => {
   try {
@@ -33,12 +34,19 @@ initDatabase();
 
 export async function GET() {
   try {
+    logMonitor('THEMES', 'REQUEST', { method: 'GET', action: 'GET_THEME' });
+    
     const result = await query("SELECT config_value FROM system_configs WHERE config_key = 'theme'");
 
+    const theme = result.rows && result.rows.length > 0 ? result.rows[0].config_value : "chinese";
+    
+    logMonitor('THEMES', 'SUCCESS', { action: 'GET_THEME', theme });
+    
     return NextResponse.json({
-      theme: result.rows && result.rows.length > 0 ? result.rows[0].config_value : "chinese",
+      theme,
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('THEMES', 'ERROR', { action: 'GET_THEME', error: error?.message || String(error) });
     console.error("Failed to get theme:", error);
     return NextResponse.json({ theme: "chinese" }, { status: 500 });
   }
@@ -46,10 +54,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('THEMES', 'REQUEST', { method: 'POST', action: 'SET_THEME' });
+    
     const { theme } = await request.json();
 
     const validThemes = ["chinese", "middleEastern", "amazon", "middleEasternLuxury"];
     if (!validThemes.includes(theme)) {
+      logMonitor('THEMES', 'VALIDATION_FAILED', { error: 'Invalid theme', theme });
       return NextResponse.json({ error: "无效的主题" }, { status: 400 });
     }
 
@@ -58,8 +69,11 @@ export async function POST(request: NextRequest) {
       ["theme", theme]
     );
 
+    logMonitor('THEMES', 'SUCCESS', { action: 'SET_THEME', theme });
+    
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('THEMES', 'ERROR', { action: 'SET_THEME', error: error?.message || String(error) });
     console.error("Failed to save theme:", error);
     return NextResponse.json({ error: "保存失败" }, { status: 500 });
   }

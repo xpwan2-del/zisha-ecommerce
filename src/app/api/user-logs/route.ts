@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { logMonitor } from '@/lib/utils/logger';
 
 // GET /api/user-logs - 查询用户操作日志（用户查看自己的，管理员查看所有）
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('USER_LOGS', 'REQUEST', { method: 'GET', action: 'GET_USER_LOGS' });
+    
     const authResult = requireAuth(request);
     if (authResult.response) {
+      logMonitor('USER_LOGS', 'AUTH_FAILED', { reason: 'Unauthorized' });
       return authResult.response;
     }
 
@@ -66,6 +70,8 @@ export async function GET(request: NextRequest) {
       new_value: log.new_value ? JSON.parse(log.new_value) : null
     }));
 
+    logMonitor('USER_LOGS', 'SUCCESS', { action: 'GET_USER_LOGS', count: formattedLogs.length, total, page, limit });
+    
     return NextResponse.json({
       success: true,
       data: {
@@ -79,7 +85,8 @@ export async function GET(request: NextRequest) {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('USER_LOGS', 'ERROR', { action: 'GET_USER_LOGS', error: error?.message || String(error) });
     console.error('Error getting user logs:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to get user logs' },

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('ORDERS', 'REQUEST', { method: 'GET', action: 'GET_ORDERS_LIST' });
+    
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -132,6 +135,15 @@ export async function GET(request: NextRequest) {
     const countResult = await query(countSql, countParams);
     const total = countResult.rows[0]?.total || 0;
 
+    logMonitor('ORDERS', 'SUCCESS', { 
+      action: 'GET_ORDERS_LIST', 
+      orderCount: orders.length,
+      total,
+      page,
+      limit,
+      orderStatus: order_status || 'all'
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -144,7 +156,8 @@ export async function GET(request: NextRequest) {
         }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ORDERS', 'ERROR', { action: 'GET_ORDERS_LIST', error: error?.message || String(error) });
     console.error('[Orders] GET error:', error);
     return NextResponse.json({
       success: false,

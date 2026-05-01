@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
-    // 创建壶型表
+    logMonitor('TEAPOT_TYPES', 'REQUEST', { method: 'POST', action: 'INIT_TEAPOT_TYPES' });
     await query(`
       CREATE TABLE IF NOT EXISTS teapot_types (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,8 +31,11 @@ export async function POST(request: NextRequest) {
       ('仿古', 'Fang Gu', 'فانغ Гу', '["https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20fang%20gu%20style%20front%20view&image_size=square", "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapot%20fang%20gu%20style%20side%20view&image_size=square"]', 180, 350, 380, '经典器型')
     `);
 
+    logMonitor('TEAPOT_TYPES', 'SUCCESS', { action: 'INIT_TEAPOT_TYPES', status: 'initialized' });
+    
     return NextResponse.json({ message: 'Teapot types table initialized successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('TEAPOT_TYPES', 'ERROR', { action: 'INIT_TEAPOT_TYPES', error: error?.message || String(error) });
     console.error('Error initializing teapot types table:', error);
     return NextResponse.json({ error: 'Failed to initialize teapot types table' }, { status: 500 });
   }

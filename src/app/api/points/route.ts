@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { logMonitor } from '@/lib/utils/logger';
 
-// 辅助函数：记录积分变动
 async function logPointsChange(
   userId: number,
   changeType: string,
@@ -31,9 +31,10 @@ async function logPointsChange(
   );
 }
 
-// GET /api/points - 获取用户积分记录
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('POINTS', 'REQUEST', { method: 'GET', action: 'GET_POINTS_LOGS' });
+
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -49,13 +50,11 @@ export async function GET(request: NextRequest) {
     let whereClause = '';
     const params: any[] = [];
 
-    // 普通用户只能查看自己的记录
     if (!isAdmin && userId) {
       whereClause = 'WHERE pl.user_id = ?';
       params.push(userId);
     }
 
-    // 按变动类型筛选
     if (changeType) {
       whereClause += whereClause ? ' AND' : 'WHERE';
       whereClause += ' pl.change_type = ?';
@@ -64,7 +63,6 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
-    // 查询积分记录
     const logsQuery = `
       SELECT
         pl.id, pl.user_id,
@@ -84,12 +82,10 @@ export async function GET(request: NextRequest) {
     const logsResult = await query(logsQuery, [...params, limit, offset]);
     const logs = logsResult.rows || [];
 
-    // 查询总数
     const countQuery = `SELECT COUNT(*) as count FROM points_logs pl ${whereClause}`;
     const countResult = await query(countQuery, params);
     const total = parseInt(String(countResult.rows?.[0]?.count || 0));
 
-    // 查询用户当前积分
     let currentPoints = 0;
     if (userId) {
       const userResult = await query(
@@ -99,7 +95,6 @@ export async function GET(request: NextRequest) {
       currentPoints = parseInt(String(userResult.rows?.[0]?.points || 0));
     }
 
-    // 查询积分统计
     const statsQuery = userId ? `
       SELECT
         SUM(CASE WHEN points > 0 THEN points ELSE 0 END) as total_earned,
@@ -117,6 +112,7 @@ export async function GET(request: NextRequest) {
     const statsResult = await query(statsQuery, userId ? [userId] : []);
     const stats = statsResult.rows?.[0] || {};
 
+    logMonitor('POINTS', 'SUCCESS', { action: 'GET_POINTS_LOGS', user_id: userId, total_records: total });
     return NextResponse.json({
       success: true,
       data: {
@@ -136,7 +132,8 @@ export async function GET(request: NextRequest) {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('POINTS', 'ERROR', { action: 'GET_POINTS_LOGS', error: error?.message || String(error) });
     console.error('Error getting points logs:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to get points logs' },
@@ -145,9 +142,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/points - 调整用户积分（管理员或系统）
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('POINTS', 'REQUEST', { method: 'POST', action: 'ADJUST_POINTS' });
+
     const body = await request.json();
     const {
       user_id,
@@ -166,7 +164,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 获取用户当前积分
     const userResult = await query(
       'SELECT points FROM users WHERE id = ?',
       [user_id]
@@ -181,7 +178,6 @@ export async function POST(request: NextRequest) {
 
     const currentPoints = parseInt(String(userResult.rows[0].points)) || 0;
 
-    // 计算新积分
     let newPoints = currentPoints;
     let actualPoints = points;
 
@@ -213,18 +209,15 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    // 更新用户积分
     await query(
       'UPDATE users SET points = ?, updated_at = datetime("now") WHERE id = ?',
       [newPoints, user_id]
     );
 
-    // 获取IP地址
     const ipAddress = request.headers.get('x-forwarded-for') ||
                       request.headers.get('x-real-ip') ||
                       'unknown';
 
-    // 记录积分变动日志
     await logPointsChange(
       user_id,
       change_type,
@@ -238,6 +231,7 @@ export async function POST(request: NextRequest) {
       ipAddress
     );
 
+    logMonitor('POINTS', 'SUCCESS', { action: 'ADJUST_POINTS', user_id, change_type, points: actualPoints, before: currentPoints, after: newPoints });
     return NextResponse.json({
       success: true,
       data: {
@@ -250,7 +244,8 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 201 });
 
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('POINTS', 'ERROR', { action: 'ADJUST_POINTS', error: error?.message || String(error) });
     console.error('Error adjusting points:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to adjust points' },

@@ -1,359 +1,268 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslation } from 'react-i18next';
-import { useCurrency } from '@/lib/contexts/CurrencyContext';
-import { formatCurrency } from '@/lib/utils/currency';
-import { useCart } from '@/lib/contexts/CartContext';
-import { useAuth } from '@/lib/contexts/AuthContext';
-import { loadStripe } from '@stripe/stripe-js';
-
 export default function CheckoutPage() {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const { currency } = useCurrency();
-  const { cart, clearCart } = useCart();
-  const { user, isLoading: isAuthLoading } = useAuth();
-  
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal' | 'mock'>('stripe');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [checkoutData, setCheckoutData] = useState<any>(null);
-  
-  useEffect(() => {
-    if (!isAuthLoading && !user) {
-      router.push('/login?redirect=/checkout');
-      return;
-    }
-  }, [isAuthLoading, user, router]);
-
-  useEffect(() => {
-    const fetchCheckoutData = async () => {
-      try {
-        const response = await fetch(`/api/checkout?cart=${encodeURIComponent(JSON.stringify(cart))}`);
-        
-        const data = await response.json();
-        if (response.ok) {
-          setCheckoutData(data);
-        } else {
-          setError(data.error || 'Failed to fetch checkout data');
-        }
-      } catch (err) {
-        setError('An error occurred');
-      }
-    };
-    
-    if (cart.length > 0) {
-      fetchCheckoutData();
-    }
-  }, [cart]);
-  
-  useEffect(() => {
-    if (!isAuthLoading && !user) {
-      router.push('/login?redirect=/checkout');
-    }
-    if (!isAuthLoading && user && cart.length === 0) {
-      router.push('/cart');
-    }
-  }, [user, cart, router, isAuthLoading]);
-
-  if (isAuthLoading || !user) {
-    return (
-      <div className="py-12 px-4 bg-[#FDF2F8] middle-east-pattern">
-        <div className="max-w-4xl mx-auto flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#831843]"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (cart.length === 0) {
-    return (
-      <div className="py-12 px-4 bg-[#FDF2F8] middle-east-pattern">
-        <div className="max-w-4xl mx-auto flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#831843]"></div>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!checkoutData) {
-    return (
-      <div className="py-12 px-4 bg-[#FDF2F8] middle-east-pattern">
-        <div className="max-w-4xl mx-auto flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#831843]"></div>
-        </div>
-      </div>
-    );
-  }
-  
-  const handlePayment = async () => {
-    setIsLoading(true);
-    setError('');
-
-    if (!user) {
-      router.push('/login?redirect=/checkout');
-      return;
-    }
-
-    try {
-      // Cookie 会自动发送，不需要检查 localStorage token
-      const validateResponse = await fetch('/api/auth/me', {
-        credentials: 'include',
-      });
-
-      if (!validateResponse.ok) {
-        router.push('/login?redirect=/checkout');
-        return;
-      }
-
-      if (paymentMethod === 'mock') {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        clearCart();
-        router.push('/checkout/success?type=order');
-      } else {
-        const response = await fetch(`/api/payments/${paymentMethod}`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            amount: checkoutData.total,
-            items: cart,
-          }),
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          if (paymentMethod === 'stripe') {
-            const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
-            if (stripe) {
-              await (stripe as any).redirectToCheckout({ sessionId: data.id });
-            }
-          } else {
-            window.location.href = data.url;
-          }
-        } else {
-          setError(data.error || 'Payment creation failed');
-        }
-      }
-    } catch (err) {
-      console.error('Payment error:', err);
-      setError('An error occurred');
-    } finally {
-      setIsLoading(false);
-    }
+  const checkoutData = {
+    items: [
+      {
+        id: 1,
+        name: '掇球紫砂壶',
+        name_en: 'Duoqiu Zisha Teapot',
+        image: '/images/products/2_掇球紫砂壶_1.jpg',
+        price: 'AED 1,599.00',
+        original_price: 'AED 1,999.00',
+        quantity: 1,
+      },
+      {
+        id: 2,
+        name: '圆口紫砂茶杯',
+        name_en: 'Round Mouth Teacup',
+        image: '/images/products/16_圆口紫砂茶杯_1.jpg',
+        price: 'AED 299.00',
+        original_price: 'AED 399.00',
+        quantity: 2,
+      },
+    ],
+    subtotal: 'AED 2,197.00',
+    original_subtotal: 'AED 2,797.00',
+    shipping: 'Free',
+    tax: 'AED 109.85',
+    total: 'AED 2,306.85',
+    promotions: '今日特惠 - AED 600.00',
+    savings: 'AED 600.00',
   };
-  
+
+  const userAddress = {
+    name: '张先生',
+    phone: '+971 50 123 4567',
+    address: 'Al Wasl Road, Jumeirah',
+    city: 'Dubai',
+    country: 'United Arab Emirates',
+  };
+
+  const paymentMethods = [
+    {
+      id: 'stripe',
+      name: 'Credit / Debit Card',
+      description: 'Visa, Mastercard, American Express',
+      icons: ['VISA', 'MC', 'AMEX'],
+      selected: true,
+    },
+    {
+      id: 'paypal',
+      name: 'PayPal',
+      description: 'Pay with your PayPal account',
+      selected: false,
+    },
+    {
+      id: 'alipay',
+      name: 'Alipay',
+      description: '支付宝支付',
+      selected: false,
+    },
+  ];
+
   return (
-    <div className="py-12 px-4 bg-[#FDF2F8] middle-east-pattern">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-center font-['Noto_Naskh_Arabic'] text-[#831843]">{t('checkout.title')}</h1>
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-amber-50">
+      <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-pink-900">
+          结账 Checkout
+        </h1>
         
-        <div className="bg-white/80 glass-effect rounded-lg shadow-md border border-[#DB2777]/20">
-          {/* Shipping address */}
-          <div className="px-6 py-4 border-b border-[#DB2777]/20">
-            <h2 className="text-lg font-semibold font-['Noto_Naskh_Arabic'] text-[#831843]">{t('checkout.shipping_address')}</h2>
-          </div>
-          
-          <div className="px-6 py-6">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium font-['Noto_Sans_Arabic'] text-[#831843]/70 mb-2">{t('checkout.name')}</label>
-                  <input
-                    type="text"
-                    value={user.name}
-                    className="w-full px-4 py-2 border border-[#DB2777]/30 rounded-lg font-['Noto_Sans_Arabic'] text-[#831843] bg-white/90"
-                    disabled
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium font-['Noto_Sans_Arabic'] text-[#831843]/70 mb-2">{t('checkout.email')}</label>
-                  <input
-                    type="email"
-                    value={user.email}
-                    className="w-full px-4 py-2 border border-[#DB2777]/30 rounded-lg font-['Noto_Sans_Arabic'] text-[#831843] bg-white/90"
-                    disabled
-                  />
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white/90 rounded-xl shadow-lg border border-pink-200 overflow-hidden">
+              <div className="px-6 py-4 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200">
+                <h2 className="text-lg font-semibold text-pink-900 flex items-center gap-2">
+                  <span>📍</span>
+                  收货地址 Shipping Address
+                </h2>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium font-['Noto_Sans_Arabic'] text-[#831843]/70 mb-2">{t('checkout.address')}</label>
-                <input
-                  type="text"
-                  placeholder={t('checkout.enter_address')}
-                  className="w-full px-4 py-2 border border-[#DB2777]/30 rounded-lg font-['Noto_Sans_Arabic'] text-[#831843] bg-white/90"
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium font-['Noto_Sans_Arabic'] text-[#831843]/70 mb-2">{t('checkout.city')}</label>
-                  <input
-                    type="text"
-                    placeholder={t('checkout.enter_city')}
-                    className="w-full px-4 py-2 border border-[#DB2777]/30 rounded-lg font-['Noto_Sans_Arabic'] text-[#831843] bg-white/90"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium font-['Noto_Sans_Arabic'] text-[#831843]/70 mb-2">{t('checkout.country')}</label>
-                  <select className="w-full px-4 py-2 border border-[#DB2777]/30 rounded-lg font-['Noto_Sans_Arabic'] text-[#831843] bg-white/90">
-                    <option value="ae">United Arab Emirates</option>
-                    <option value="us">United States</option>
-                    <option value="cn">China</option>
-                    <option value="other">Other</option>
-                  </select>
+              <div className="p-6">
+                <div className="flex items-start gap-4 p-4 bg-pink-50/50 rounded-lg border border-pink-200">
+                  <div className="flex-shrink-0 w-10 h-10 bg-pink-900 rounded-full flex items-center justify-center text-white">
+                    👤
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-pink-900">{userAddress.name}</span>
+                      <span className="px-2 py-0.5 text-xs bg-pink-900 text-white rounded-full">默认 Default</span>
+                    </div>
+                    <p className="text-sm text-pink-700">{userAddress.phone}</p>
+                    <p className="text-sm text-pink-700 mt-1">{userAddress.address}, {userAddress.city}</p>
+                    <p className="text-sm text-pink-700">{userAddress.country}</p>
+                  </div>
+                  <button className="text-sm text-pink-900 hover:text-pink-600 font-medium transition-colors">
+                    更改 Change
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
-          
-          {/* Payment method */}
-          <div className="px-6 py-4 border-b border-[#DB2777]/20">
-            <h2 className="text-lg font-semibold font-['Noto_Naskh_Arabic'] text-[#831843]">{t('checkout.payment_method')}</h2>
-          </div>
-          
-          <div className="px-6 py-6">
-            <div className="space-y-4">
-              <div className="flex items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => setPaymentMethod('stripe')}>
-                <input
-                  type="radio"
-                  name="payment"
-                  value="stripe"
-                  checked={paymentMethod === 'stripe'}
-                  onChange={() => setPaymentMethod('stripe')}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
-                />
-                <div className="ml-4 flex-1">
-                  <h3 className="font-medium">Credit / Debit Card</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Pay with Visa, Mastercard, American Express, etc.</p>
-                </div>
-                <div className="flex space-x-2">
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-1 14H5v-2h14v2zm0-6H5V8h14v4z" />
-                  </svg>
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-1 14H5v-2h14v2zm0-4H5V8h14v2z" />
-                  </svg>
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-1 14H5v-2h14v2zm0-4H5V8h14v2z" />
-                  </svg>
-                </div>
+
+            <div className="bg-white/90 rounded-xl shadow-lg border border-pink-200 overflow-hidden">
+              <div className="px-6 py-4 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200">
+                <h2 className="text-lg font-semibold text-pink-900 flex items-center gap-2">
+                  <span>💳</span>
+                  支付方式 Payment Method
+                </h2>
               </div>
               
-              <div className="flex items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => setPaymentMethod('paypal')}>
-                <input
-                  type="radio"
-                  name="payment"
-                  value="paypal"
-                  checked={paymentMethod === 'paypal'}
-                  onChange={() => setPaymentMethod('paypal')}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
-                />
-                <div className="ml-4 flex-1">
-                  <h3 className="font-medium">PayPal</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Pay with your PayPal account</p>
-                </div>
-                <svg className="w-12 h-8" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm6.605 4.61a8.502 8.502 0 0 1 1.93 5.314c-.281-.054-3.101-.629-5.943-.271-.065-.141-.12-.293-.184-.445a25.416 25.416 0 0 0-.564-1.236c3.145-1.28 4.577-3.124 4.761-3.362zM12 2.162c2.907 0 5.467.986 7.293 2.64a9.768 9.768 0 0 1-1.693 1.21c-1.983-1.05-4.086-1.674-6.367-1.771a22.213 22.213 0 0 0-.847 1.82c-3.251.16-6.143 1.641-7.69 3.844a8.581 8.581 0 0 1 4.923-1.293c.238-.477.495-.943.769-1.399zM2.01 12.318a8.482 8.482 0 0 1 4.939-2.52c-.084.307-.163.62-.235.933-.418 1.723-.638 3.625-.638 5.608 0 1.019.108 2.016.31 2.982-1.184-.069-2.269-.544-3.182-1.342a8.588 8.588 0 0 1 1.806-3.661zM12 21.838c-2.907 0-5.467-.986-7.293-2.64a9.768 9.768 0 0 1 1.693-1.21c1.983 1.05 4.086 1.674 6.367 1.771a22.23 22.23 0 0 0 .847-1.82c3.251-.16 6.143-1.641 7.69-3.844a8.581 8.581 0 0 1-4.923 1.293c-.238.477-.495.943-.769 1.399zm9.99-1.52a8.482 8.482 0 0 1-4.939 2.52c.084-.307.163-.62.235-.933.418-1.723.638-3.625.638-5.608 0-1.019-.108-2.016-.31-2.982 1.184.069 2.269.544 3.182 1.342a8.588 8.588 0 0 1-1.806 3.661z" />
-                </svg>
-              </div>
-              
-              <div className="flex items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => setPaymentMethod('mock')}>
-                <input
-                  type="radio"
-                  name="payment"
-                  value="mock"
-                  checked={paymentMethod === 'mock'}
-                  onChange={() => setPaymentMethod('mock')}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
-                />
-                <div className="ml-4 flex-1">
-                  <h3 className="font-medium">模拟支付</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">测试使用，模拟支付成功</p>
-                </div>
-                <div className="w-12 h-8 flex items-center justify-center bg-green-100 dark:bg-green-900 rounded-full">
-                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Order summary */}
-          <div className="px-6 py-4 border-b border-[#DB2777]/20">
-            <h2 className="text-lg font-semibold font-['Noto_Naskh_Arabic'] text-[#831843]">{t('checkout.order_summary')}</h2>
-          </div>
-          
-          <div className="px-6 py-6">
-            <div className="space-y-4">
-              {cart.map((item) => (
-                <div key={item.id} className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <img
-                      src={item.image || '/placeholder.jpg'}
-                      alt={item.name}
-                      className="w-12 h-12 object-cover rounded-lg mr-4"
-                    />
-                    <div>
-                      <h3 className="font-medium font-['Noto_Naskh_Arabic'] text-[#831843]">{item.name}</h3>
-                      <p className="text-sm font-['Noto_Sans_Arabic'] text-[#831843]/70">{item.quantity} × {formatCurrency(item.price, currency)}</p>
+              <div className="p-6 space-y-4">
+                {paymentMethods.map((method) => (
+                  <div
+                    key={method.id}
+                    className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      method.selected
+                        ? 'border-pink-900 bg-pink-50/50 shadow-md'
+                        : 'border-pink-200 hover:bg-pink-50/30'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-4 ${
+                      method.selected ? 'border-pink-900' : 'border-pink-300'
+                    }`}>
+                      {method.selected && (
+                        <div className="w-3 h-3 rounded-full bg-pink-900"></div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-pink-900">{method.name}</h3>
+                      <p className="text-sm text-pink-600">{method.description}</p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      {method.id === 'stripe' && (
+                        <div className="flex space-x-2">
+                          <div className="w-10 h-7 bg-gradient-to-r from-blue-600 to-blue-800 rounded flex items-center justify-center text-white text-xs font-bold">VISA</div>
+                          <div className="w-10 h-7 bg-gradient-to-r from-red-500 to-red-700 rounded flex items-center justify-center text-white text-xs font-bold">MC</div>
+                          <div className="w-10 h-7 bg-gradient-to-r from-blue-400 to-blue-600 rounded flex items-center justify-center text-white text-xs font-bold">AMEX</div>
+                        </div>
+                      )}
+                      {method.id === 'paypal' && (
+                        <div className="px-3 py-1.5 bg-[#FFC439] rounded font-bold text-sm text-[#003087]">PayPal</div>
+                      )}
+                      {method.id === 'alipay' && (
+                        <div className="px-3 py-1.5 bg-[#1677FF] rounded flex items-center justify-center">
+                          <span className="text-white font-bold text-sm">Alipay</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <p className="font-medium font-['Noto_Naskh_Arabic'] text-[#831843]">{formatCurrency(item.price * item.quantity, currency)}</p>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white/90 rounded-xl shadow-lg border border-pink-200 overflow-hidden">
+              <div className="px-6 py-4 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200">
+                <h2 className="text-lg font-semibold text-pink-900 flex items-center gap-2">
+                  <span>🛒</span>
+                  商品清单 Order Items
+                </h2>
+              </div>
               
-              <div className="pt-4 border-t border-[#DB2777]/20 space-y-2">
-                <div className="flex justify-between">
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]/70">{t('checkout.subtotal')}</span>
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]">{formatCurrency(checkoutData.subtotal, currency)}</span>
+              <div className="p-6 space-y-4">
+                {checkoutData.items.map((item) => (
+                  <div key={item.id} className="flex gap-4 p-4 bg-pink-50/30 rounded-lg">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-lg overflow-hidden bg-pink-100 flex items-center justify-center text-4xl">
+                      🏺
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0 pr-4">
+                          <h3 className="font-medium text-pink-900 truncate">{item.name}</h3>
+                          <p className="text-xs text-pink-600 truncate mt-0.5">{item.name_en}</p>
+                          <p className="text-sm text-pink-700 mt-1">数量 Qty: {item.quantity}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-semibold text-pink-900">{item.price}</p>
+                          <p className="text-xs text-pink-400 line-through mt-0.5">{item.original_price}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1">
+            <div className="bg-white/90 rounded-xl shadow-lg border border-pink-200 overflow-hidden sticky top-6">
+              <div className="px-6 py-4 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200">
+                <h2 className="text-lg font-semibold text-pink-900 flex items-center gap-2">
+                  <span>📋</span>
+                  订单摘要 Order Summary
+                </h2>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-pink-700">小计 Subtotal (2 items)</span>
+                    <span className="text-pink-900 font-medium">{checkoutData.subtotal}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm">
+                    <span className="text-pink-400 line-through">原价 Original Price</span>
+                    <span className="text-pink-400 line-through">{checkoutData.original_subtotal}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm">
+                    <span className="text-green-600">折扣 Discount</span>
+                    <span className="text-green-600 font-medium">-{checkoutData.savings}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm">
+                    <span className="text-pink-700">运费 Shipping</span>
+                    <span className="text-green-600 font-medium">免运费 Free</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm">
+                    <span className="text-pink-700">税费 Tax</span>
+                    <span className="text-pink-900">{checkoutData.tax}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]/70">{t('checkout.shipping')}</span>
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]">{checkoutData.shipping === 0 ? 'Free' : formatCurrency(checkoutData.shipping, currency)}</span>
+                
+                <div className="border-t border-pink-200 pt-4">
+                  <div className="flex justify-between">
+                    <span className="text-lg font-semibold text-pink-900">总计 Total</span>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-pink-900">{checkoutData.total}</span>
+                      <p className="text-xs text-pink-600 mt-0.5">≈ $628.02 USD | ¥ 4,523.52 CNY</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]/70">{t('checkout.tax')}</span>
-                  <span className="font-['Noto_Sans_Arabic'] text-[#831843]">{formatCurrency(checkoutData.tax, currency)}</span>
+
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600 text-lg">✓</span>
+                    <div>
+                      <p className="text-sm text-green-800 font-medium">{checkoutData.promotions}</p>
+                      <p className="text-xs text-green-600">您节省了 {checkoutData.savings}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between font-semibold text-lg font-['Noto_Naskh_Arabic'] text-[#831843]">
-                  <span>{t('checkout.total')}</span>
-                  <span>{formatCurrency(checkoutData.total, currency)}</span>
+                
+                <div className="space-y-3 pt-4">
+                  <button
+                    className="w-full py-4 bg-gradient-to-r from-pink-900 via-pink-800 to-pink-900 text-white rounded-lg font-semibold hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                  >
+                    <span>🔒</span>
+                    确认支付 Confirm Payment
+                  </button>
+                  
+                  <button
+                    className="w-full py-3 border-2 border-pink-900 text-pink-900 rounded-lg font-medium hover:bg-pink-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    <span>←</span>
+                    返回购物车 Back to Cart
+                  </button>
                 </div>
               </div>
               
-              {error && (
-                <div className="bg-[#DB2777]/10 border border-[#DB2777]/30 text-[#DB2777] p-3 rounded-lg font-['Noto_Sans_Arabic']">
-                  {error}
+              <div className="px-6 py-4 bg-pink-50/50 border-t border-pink-200">
+                <div className="flex items-center justify-center gap-4 text-pink-600">
+                  <span>🔒</span>
+                  <span className="text-xs">安全加密支付 Secure & Encrypted Payment</span>
                 </div>
-              )}
-              
-              <button
-                onClick={handlePayment}
-                disabled={isLoading}
-                className="w-full py-3 rounded-lg font-medium transition-all hover:opacity-90 disabled:opacity-50 font-['Noto_Sans_Arabic']"
-                style={{
-                  backgroundColor: 'var(--btn-primary-bg)',
-                  color: 'var(--btn-primary-text)',
-                  border: '1px solid var(--btn-primary-border)'
-                }}
-              >
-                {isLoading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    {t('checkout.processing')}
-                  </div>
-                ) : (
-                  t('checkout.pay_now', { amount: formatCurrency(checkoutData.total, currency).replace(/[^0-9.]/g, '') })
-                )}
-              </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logMonitor } from '@/lib/utils/logger';
 
 interface Guarantee {
   id: number;
@@ -11,7 +12,6 @@ interface Guarantee {
   order: number;
 }
 
-// 模拟数据库
 let guarantees: Guarantee[] = [
   {
     id: 1,
@@ -57,6 +57,8 @@ let guarantees: Guarantee[] = [
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    logMonitor('GUARANTEES', 'REQUEST', { method: 'PUT', action: 'UPDATE_GUARANTEE' });
+
     const { id } = await params;
     const idInt = parseInt(id);
     const body = await request.json();
@@ -71,8 +73,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       ...body
     };
     
+    logMonitor('GUARANTEES', 'SUCCESS', { action: 'UPDATE_GUARANTEE', id: idInt });
     return NextResponse.json(guarantees[guaranteeIndex]);
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('GUARANTEES', 'ERROR', { action: 'UPDATE_GUARANTEE', error: error?.message || String(error) });
     console.error('Error updating guarantee:', error);
     return NextResponse.json({ error: 'Failed to update guarantee' }, { status: 500 });
   }
@@ -80,6 +84,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    logMonitor('GUARANTEES', 'REQUEST', { method: 'DELETE', action: 'DELETE_GUARANTEE' });
+
     const { id } = await params;
     const idInt = parseInt(id);
     
@@ -89,8 +95,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     }
     
     guarantees.splice(guaranteeIndex, 1);
+    logMonitor('GUARANTEES', 'SUCCESS', { action: 'DELETE_GUARANTEE', id: idInt });
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('GUARANTEES', 'ERROR', { action: 'DELETE_GUARANTEE', error: error?.message || String(error) });
     console.error('Error deleting guarantee:', error);
     return NextResponse.json({ error: 'Failed to delete guarantee' }, { status: 500 });
   }

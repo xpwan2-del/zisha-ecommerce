@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    logMonitor('ORDERS', 'REQUEST', { method: 'PATCH', action: 'UPDATE_ORDER_ADDRESS' });
+    
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -68,11 +71,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       [address_id, orderId]
     );
 
+    logMonitor('ORDERS', 'SUCCESS', { 
+      action: 'UPDATE_ORDER_ADDRESS', 
+      orderId,
+      addressId: address_id 
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Address updated successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('ORDERS', 'ERROR', { action: 'UPDATE_ORDER_ADDRESS', error: error?.message || String(error) });
     console.error('Error updating order address:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

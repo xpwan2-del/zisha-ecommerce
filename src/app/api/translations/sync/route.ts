@@ -91,9 +91,7 @@ async function syncTranslations(
   const now = new Date().toISOString();
 
   for (const lang of languages) {
-    const translations = manualTranslations
-      ? manualTranslations.map(t => ({ key: t.key, value: t.lang }))
-      : loadTranslationsFromFile(lang);
+    const translations = loadTranslationsFromFile(lang);
 
     for (const { key, value } of translations) {
       try {
@@ -106,7 +104,7 @@ async function syncTranslations(
               updated_at = excluded.updated_at
           `, [key, lang, value, now, now]);
 
-          if (updateResult.changes > 0) {
+          if (updateResult.changes && updateResult.changes > 0) {
             result.updated++;
           } else {
             result.added++;

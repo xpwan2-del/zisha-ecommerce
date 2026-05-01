@@ -55,6 +55,22 @@ const FALLBACK_COLORS: Record<string, string> = {
   inventoryStatusLimited: "#F97316",
   inventoryStatusLowStock: "#DC2626",
   inventoryStatusOutOfStock: "#DC2626",
+  promotionBadgeBg: "linear-gradient(135deg, #EF4444, rgba(239, 68, 68, 0.6))",
+  promotionBadgeText: "#FFFFFF",
+  promotionFinalBadgeBg: "#EF4444",
+  promotionFinalBadgeText: "#FFFFFF",
+  limitedBadgeBg: "#D4AF37",
+  limitedBadgeText: "#FFFFFF",
+  activityBadge1: "#FF5733",
+  activityBadge2: "#33FF57",
+  activityBadge3: "#3357FF",
+  activityBadge4: "#FF33F1",
+  activityBadge5: "#FFB733",
+  activityBadge6: "#33C1FF",
+  activityBadge7: "#FF3366",
+  activityBadge8: "#2ECC71",
+  activityBadge9: "#3498DB",
+  activityBadge10: "#E74C3C",
 };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -165,6 +181,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     cssVars.inventoryStatusLimited = dbColors.inventoryStatus_limited || FALLBACK_COLORS.inventoryStatusLimited;
     cssVars.inventoryStatusLowStock = dbColors.inventoryStatus_lowStock || FALLBACK_COLORS.inventoryStatusLowStock;
     cssVars.inventoryStatusOutOfStock = dbColors.inventoryStatus_outOfStock || FALLBACK_COLORS.inventoryStatusOutOfStock;
+    cssVars.promotionBadgeBg = dbColors.promotionBadgeBg || FALLBACK_COLORS.promotionBadgeBg;
+    cssVars.promotionBadgeText = dbColors.promotionBadgeText || FALLBACK_COLORS.promotionBadgeText;
+    cssVars.promotionFinalBadgeBg = dbColors.promotionFinalBadgeBg || FALLBACK_COLORS.promotionFinalBadgeBg;
+    cssVars.promotionFinalBadgeText = dbColors.promotionFinalBadgeText || FALLBACK_COLORS.promotionFinalBadgeText;
+    cssVars.limitedBadgeBg = dbColors.limitedBadgeBg || FALLBACK_COLORS.limitedBadgeBg;
+    cssVars.limitedBadgeText = dbColors.limitedBadgeText || FALLBACK_COLORS.limitedBadgeText;
+    cssVars.activityBadge1 = dbColors.activityBadge1 || FALLBACK_COLORS.activityBadge1;
+    cssVars.activityBadge2 = dbColors.activityBadge2 || FALLBACK_COLORS.activityBadge2;
+    cssVars.activityBadge3 = dbColors.activityBadge3 || FALLBACK_COLORS.activityBadge3;
+    cssVars.activityBadge4 = dbColors.activityBadge4 || FALLBACK_COLORS.activityBadge4;
+    cssVars.activityBadge5 = dbColors.activityBadge5 || FALLBACK_COLORS.activityBadge5;
+    cssVars.activityBadge6 = dbColors.activityBadge6 || FALLBACK_COLORS.activityBadge6;
+    cssVars.activityBadge7 = dbColors.activityBadge7 || FALLBACK_COLORS.activityBadge7;
+    cssVars.activityBadge8 = dbColors.activityBadge8 || FALLBACK_COLORS.activityBadge8;
+    cssVars.activityBadge9 = dbColors.activityBadge9 || FALLBACK_COLORS.activityBadge9;
+    cssVars.activityBadge10 = dbColors.activityBadge10 || FALLBACK_COLORS.activityBadge10;
 
     return cssVars;
   };
@@ -208,6 +240,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--color-blue", colors.colorBlue);
     root.style.setProperty("--color-yellow", colors.colorYellow);
     root.style.setProperty("--color-orange", colors.colorOrange);
+    root.style.setProperty("--promotion-badge-bg", colors.promotionBadgeBg);
+    root.style.setProperty("--promotion-badge-text", colors.promotionBadgeText);
+    root.style.setProperty("--promotion-final-badge-bg", colors.promotionFinalBadgeBg);
+    root.style.setProperty("--promotion-final-badge-text", colors.promotionFinalBadgeText);
+    root.style.setProperty("--limited-badge-bg", colors.limitedBadgeBg);
+    root.style.setProperty("--limited-badge-text", colors.limitedBadgeText);
+    root.style.setProperty("--activity-badge-1", colors.activityBadge1);
+    root.style.setProperty("--activity-badge-2", colors.activityBadge2);
+    root.style.setProperty("--activity-badge-3", colors.activityBadge3);
+    root.style.setProperty("--activity-badge-4", colors.activityBadge4);
+    root.style.setProperty("--activity-badge-5", colors.activityBadge5);
+    root.style.setProperty("--activity-badge-6", colors.activityBadge6);
+    root.style.setProperty("--activity-badge-7", colors.activityBadge7);
+    root.style.setProperty("--activity-badge-8", colors.activityBadge8);
+    root.style.setProperty("--activity-badge-9", colors.activityBadge9);
+    root.style.setProperty("--activity-badge-10", colors.activityBadge10);
   };
 
   const handleSetTheme = async (newTheme: ThemeKey) => {
@@ -245,6 +293,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                 });
               }
             }
+
+            const badgeColors = {
+              promotionBadgeBg: dbColors.promotionBadgeBg || FALLBACK_COLORS.promotionBadgeBg,
+              promotionBadgeText: dbColors.promotionBadgeText || FALLBACK_COLORS.promotionBadgeText,
+              promotionFinalBadgeBg: dbColors.promotionFinalBadgeBg || FALLBACK_COLORS.promotionFinalBadgeBg,
+              promotionFinalBadgeText: dbColors.promotionFinalBadgeText || FALLBACK_COLORS.promotionFinalBadgeText,
+              limitedBadgeBg: dbColors.limitedBadgeBg || FALLBACK_COLORS.limitedBadgeBg,
+              limitedBadgeText: dbColors.limitedBadgeText || FALLBACK_COLORS.limitedBadgeText,
+              activityBadge1: dbColors.activityBadge1 || FALLBACK_COLORS.activityBadge1,
+              activityBadge2: dbColors.activityBadge2 || FALLBACK_COLORS.activityBadge2,
+              activityBadge3: dbColors.activityBadge3 || FALLBACK_COLORS.activityBadge3,
+              activityBadge4: dbColors.activityBadge4 || FALLBACK_COLORS.activityBadge4,
+              activityBadge5: dbColors.activityBadge5 || FALLBACK_COLORS.activityBadge5,
+              activityBadge6: dbColors.activityBadge6 || FALLBACK_COLORS.activityBadge6,
+              activityBadge7: dbColors.activityBadge7 || FALLBACK_COLORS.activityBadge7,
+              activityBadge8: dbColors.activityBadge8 || FALLBACK_COLORS.activityBadge8,
+              activityBadge9: dbColors.activityBadge9 || FALLBACK_COLORS.activityBadge9,
+              activityBadge10: dbColors.activityBadge10 || FALLBACK_COLORS.activityBadge10,
+            };
+            Object.assign(convertedColors, badgeColors);
 
             setThemeColors(convertedColors);
           }

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('TRANSLATIONS', 'REQUEST', { method: 'GET', action: 'GET_TRANSLATIONS' });
+    
     const url = new URL(request.url);
     const language = url.searchParams.get('language');
     const key = url.searchParams.get('key');
@@ -51,8 +54,11 @@ export async function GET(request: NextRequest) {
       }
     });
     
+    logMonitor('TRANSLATIONS', 'SUCCESS', { action: 'GET_TRANSLATIONS', count: result.rows?.length || 0 });
+    
     return NextResponse.json(translationsByLanguage);
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('TRANSLATIONS', 'ERROR', { action: 'GET_TRANSLATIONS', error: error?.message || String(error) });
     console.error('Error fetching translations:', error);
     return NextResponse.json({ error: 'Failed to fetch translations' }, { status: 500 });
   }
@@ -60,10 +66,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('TRANSLATIONS', 'REQUEST', { method: 'POST', action: 'CREATE_TRANSLATION' });
+    
     const body = await request.json();
     const { key, language, value } = body;
 
     if (!key || !language || !value) {
+      logMonitor('TRANSLATIONS', 'VALIDATION_FAILED', { error: 'Missing required fields' });
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -87,8 +96,11 @@ export async function POST(request: NextRequest) {
       [key, language]
     );
 
+    logMonitor('TRANSLATIONS', 'SUCCESS', { action: 'CREATE_TRANSLATION', key, language });
+    
     return NextResponse.json(result.rows[0], { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('TRANSLATIONS', 'ERROR', { action: 'CREATE_TRANSLATION', error: error?.message || String(error) });
     console.error('Error creating translation:', error);
     return NextResponse.json({ error: 'Failed to create translation' }, { status: 500 });
   }
@@ -96,10 +108,13 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    logMonitor('TRANSLATIONS', 'REQUEST', { method: 'PUT', action: 'UPDATE_TRANSLATION' });
+    
     const body = await request.json();
     const { id, key, language, value } = body;
 
     if (!id) {
+      logMonitor('TRANSLATIONS', 'VALIDATION_FAILED', { error: 'Missing translation ID' });
       return NextResponse.json({ error: 'Missing translation ID' }, { status: 400 });
     }
 
@@ -111,6 +126,7 @@ export async function PUT(request: NextRequest) {
     );
 
     if (!updateResult.changes || updateResult.changes === 0) {
+      logMonitor('TRANSLATIONS', 'NOT_FOUND', { translationId: id });
       return NextResponse.json({ error: 'Translation not found' }, { status: 404 });
     }
 
@@ -120,8 +136,11 @@ export async function PUT(request: NextRequest) {
       [id]
     );
 
+    logMonitor('TRANSLATIONS', 'SUCCESS', { action: 'UPDATE_TRANSLATION', translationId: id });
+    
     return NextResponse.json(updatedResult.rows[0]);
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('TRANSLATIONS', 'ERROR', { action: 'UPDATE_TRANSLATION', error: error?.message || String(error) });
     console.error('Error updating translation:', error);
     return NextResponse.json({ error: 'Failed to update translation' }, { status: 500 });
   }
@@ -129,10 +148,13 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    logMonitor('TRANSLATIONS', 'REQUEST', { method: 'DELETE', action: 'DELETE_TRANSLATION' });
+    
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
 
     if (!id) {
+      logMonitor('TRANSLATIONS', 'VALIDATION_FAILED', { error: 'Missing translation ID' });
       return NextResponse.json({ error: 'Missing translation ID' }, { status: 400 });
     }
 
@@ -142,11 +164,15 @@ export async function DELETE(request: NextRequest) {
     );
 
     if (!deleteResult.changes || deleteResult.changes === 0) {
+      logMonitor('TRANSLATIONS', 'NOT_FOUND', { translationId: id });
       return NextResponse.json({ error: 'Translation not found' }, { status: 404 });
     }
 
+    logMonitor('TRANSLATIONS', 'SUCCESS', { action: 'DELETE_TRANSLATION', translationId: id });
+    
     return NextResponse.json({ message: 'Translation deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('TRANSLATIONS', 'ERROR', { action: 'DELETE_TRANSLATION', error: error?.message || String(error) });
     console.error('Error deleting translation:', error);
     return NextResponse.json({ error: 'Failed to delete translation' }, { status: 500 });
   }

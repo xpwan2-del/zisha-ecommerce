@@ -430,6 +430,46 @@ p {
   box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.3);
 }
 
+/* Promotion Final Discount Badge */
+.promotion-final-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 10px;
+  color: var(--promotionFinalBadgeText, #FFFFFF);
+  background: var(--promotionFinalBadgeBg, #EF4444);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Single Promotion Badge */
+.promotion-badge {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-weight: bold;
+  font-size: 12px;
+  color: var(--promotionBadgeText, #FFFFFF);
+  background: var(--promotionBadgeBg, linear-gradient(135deg, #EF4444, rgba(239, 68, 68, 0.6)));
+}
+
+/* Activity Badge */
+.activity-badge {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-weight: bold;
+  font-size: 12px;
+  color: #FFFFFF;
+}
+
+/* Limited Badge */
+.limited-badge {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-weight: bold;
+  font-size: 12px;
+  color: var(--limitedBadgeText, #FFFFFF);
+  background: var(--limitedBadgeBg, #D4AF37);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   h1 {

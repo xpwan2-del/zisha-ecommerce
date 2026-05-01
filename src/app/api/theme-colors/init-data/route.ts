@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { logMonitor } from "@/lib/utils/logger";
 
 interface ConfigItem {
   theme: string;
@@ -200,6 +201,8 @@ const allConfigs: ConfigItem[] = [
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('THEME_COLORS', 'REQUEST', { method: 'POST', action: 'INIT_THEME_COLORS_DATA' });
+    
     const { searchParams } = new URL(request.url);
     const theme = searchParams.get("theme");
 
@@ -219,12 +222,15 @@ export async function POST(request: NextRequest) {
       insertedCount++;
     }
 
+    logMonitor('THEME_COLORS', 'SUCCESS', { action: 'INIT_THEME_COLORS_DATA', insertedCount, theme: theme || 'all' });
+    
     return NextResponse.json({
       success: true,
       message: `Initialized ${insertedCount} configs`,
       themes: Array.from(new Set(allConfigs.map(c => c.theme)))
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('THEME_COLORS', 'ERROR', { action: 'INIT_THEME_COLORS_DATA', error: error?.message || String(error) });
     console.error("Failed to initialize configs:", error);
     return NextResponse.json(
       { success: false, error: "Failed to initialize configs" },
@@ -235,16 +241,21 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
+    logMonitor('THEME_COLORS', 'REQUEST', { method: 'GET', action: 'CHECK_THEME_COLORS' });
+    
     const result = await query("SELECT COUNT(*) as count FROM theme_color_configs");
     const totalInDb = result.rows?.[0]?.count || 0;
 
+    logMonitor('THEME_COLORS', 'SUCCESS', { action: 'CHECK_THEME_COLORS', totalInDb, totalInConfig: allConfigs.length, needsInit: totalInDb < allConfigs.length });
+    
     return NextResponse.json({
       success: true,
       totalInDb,
       totalInConfig: allConfigs.length,
       needsInit: totalInDb < allConfigs.length
     });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('THEME_COLORS', 'ERROR', { action: 'CHECK_THEME_COLORS', error: error?.message || String(error) });
     console.error("Failed to check configs:", error);
     return NextResponse.json(
       { success: false, error: "Failed to check" },

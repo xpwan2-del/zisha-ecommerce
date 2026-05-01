@@ -40,7 +40,7 @@ export default function TranslationsPage() {
       if (response.ok) {
         const data = await response.json();
         const translationsArray: TranslationData[] = [];
-        const processObject = (obj: any, prefix: string = '') => {
+        const processObject = (obj: any, prefix: string = '', lang: string = '') => {
           Object.keys(obj).forEach(key => {
             const value = obj[key];
             const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -48,18 +48,18 @@ export default function TranslationsPage() {
             if (typeof value === 'string' && value) {
               const existing = translationsArray.find(t => t.key === fullKey);
               if (existing) {
-                existing[data.key === fullKey ? data.key.split('.').pop() as string : ''] = value;
+                (existing as any)[lang] = value;
               } else {
-                translationsArray.push({ key: fullKey, [data.key]: value });
+                translationsArray.push({ key: fullKey, [lang]: value });
               }
             } else if (typeof value === 'object' && value !== null) {
-              processObject(value, fullKey);
+              processObject(value, fullKey, lang);
             }
           });
         };
 
         Object.keys(data).forEach(language => {
-          processObject(data[language], '');
+          processObject(data[language], '', language);
         });
 
         const mergedTranslations: { [key: string]: TranslationData } = {};

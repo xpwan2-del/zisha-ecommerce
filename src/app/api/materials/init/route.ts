@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
-    // 创建泥料表
+    logMonitor('MATERIALS', 'REQUEST', { method: 'POST', action: 'INIT_MATERIALS' });
+
     await query(`
       CREATE TABLE IF NOT EXISTS materials (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,7 +20,6 @@ export async function POST(request: NextRequest) {
       )
     `);
 
-    // 插入测试数据
     await query(`
       INSERT INTO materials (name, name_en, name_ar, color, description, price_modifier, stock)
       VALUES 
@@ -28,8 +29,10 @@ export async function POST(request: NextRequest) {
       ('天青泥', 'Tian Qing Ni', 'تيان تشينغ ني', '#708090', '稀有泥料', 300, 30)
     `);
 
+    logMonitor('MATERIALS', 'SUCCESS', { action: 'INIT_MATERIALS' });
     return NextResponse.json({ message: 'Materials table initialized successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('MATERIALS', 'ERROR', { action: 'INIT_MATERIALS', error: error?.message || String(error) });
     console.error('Error initializing materials table:', error);
     return NextResponse.json({ error: 'Failed to initialize materials table' }, { status: 500 });
   }

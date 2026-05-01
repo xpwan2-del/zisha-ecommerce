@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logMonitor } from '@/lib/utils/logger';
 
 interface Guarantee {
   id: number;
@@ -11,7 +12,6 @@ interface Guarantee {
   order: number;
 }
 
-// 模拟数据库
 let guarantees: Guarantee[] = [
   {
     id: 1,
@@ -57,10 +57,13 @@ let guarantees: Guarantee[] = [
 
 export async function GET() {
   try {
-    // 按顺序排序
+    logMonitor('GUARANTEES', 'REQUEST', { method: 'GET', action: 'GET_GUARANTEES' });
+
     const sortedGuarantees = guarantees.sort((a, b) => a.order - b.order);
+    logMonitor('GUARANTEES', 'SUCCESS', { action: 'GET_GUARANTEES', count: sortedGuarantees.length });
     return NextResponse.json(sortedGuarantees);
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('GUARANTEES', 'ERROR', { action: 'GET_GUARANTEES', error: error?.message || String(error) });
     console.error('Error fetching guarantees:', error);
     return NextResponse.json({ error: 'Failed to fetch guarantees' }, { status: 500 });
   }
@@ -68,6 +71,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    logMonitor('GUARANTEES', 'REQUEST', { method: 'POST', action: 'CREATE_GUARANTEE' });
+
     const body = await request.json();
     
     const newGuarantee: Guarantee = {
@@ -82,8 +87,10 @@ export async function POST(request: Request) {
     };
     
     guarantees.push(newGuarantee);
+    logMonitor('GUARANTEES', 'SUCCESS', { action: 'CREATE_GUARANTEE', id: newGuarantee.id });
     return NextResponse.json(newGuarantee, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('GUARANTEES', 'ERROR', { action: 'CREATE_GUARANTEE', error: error?.message || String(error) });
     console.error('Error adding guarantee:', error);
     return NextResponse.json({ error: 'Failed to add guarantee' }, { status: 500 });
   }

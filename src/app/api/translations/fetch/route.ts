@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
 
 // 模拟翻译数据
 const mockTranslations: Record<string, Record<string, string>> = {
@@ -88,6 +89,8 @@ const mockTranslations: Record<string, Record<string, string>> = {
 
 export async function GET(request: NextRequest) {
   try {
+    logMonitor('TRANSLATIONS', 'REQUEST', { method: 'GET', action: 'FETCH_TRANSLATIONS' });
+    
     const url = new URL(request.url);
     const language = url.searchParams.get('language') || 'en';
 
@@ -102,13 +105,17 @@ export async function GET(request: NextRequest) {
         translations[row.key] = row.value;
       });
 
+      logMonitor('TRANSLATIONS', 'SUCCESS', { action: 'FETCH_TRANSLATIONS', language, count: Object.keys(translations).length, source: 'database' });
+      
       return NextResponse.json(translations);
     } catch (dbError) {
       console.error('Database error, using mock translations:', dbError);
+      logMonitor('TRANSLATIONS', 'SUCCESS', { action: 'FETCH_TRANSLATIONS', language, source: 'mock' });
       // 数据库失败时使用模拟数据
       return NextResponse.json(mockTranslations[language as keyof typeof mockTranslations] || {});
     }
-  } catch (error) {
+  } catch (error: any) {
+    logMonitor('TRANSLATIONS', 'ERROR', { action: 'FETCH_TRANSLATIONS', error: error?.message || String(error) });
     console.error('Error fetching translations:', error);
     return NextResponse.json({}, { status: 500 });
   }
