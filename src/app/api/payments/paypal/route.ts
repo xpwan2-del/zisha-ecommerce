@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
     await PaymentService.initialize();
 
     const body = await req.json();
-    const { amount, currency = 'USD', items, order_number, source = 'quick-order' } = body;
+    const { amount, currency = 'USD', items, order_number } = body;
 
     if (!order_number) {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
@@ -255,8 +255,8 @@ export async function POST(req: NextRequest) {
         items: calculatedItems,
       }],
       application_context: {
-        return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/quick-order/success?order_number=${order_number}&source=${source}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/quick-order/success?order_number=${order_number}&source=${source}`,
+        return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart?order_id=${order_number}`,
       },
     };
 

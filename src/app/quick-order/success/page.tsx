@@ -64,19 +64,19 @@ function PaymentSuccessContent() {
 
         const data = await response.json();
 
+        const orderResponse = await fetch(`/api/orders-list?order_number=${orderNumber}`, {
+          credentials: 'include',
+        });
+        const orderData = await orderResponse.json();
+
+        if (orderData.success && orderData.data?.orders?.[0]) {
+          setOrderInfo(orderData.data.orders[0]);
+        } else if (orderData.success && orderData.data?.orders) {
+          setOrderInfo(orderData.data.orders[0]);
+        }
+
         if (data.success) {
           setPaymentStatus('success');
-
-          const orderResponse = await fetch(`/api/orders-list?order_number=${orderNumber}`, {
-            credentials: 'include',
-          });
-          const orderData = await orderResponse.json();
-
-          if (orderData.success && orderData.data?.orders?.[0]) {
-            setOrderInfo(orderData.data.orders[0]);
-          } else if (orderData.success && orderData.data?.orders) {
-            setOrderInfo(orderData.data.orders[0]);
-          }
         } else {
           setPaymentStatus('fail');
           setErrorInfo({
