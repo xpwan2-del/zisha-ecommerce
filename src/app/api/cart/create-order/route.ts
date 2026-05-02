@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
         const discountAmount = round2((item.original_price_usd - item.price_usd) * item.quantity);
 
         await query(
-          `INSERT INTO order_items (order_id, product_id, quantity, specifications, original_price, promotion_ids, discount_amount)
+          `INSERT INTO order_items (order_id, product_id, quantity, specifications, original_price, promotion_ids, total_promotions_discount_amount)
            VALUES (?, ?, ?, '{}', ?, ?, ?)`,
           [
             orderId,
