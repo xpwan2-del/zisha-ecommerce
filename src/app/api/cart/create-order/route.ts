@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
       const orderInsert = await query(
         `INSERT INTO orders (
           user_id, order_number, payment_method, order_status,
-          total_amount, total_original_price, total_coupon_discount,
+          total_after_promotions_amount, total_original_price, total_coupon_discount,
           order_final_discount_amount, final_amount,
           shipping_address_id, shipping_fee, coupon_ids, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
