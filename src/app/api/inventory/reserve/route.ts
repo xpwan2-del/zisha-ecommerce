@@ -342,7 +342,7 @@ export async function POST(request: NextRequest) {
         'pending',
         'pending',
         null,
-        promotionIdsJson,
+        '[]',
         0,
         finalAmount,
         null
