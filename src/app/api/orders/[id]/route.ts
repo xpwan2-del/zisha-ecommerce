@@ -209,6 +209,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
+    const orderCouponsResult = await query(
+      `SELECT oc.id as order_coupon_id, oc.coupon_id as user_coupon_id, oc.discount_applied
+       FROM order_coupons oc
+       JOIN user_coupons uc ON oc.coupon_id = uc.id 
+         AND oc.user_id = uc.user_id AND uc.status = 'used'
+       WHERE oc.order_id = ? AND oc.status = 'applied'`,
+      [orderId]
+    );
+
+    for (const row of orderCouponsResult.rows) {
+      await query(
+        `UPDATE user_coupons SET status = 'active', used_order_id = NULL 
+         WHERE id = ? AND user_id = ?`,
+        [row.user_coupon_id, order.user_id]
+      );
+      await query(
+        `UPDATE order_coupons SET status = 'refunded', refunded_at = datetime('now') 
+         WHERE id = ?`,
+        [row.order_coupon_id]
+      );
+    }
+
     await query(
       `UPDATE orders SET order_status = 'cancelled', payment_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`,
       [orderId]
