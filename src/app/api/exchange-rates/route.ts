@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { setRatesCache } from '@/lib/utils/currency';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/exchange-rates 获取汇率
+ * @apiName GetExchangeRates
+ * @apiGroup EXCHANGE_RATES
+ * @apiDescription 获取各货币之间的实时汇率。
+ */
+
 
 export async function GET() {
   try {

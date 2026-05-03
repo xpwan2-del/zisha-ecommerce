@@ -4,6 +4,13 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {POST} /api/auth/register 用户注册
+ * @apiName Register
+ * @apiGroup AUTH
+ * @apiDescription 新用户注册账号，包含邮箱验证和密码加密。
+ */
+
 
 function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+/**
+ * @api {GET} /api/products/seed 种子产品数据
+ * @apiName SeedProducts
+ * @apiGroup PRODUCTS
+ * @apiDescription 向数据库插入种子产品数据用于开发测试。
+ */
+
 
 export async function POST(request: NextRequest) {
   try {

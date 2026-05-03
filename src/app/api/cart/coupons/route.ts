@@ -3,6 +3,13 @@ import { requireAuth } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
 
+/**
+ * @api {GET} /api/cart/coupons 获取购物车可用优惠券
+ * @apiName GetCartCoupons
+ * @apiGroup CART
+ * @apiDescription 获取当前购物车商品可用的优惠券列表，包含优惠券验证和折扣计算。
+ */
+
 function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') || 
          request.nextUrl.searchParams.get('lang') || 

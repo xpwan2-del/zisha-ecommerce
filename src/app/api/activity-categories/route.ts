@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/activity-categories 获取活动分类
+ * @apiName GetActivityCategories
+ * @apiGroup ACTIVITIES
+ * @apiDescription 获取商品活动的分类列表。
+ */
+
 
 // GET /api/activity-categories - Get all activity categories with product counts
 export async function GET(request: NextRequest) {

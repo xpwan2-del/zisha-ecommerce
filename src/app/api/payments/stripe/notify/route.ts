@@ -3,6 +3,13 @@ import Stripe from 'stripe';
 import { query } from '@/lib/db';
 import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {POST} /api/payments/stripe/notify Stripe 支付回调
+ * @apiName StripeNotify
+ * @apiGroup PAYMENTS
+ * @apiDescription 接收 Stripe Webhook 支付结果通知，验证签名并更新订单状态。
+ */
+
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {

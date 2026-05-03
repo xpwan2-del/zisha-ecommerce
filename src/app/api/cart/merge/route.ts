@@ -4,6 +4,13 @@ import { requireAuth } from '@/lib/auth';
 import { getMessage, getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
+/**
+ * @api {POST} /api/cart/merge 合并购物车
+ * @apiName MergeCart
+ * @apiGroup CART
+ * @apiDescription 用户登录后将本地购物车与服务器购物车合并。
+ */
+
 function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||
          request.cookies.get('locale')?.value ||

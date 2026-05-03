@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+/**
+ * @api {GET} /api/db/tables 获取数据库表列表
+ * @apiName GetDBTables
+ * @apiGroup DB_DEBUG
+ * @apiDescription 获取数据库中所有表的列表（调试工具）。
+ */
+
 
 export async function GET() {
   try {

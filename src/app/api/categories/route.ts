@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/categories 获取分类列表
+ * @apiName GetCategories
+ * @apiGroup CATEGORIES
+ * @apiDescription 获取商品分类列表，支持树形结构和多语言。
+ */
+
 
 export async function GET(request: NextRequest) {
   try {

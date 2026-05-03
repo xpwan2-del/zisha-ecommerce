@@ -671,6 +671,7 @@ export default function CartPage() {
             order_number,
             amount: Number(amount_usd || 0).toFixed(2),
             currency: 'USD',
+            source: 'cart',
             items: (items || []).map((it: any) => ({
               product_id: it.product_id,
               name: it.name,
@@ -700,7 +701,8 @@ export default function CartPage() {
             order_id,
             order_number,
             amount: Number(amount_cny || 0).toFixed(2),
-            currency: 'CNY'
+            currency: 'CNY',
+            source: 'cart'
           })
         });
 
@@ -723,6 +725,7 @@ export default function CartPage() {
             order_number,
             amount: Number(amount_aed || 0).toFixed(2),
             currency: 'aed',
+            source: 'cart',
             items: (items || []).map((it: any) => ({
               product_id: it.product_id,
               name: it.name,

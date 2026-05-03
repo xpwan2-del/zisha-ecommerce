@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/orders-list 获取用户订单列表
+ * @apiName GetUserOrders
+ * @apiGroup ORDERS
+ * @apiDescription 获取当前登录用户的订单列表，支持分页和状态筛选。
+ */
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,6 +21,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const order_status = searchParams.get('order_status');
+    const order_number = searchParams.get('order_number');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '100');
     const user_id = authResult.user.userId;
@@ -43,6 +51,11 @@ export async function GET(request: NextRequest) {
     `;
 
     const params: any[] = [user_id];
+
+    if (order_number) {
+      ordersSql += ' AND o.order_number = ?';
+      params.push(order_number);
+    }
 
     if (order_status) {
       if (order_status === 'refund') {
@@ -121,6 +134,11 @@ export async function GET(request: NextRequest) {
 
     let countSql = 'SELECT COUNT(*) as total FROM orders WHERE user_id = ?';
     const countParams: any[] = [user_id];
+
+    if (order_number) {
+      countSql += ' AND order_number = ?';
+      countParams.push(order_number);
+    }
 
     if (order_status) {
       if (order_status === 'refund') {

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/products/deals 获取促销商品列表
+ * @apiName GetDealsProducts
+ * @apiGroup PRODUCTS
+ * @apiDescription 获取所有参与促销活动的商品列表，支持排序和分页。
+ */
+
 
 function parseJSON(value: any, defaultValue: any = []): any {
   if (!value) return defaultValue;
@@ -26,9 +33,9 @@ export async function GET(request: NextRequest) {
     if (sort === 'discount') {
       orderBy = 'ORDER BY pr.discount_percent DESC';
     } else if (sort === 'price_asc') {
-      orderBy = 'ORDER BY p.price ASC';
+      orderBy = 'ORDER BY COALESCE(pp_usd.price, 0) ASC';
     } else if (sort === 'price_desc') {
-      orderBy = 'ORDER BY p.price DESC';
+      orderBy = 'ORDER BY COALESCE(pp_usd.price, 0) DESC';
     } else if (sort === 'newest') {
       orderBy = 'ORDER BY p.id ASC';
     }
@@ -36,6 +43,7 @@ export async function GET(request: NextRequest) {
     const countQuery = `
       SELECT COUNT(DISTINCT p.id) as count
       FROM products p
+      LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
       JOIN product_promotions pp ON p.id = pp.product_id
       JOIN promotions pr ON pp.promotion_id = pr.id
       WHERE pp.end_time > datetime('now')
@@ -46,6 +54,7 @@ export async function GET(request: NextRequest) {
     const productsQuery = `
       SELECT DISTINCT p.id
       FROM products p
+      LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
       JOIN product_promotions pp ON p.id = pp.product_id
       JOIN promotions pr ON pp.promotion_id = pr.id
       WHERE pp.end_time > datetime('now')
@@ -77,7 +86,7 @@ export async function GET(request: NextRequest) {
       SELECT
         p.id, p.name, p.name_en, p.name_ar,
         p.description, p.description_en, p.description_ar,
-        p.price,
+        COALESCE(pp_usd2.price, 0) as price,
         p.image, p.images,
         p.category_id, p.created_at,
         c.name as category_name,
@@ -92,6 +101,7 @@ export async function GET(request: NextRequest) {
         ins.color as status_color,
         ins.color_name as status_color_name
       FROM products p
+      LEFT JOIN product_prices pp_usd2 ON p.id = pp_usd2.product_id AND pp_usd2.currency = 'USD'
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN inventory i ON p.id = i.product_id
       LEFT JOIN inventory_status ins ON i.status_id = ins.id
@@ -199,18 +209,26 @@ export async function GET(request: NextRequest) {
         original_price: mainPromo.original_price || row.price
       } : null;
 
-      const allPromotions = promotions.map((p: any) => ({
-        id: p.promotion_id,
-        name: p.promotion_name,
-        name_en: p.promotion_name_en,
-        name_ar: p.promotion_name_ar,
-        discount_percent: p.discount_percent,
-        type: p.promotion_type,
-        icon: p.promotion_icon,
-        color: p.promotion_color,
-        priority: p.priority,
-        can_stack: p.can_stack
-      })).filter((p: any) => p.name !== '今日特惠' && p.name !== '特惠商品');
+      const allPromotions = (() => {
+        const mapped = promotions.map((p: any) => ({
+          id: p.promotion_id,
+          name: p.promotion_name,
+          name_en: p.promotion_name_en,
+          name_ar: p.promotion_name_ar,
+          discount_percent: p.discount_percent,
+          type: p.promotion_type,
+          icon: p.promotion_icon,
+          color: p.promotion_color,
+          priority: p.priority,
+          can_stack: p.can_stack
+        })).filter((p: any) => p.name !== '今日特惠' && p.name !== '特惠商品');
+
+        const exclusivePromo = mapped.find((p: any) => p.can_stack === 1);
+        if (exclusivePromo) {
+          return [exclusivePromo];
+        }
+        return mapped;
+      })();
 
       const featuresResult = await query(
         `SELECT 
@@ -243,6 +261,7 @@ export async function GET(request: NextRequest) {
         description_en: row.description_en,
         description_ar: row.description_ar,
         price: parseFloat(row.price) || 0,
+        price_usd: parseFloat(row.price) || 0,
         original_price: parseFloat(row.price) || 0,
         stock: parseInt(row.stock) || 0,
         stock_status_id: row.stock_status_id || 1,

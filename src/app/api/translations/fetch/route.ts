@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/translations/fetch 获取前端翻译
+ * @apiName FetchTranslations
+ * @apiGroup TRANSLATIONS
+ * @apiDescription 为前端提供指定语言的翻译词条，用于 i18n。
+ */
+
 
 // 模拟翻译数据
 const mockTranslations: Record<string, Record<string, string>> = {

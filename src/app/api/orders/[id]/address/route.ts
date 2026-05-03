@@ -3,6 +3,13 @@ import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
 
+/**
+ * @api {PATCH} /api/orders/:id/address 更新订单地址
+ * @apiName UpdateOrderAddress
+ * @apiGroup ORDERS
+ * @apiDescription 更新指定订单的配送地址信息。
+ */
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     logMonitor('ORDERS', 'REQUEST', { method: 'PATCH', action: 'UPDATE_ORDER_ADDRESS' });

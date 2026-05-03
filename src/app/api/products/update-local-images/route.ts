@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+/**
+ * @api {GET} /api/products/update-local-images 更新本地图片
+ * @apiName UpdateLocalImages
+ * @apiGroup PRODUCTS
+ * @apiDescription 根据产品名称关键词更新本地图片路径。
+ */
+
 
 // 产品名称关键词到图片文件名的映射（按优先级排序，越具体的匹配越靠前）
 // 注意：文件名格式为 1_xxx.jpg 而不是 01_xxx.jpg

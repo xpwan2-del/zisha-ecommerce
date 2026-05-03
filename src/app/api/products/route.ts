@@ -84,12 +84,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (min_price) {
-      whereConditions.push('p.price >= ?');
+      whereConditions.push('COALESCE(pp_usd.price, 0) >= ?');
       params.push(parseFloat(min_price));
     }
 
     if (max_price) {
-      whereConditions.push('p.price <= ?');
+      whereConditions.push('COALESCE(pp_usd.price, 0) <= ?');
       params.push(parseFloat(max_price));
     }
 
@@ -117,10 +117,10 @@ export async function GET(request: NextRequest) {
     let orderBy = 'ORDER BY p.id ASC';
     switch (sort) {
       case 'price_asc':
-        orderBy = 'ORDER BY p.price ASC';
+        orderBy = 'ORDER BY pp_usd.price ASC';
         break;
       case 'price_desc':
-        orderBy = 'ORDER BY p.price DESC';
+        orderBy = 'ORDER BY pp_usd.price DESC';
         break;
       case 'sales':
         orderBy = 'ORDER BY i.quantity DESC';
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     // 查询总数
-    const countQuery = `SELECT COUNT(*) as count FROM products p ${whereClause}`;
+    const countQuery = `SELECT COUNT(*) as count FROM products p LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD' ${whereClause}`;
     const countResult = await query(countQuery, params);
     const total = parseInt(String(countResult.rows?.[0]?.count || 0));
 

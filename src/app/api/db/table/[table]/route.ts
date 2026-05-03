@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+/**
+ * @api {GET} /api/db/table/:table 查询表数据
+ * @apiName GetTableData
+ * @apiGroup DB_DEBUG
+ * @apiDescription 查询指定表的数据，支持分页（调试工具）。
+ */
+
 
 export async function GET(
   request: NextRequest,

@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/inventory-status 获取库存状态配置
+ * @apiName GetInventoryStatus
+ * @apiGroup INVENTORY
+ * @apiDescription 获取库存状态的配置信息（有货/缺货等状态定义）。
+ */
+
 
 export async function GET() {
   try {

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/points 获取用户积分
+ * @apiName GetUserPoints
+ * @apiGroup POINTS
+ * @apiDescription 获取当前用户的积分余额和积分变动记录。
+ */
+
 
 async function logPointsChange(
   userId: number,

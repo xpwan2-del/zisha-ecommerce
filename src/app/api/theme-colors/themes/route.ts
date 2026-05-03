@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { logMonitor } from "@/lib/utils/logger";
+/**
+ * @api {GET} /api/theme-colors/themes 获取主题颜色主题
+ * @apiName GetThemeColorThemes
+ * @apiGroup THEMES
+ * @apiDescription 获取所有主题配色方案列表。
+ */
+
 
 export async function GET() {
   try {

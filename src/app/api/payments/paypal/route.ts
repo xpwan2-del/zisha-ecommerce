@@ -4,6 +4,18 @@ import { PaymentService } from '@/lib/payment/PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
 import { resolvePaymentError } from '@/lib/payment/errorCodeMapper';
 
+/**
+ * @api {POST} /api/payments/paypal 创建 PayPal 支付
+ * @apiName CreatePayPalPayment
+ * @apiGroup PAYMENTS
+ * @apiDescription 根据订单号创建 PayPal 支付订单，返回 PayPal 支付链接。
+ *
+ * @api {GET} /api/payments/paypal PayPal 支付状态
+ * @apiName GetPayPalStatus
+ * @apiGroup PAYMENTS
+ * @apiDescription 查询 PayPal 支付订单的当前状态。
+ */
+
 const PAYPAL_API_BASE_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_BASE_LIVE = 'https://api-m.paypal.com';
 
@@ -184,7 +196,7 @@ export async function POST(req: NextRequest) {
     await PaymentService.initialize();
 
     const body = await req.json();
-    const { amount, currency = 'USD', items, order_number } = body;
+    const { amount, currency = 'USD', items, order_number, source = 'cart' } = body;
 
     if (!order_number) {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
@@ -255,8 +267,8 @@ export async function POST(req: NextRequest) {
         items: calculatedItems,
       }],
       application_context: {
-        return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart?order_id=${order_number}`,
+        return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/payments/result?order_number=${order_number}&source=${source}&platform=paypal`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/payments/result?order_number=${order_number}&source=${source}&platform=paypal&status=cancel`,
       },
     };
 

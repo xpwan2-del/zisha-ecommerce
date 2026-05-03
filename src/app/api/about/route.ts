@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/about 获取关于我们页面数据
+ * @apiName GetAboutPage
+ * @apiGroup ABOUT
+ * @apiDescription 获取关于我们页面的内容和配置信息。
+ */
+
 
 // GET /api/about - Get about information
 export async function GET() {

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/materials 获取原材料列表
+ * @apiName GetMaterials
+ * @apiGroup MATERIALS
+ * @apiDescription 获取紫砂壶原材料分类列表。
+ */
+
 
 export async function GET(request: NextRequest) {
   try {

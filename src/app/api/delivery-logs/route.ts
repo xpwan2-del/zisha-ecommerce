@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { DeliverySubStatus } from '@/lib/order-status-config';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/delivery-logs 获取配送日志
+ * @apiName GetDeliveryLogs
+ * @apiGroup DELIVERY
+ * @apiDescription 获取订单配送状态变更日志。
+ */
+
 
 export async function GET(request: NextRequest) {
   try {

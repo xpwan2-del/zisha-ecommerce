@@ -93,12 +93,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (minPrice) {
-      whereConditions.push(`p.price >= ?`);
+      whereConditions.push(`pp_usd.price >= ?`);
       params.push(parseFloat(minPrice));
     }
 
     if (maxPrice) {
-      whereConditions.push(`p.price <= ?`);
+      whereConditions.push(`pp_usd.price <= ?`);
       params.push(parseFloat(maxPrice));
     }
 
@@ -107,10 +107,10 @@ export async function GET(request: NextRequest) {
     let orderBy = 'ORDER BY p.id DESC';
     switch (sort) {
       case 'price_asc':
-        orderBy = 'ORDER BY p.price ASC';
+        orderBy = 'ORDER BY pp_usd.price ASC';
         break;
       case 'price_desc':
-        orderBy = 'ORDER BY p.price DESC';
+        orderBy = 'ORDER BY pp_usd.price DESC';
         break;
       case 'stock':
         orderBy = 'ORDER BY COALESCE(i.quantity, 0) DESC';
@@ -122,14 +122,14 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
-    const countQuery = `SELECT COUNT(*) as count FROM products p ${whereClause}`;
+    const countQuery = `SELECT COUNT(*) as count FROM products p LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD' ${whereClause}`;
     const countResult = await query(countQuery, params);
     const total = parseInt(String(countResult.rows?.[0]?.count || 0));
 
     const productsQuery = `
       SELECT 
         p.id, p.name, p.name_en, p.name_ar,
-        p.price, p.price_usd, p.price_ae,
+        pp_usd.price,
         p.image, p.category_id, p.is_limited, p.display_mode,
         c.name as category_name,
         c.name_en as category_name_en,
@@ -143,6 +143,7 @@ export async function GET(request: NextRequest) {
         ins.color as status_color,
         ins.color_name as status_color_name
       FROM products p
+      LEFT JOIN product_prices pp_usd ON p.id = pp_usd.product_id AND pp_usd.currency = 'USD'
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN inventory i ON p.id = i.product_id
       LEFT JOIN inventory_status ins ON i.status_id = ins.id
@@ -197,8 +198,6 @@ export async function GET(request: NextRequest) {
         name_en: row.name_en,
         name_ar: row.name_ar,
         price: row.price,
-        price_usd: row.price_usd,
-        price_ae: row.price_ae,
         image: row.image,
         category_id: row.category_id,
         category_name: row.category_name,
@@ -351,22 +350,26 @@ export async function POST(request: NextRequest) {
       INSERT INTO products (
         name, name_en, name_ar,
         description, description_en, description_ar,
-        price, price_usd, price_ae,
         image, images, video,
         category_id, is_limited, display_mode,
         specifications, shipping, after_sale,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `, [
       name, name_en, name_ar,
       description || '', description_en || '', description_ar || '',
-      price, price_usd || price, price_ae || price,
       image || '', JSON.stringify(images || []), video || '',
       category_id, is_limited || 0, display_mode || 'normal',
       specifications || '{}', shipping || '', after_sale || ''
     ]);
 
     const productId = insertResult.lastInsertRowid;
+
+    await query(`INSERT INTO product_prices (product_id, currency, price, created_at) VALUES (?, 'USD', ?, datetime('now'))`, [productId, price]);
+    if (price_usd && price_usd != price) {
+      await query(`INSERT INTO product_prices (product_id, currency, price, created_at) VALUES (?, 'USD', ?, datetime('now'))`, [productId, price_usd]);
+    }
+    await query(`INSERT INTO product_prices (product_id, currency, price, created_at) VALUES (?, 'AED', ?, datetime('now'))`, [productId, price_ae || price]);
 
     const calcStatusId = (qty: number) => {
       if (qty <= 0) return 4;

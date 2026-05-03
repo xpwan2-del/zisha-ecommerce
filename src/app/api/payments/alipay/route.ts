@@ -3,6 +3,18 @@ import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
 
+/**
+ * @api {GET} /api/payments/alipay 创建支付宝支付
+ * @apiName CreateAlipayPayment
+ * @apiGroup PAYMENTS
+ * @apiDescription 根据订单 ID 创建支付宝支付链接，跳转支付宝支付页面。
+ *
+ * @api {POST} /api/payments/alipay 支付宝支付成功回调
+ * @apiName AlipaySuccess
+ * @apiGroup PAYMENTS
+ * @apiDescription 支付宝支付成功后前端跳转页面，更新订单支付状态。
+ */
+
 const EXCHANGE_RATES = {
   aed: 1,
   usd: 0.2722,
@@ -18,6 +30,7 @@ export async function GET(request: NextRequest) {
     const amount = searchParams.get('amount');
     const currency = searchParams.get('currency') || 'USD';
     const order_number = searchParams.get('order_number');
+    const source = searchParams.get('source') || 'cart';
 
     if (!orderId || !amount) {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', { error: 'Missing order_id or amount' });
@@ -84,7 +97,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0],
       version: '1.0',
       notify_url: `${baseUrl}/api/payments/alipay/notify`,
-      return_url: `${baseUrl}/cart/success?order_number=${order_number}&trade_no={TRADE_NO}`,
+      return_url: `${baseUrl}/api/payments/result?order_number=${order_number}&trade_no={TRADE_NO}&source=${source}&platform=alipay`,
       biz_content: bizContentStr
     };
 
@@ -121,7 +134,7 @@ export async function POST(request: NextRequest) {
     logMonitor('PAYMENTS', 'REQUEST', { method: 'POST', action: 'ALIPAY_CREATE_PAYMENT' });
     
     const body = await request.json();
-    const { order_id, amount, currency, order_number } = body;
+    const { order_id, amount, currency, order_number, source = 'cart' } = body;
 
     if (!order_id || !amount) {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', { error: 'Missing order_id or amount' });

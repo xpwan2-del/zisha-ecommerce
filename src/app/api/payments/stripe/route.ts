@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { query } from '@/lib/db';
+import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {POST} /api/payments/stripe 创建 Stripe 支付
+ * @apiName CreateStripePayment
+ * @apiGroup PAYMENTS
+ * @apiDescription 创建 Stripe Checkout Session，返回支付跳转链接。
+ */
+
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
@@ -11,8 +19,8 @@ const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
 async function calculateItemPrice(productId: number, quantity: number): Promise<{ price: number; originalPrice: number }> {
   // 查询商品原价
   const productResult = await query(
-    'SELECT price FROM products WHERE id = ?',
-    [productId]
+    'SELECT pp.price FROM product_prices pp WHERE pp.product_id = ? AND pp.currency = ?',
+    [productId, 'USD']
   );
 
   if (productResult.rows.length === 0) {
@@ -75,9 +83,11 @@ async function verifyPrices(items: any[]): Promise<{ valid: boolean; errors: str
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('PAYMENTS', 'REQUEST', { method: 'POST', path: '/api/payments/stripe' });
     console.log('=== [Stripe Payment API] Processing payment request ===');
     
     if (!stripe) {
+      logMonitor('PAYMENTS', 'ERROR', { action: 'STRIPE_NOT_CONFIGURED' });
       console.error('Stripe is not configured');
       return NextResponse.json({
         success: false,
@@ -89,11 +99,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Received payment data:', JSON.stringify(body, null, 2));
     
-    const { amount, currency = 'aed', items, order_number } = body;
+    const { amount, currency = 'aed', items, order_number, source = 'cart' } = body;
     console.log('Processing payment - Amount:', amount, 'Currency:', currency, 'Items count:', items?.length || 0);
 
     // 验证订单号
     if (!order_number) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { reason: 'Missing order_number' });
       console.error('[Stripe] Missing order_number parameter');
       return NextResponse.json({
         success: false,
@@ -107,6 +118,7 @@ export async function POST(request: NextRequest) {
     console.log('Verifying prices on server...');
     const { valid, errors } = await verifyPrices(items);
     if (!valid) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { action: 'PRICE_VERIFICATION', errors });
       console.error('Price verification failed:', errors);
       return NextResponse.json({
         success: false,
@@ -137,13 +149,20 @@ export async function POST(request: NextRequest) {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/cart/success?order_number=${order_number}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/cart`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/payments/result?order_number=${order_number}&session_id={CHECKOUT_SESSION_ID}&source=${source}&platform=stripe`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/payments/result?order_number=${order_number}&source=${source}&platform=stripe&status=cancel`,
       metadata: {
         order_number: order_number,
       },
     });
     
+    logMonitor('PAYMENTS', 'SUCCESS', {
+      action: 'STRIPE_SESSION_CREATED',
+      sessionId: session.id,
+      orderNumber: order_number,
+      currency: currency,
+      itemCount: items?.length || 0
+    });
     console.log('Stripe session created successfully:', {
       session_id: session.id,
       session_url: session.url,
@@ -161,6 +180,7 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
+    logMonitor('PAYMENTS', 'ERROR', { action: 'STRIPE_PAYMENT', error: String(error) });
     console.error('=== [Stripe Payment API] Error ===');
     console.error('Stripe error:', error);
     return NextResponse.json({

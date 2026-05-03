@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/home 获取首页数据
+ * @apiName GetHomeData
+ * @apiGroup HOME
+ * @apiDescription 获取首页各模块数据，包括商品推荐、促销活动、分类等。
+ */
+
 
 interface HomeModule {
   id: number;

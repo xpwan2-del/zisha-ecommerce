@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { logMonitor } from "@/lib/utils/logger";
+/**
+ * @api {GET} /api/theme-colors/init-data 初始化主题颜色数据
+ * @apiName InitThemeColorsData
+ * @apiGroup THEMES
+ * @apiDescription 向主题颜色表插入种子数据。
+ */
+
 
 interface ConfigItem {
   theme: string;

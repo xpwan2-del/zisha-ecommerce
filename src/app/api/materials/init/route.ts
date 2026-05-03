@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/materials/init 初始化原材料表
+ * @apiName InitMaterialsTable
+ * @apiGroup MATERIALS
+ * @apiDescription 创建原材料相关的数据库表结构。
+ */
+
 
 export async function POST(request: NextRequest) {
   try {

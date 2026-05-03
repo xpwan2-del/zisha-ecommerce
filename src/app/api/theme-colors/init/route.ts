@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/theme-colors/init 初始化主题颜色表
+ * @apiName InitThemeColorsTable
+ * @apiGroup THEMES
+ * @apiDescription 创建主题颜色相关的数据库表结构。
+ */
+
 
 export async function POST(request: NextRequest) {
   try {

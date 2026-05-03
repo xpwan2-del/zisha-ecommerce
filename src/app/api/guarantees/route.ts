@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/guarantees 获取保障条款
+ * @apiName GetGuarantees
+ * @apiGroup GUARANTEES
+ * @apiDescription 获取商城的保障条款列表。
+ */
+
 
 interface Guarantee {
   id: number;

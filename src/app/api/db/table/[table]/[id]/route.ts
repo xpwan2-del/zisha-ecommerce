@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+/**
+ * @api {GET} /api/db/table/:table/:id 查询表记录
+ * @apiName GetTableRecord
+ * @apiGroup DB_DEBUG
+ * @apiDescription 查询指定表的单条记录（调试工具）。
+ */
+
 
 function calculateStatusId(quantity: number): number {
   if (quantity <= 0) return 4;

@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
+import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {POST} /api/payments/alipay/notify 支付宝支付回调
+ * @apiName AlipayNotify
+ * @apiGroup PAYMENTS
+ * @apiDescription 接收支付宝异步支付结果通知，更新订单支付状态。
+ */
+
 
 export async function POST(request: NextRequest) {
   try {
+    logMonitor('PAYMENTS', 'REQUEST', { method: 'POST', path: '/api/payments/alipay/notify' });
+
     const body = await request.text();
     const params = new URLSearchParams(body);
     const signType = params.get('sign_type');
@@ -20,6 +30,7 @@ export async function POST(request: NextRequest) {
     console.log('trade_no:', tradeNo);
 
     if (!outTradeNo) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { reason: 'Missing out_trade_no' });
       console.error('[Alipay Notify] Missing out_trade_no');
       return NextResponse.json('fail', { status: 400 });
     }
@@ -30,6 +41,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (orderResult.rows.length === 0) {
+      logMonitor('PAYMENTS', 'NOT_FOUND', { order_number: outTradeNo });
       console.error('[Alipay Notify] Order not found:', outTradeNo);
       return NextResponse.json('fail', { status: 404 });
     }
@@ -82,15 +94,24 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      logMonitor('PAYMENTS', 'SUCCESS', {
+        action: 'ALIPAY_NOTIFY',
+        orderId: order.id,
+        orderNumber: outTradeNo,
+        tradeStatus: tradeStatus,
+        tradeNo: tradeNo
+      });
       console.log('[Alipay Notify] Order updated to paid:', outTradeNo);
 
       return NextResponse.json('success');
     }
 
+    logMonitor('PAYMENTS', 'ERROR', { action: 'ALIPAY_NOTIFY_UNKNOWN_STATUS', tradeStatus: tradeStatus });
     console.log('[Alipay Notify] Unknown trade status:', tradeStatus);
     return NextResponse.json('fail');
 
   } catch (error) {
+    logMonitor('PAYMENTS', 'ERROR', { action: 'ALIPAY_NOTIFY', error: String(error) });
     console.error('=== [Alipay Notify] Error ===');
     console.error(error);
     return NextResponse.json('fail', { status: 500 });

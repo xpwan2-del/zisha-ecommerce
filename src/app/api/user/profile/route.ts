@@ -108,6 +108,21 @@ export async function PUT(request: NextRequest) {
 
     const { password, ...updateData } = data;
 
+    const allowedFields = ['name', 'email', 'phone'];
+
+    for (const key of Object.keys(updateData)) {
+      if (!allowedFields.includes(key)) {
+        logMonitor('PRODUCTS', 'VALIDATION_FAILED', {
+          reason: `Invalid field: ${key}`,
+          allowedFields
+        });
+        return NextResponse.json(
+          { success: false, error: `Invalid field: ${key}` },
+          { status: 400 }
+        );
+      }
+    }
+
     if (Object.keys(updateData).length === 0) {
       logMonitor('PRODUCTS', 'VALIDATION_FAILED', {
         reason: 'No fields to update'

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/translations 获取翻译列表
+ * @apiName GetTranslations
+ * @apiGroup TRANSLATIONS
+ * @apiDescription 获取翻译词条列表，支持分页和语言筛选。
+ */
+
 
 export async function GET(request: NextRequest) {
   try {

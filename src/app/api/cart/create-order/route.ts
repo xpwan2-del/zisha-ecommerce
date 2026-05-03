@@ -5,6 +5,13 @@ import { applyPromotions } from '@/lib/pricing/cartPricing';
 import { getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
+/**
+ * @api {POST} /api/cart/create-order 购物车下单
+ * @apiName CreateOrderFromCart
+ * @apiGroup CART
+ * @apiDescription 将购物车中的商品创建为订单。验证库存、计算促销价格、扣减库存。
+ */
+
 function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||
          request.cookies.get('locale')?.value ||

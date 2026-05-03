@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/contact 获取联系我们页面数据
+ * @apiName GetContactPage
+ * @apiGroup CONTACT
+ * @apiDescription 获取联系我们页面的内容、联系方式和表单配置。
+ */
+
 
 // GET /api/contact - Get contact information
 export async function GET() {

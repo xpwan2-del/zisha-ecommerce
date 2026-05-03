@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { logMonitor } from "@/lib/utils/logger";
+/**
+ * @api {GET} /api/themes 获取主题列表
+ * @apiName GetThemes
+ * @apiGroup THEMES
+ * @apiDescription 获取商城主题配置列表。
+ */
+
 
 const initDatabase = async () => {
   try {

@@ -4,6 +4,23 @@ import { requireAuth, requireAdmin } from '@/lib/auth';
 import { getMessage, getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
+/**
+ * @api {GET} /api/orders 获取订单列表
+ * @apiName GetOrders
+ * @apiGroup ORDERS
+ * @apiDescription 获取订单列表。普通用户获取自己的订单，管理员获取全部订单。支持分页和状态筛选。
+ *
+ * @api {POST} /api/orders 创建订单（管理员后台）
+ * @apiName CreateOrder
+ * @apiGroup ORDERS
+ * @apiDescription 管理员在后台为用户创建订单。服务端验证价格和库存。
+ *
+ * @api {PUT} /api/orders 更新订单状态
+ * @apiName UpdateOrderStatus
+ * @apiGroup ORDERS
+ * @apiDescription 管理员更新订单状态（确认/发货/完成/取消等）。
+ */
+
 function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||
          request.cookies.get('locale')?.value ||
@@ -45,7 +62,7 @@ export async function GET(request: NextRequest) {
         o.id,
         o.order_number,
         o.order_status,
-        o.total_amount,
+        o.total_after_promotions_amount,
         o.order_final_discount_amount,
         o.final_amount,
         o.shipping_fee,
@@ -205,7 +222,7 @@ export async function POST(request: NextRequest) {
         total_amount += promotionPrice * item.quantity;
       } else {
         // 没有促销，使用产品原价
-        const productResult = await query('SELECT price FROM products WHERE id = ?', [item.product_id]);
+        const productResult = await query('SELECT pp.price FROM product_prices pp WHERE pp.product_id = ? AND pp.currency = ?', [item.product_id, 'USD']);
         if (productResult.rows.length === 0) {
           return NextResponse.json(
             { success: false, error: `Product ${item.product_id} not found` },
@@ -254,7 +271,7 @@ export async function POST(request: NextRequest) {
       // Create order
       const orderInsertResult = await query(
         `INSERT INTO orders (
-          user_id, order_number, payment_method, order_status, total_amount, order_final_discount_amount,
+          user_id, order_number, payment_method, order_status, total_after_promotions_amount, order_final_discount_amount,
           final_amount, shipping_address_id, shipping_fee
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -275,7 +292,7 @@ export async function POST(request: NextRequest) {
       // Create order items
       for (const item of items) {
         const promoInfo = itemPromoInfo.get(item.product_id);
-        const unit_price = promoInfo ? promoInfo.promotionPrice : parseFloat((await query('SELECT price FROM products WHERE id = ?', [item.product_id])).rows[0].price);
+        const unit_price = promoInfo ? promoInfo.promotionPrice : parseFloat((await query('SELECT pp.price FROM product_prices pp WHERE pp.product_id = ? AND pp.currency = ?', [item.product_id, 'USD'])).rows[0].price);
 
         await query(
           `INSERT INTO order_items (order_id, product_id, quantity, specifications, original_price, promotion_ids, discount_amount)

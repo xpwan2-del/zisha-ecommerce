@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/teapot-types/init 初始化壶型表
+ * @apiName InitTeapotTypesTable
+ * @apiGroup TEAPOT_TYPES
+ * @apiDescription 创建壶型相关的数据库表结构。
+ */
+
 
 export async function POST(request: NextRequest) {
   try {

@@ -281,7 +281,7 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
   const getBtns = () => {
     switch (order.order_status) {
       case 'pending':
-        return (<><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>立即支付</button><button className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs cursor-pointer hover:bg-gray-200 transition-colors">取消订单</button><button onClick={handleEditAddress} className="px-3 py-1.5 bg-blue-100 text-blue-600 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors">修改地址</button></>);
+        return (<><button onClick={handlePayNow} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>立即支付</button><button onClick={handleCancelOrder} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs cursor-pointer hover:bg-gray-200 transition-colors">取消订单</button><button onClick={handleEditAddress} className="px-3 py-1.5 bg-blue-100 text-blue-600 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors">修改地址</button></>);
       case 'paid':
         return (<><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>申请退款</button><button onClick={handleEditAddress} className="px-3 py-1.5 bg-blue-100 text-blue-600 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors">修改地址</button></>);
       case 'shipped':
@@ -356,6 +356,30 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
       alert('更新地址失败');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePayNow = () => {
+    router.push(`/orders/${order.id}`);
+  };
+
+  const handleCancelOrder = async () => {
+    if (!confirm('确定要取消这个订单吗？取消后库存将自动归还。')) return;
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'cancel' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        onAddressUpdated?.();
+      } else {
+        alert(data.error || '取消失败');
+      }
+    } catch (err) {
+      alert('取消请求失败');
     }
   };
 

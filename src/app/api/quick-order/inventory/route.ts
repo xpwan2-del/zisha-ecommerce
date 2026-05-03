@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {POST} /api/quick-order/inventory 快速订单库存操作
+ * @apiName QuickOrderInventory
+ * @apiGroup QUICK_ORDER
+ * @apiDescription 快速订单页面的库存加减操作，支持 increment/decrement。
+ */
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const productResult = await query(
-      'SELECT p.id, p.name, p.price, i.quantity as stock FROM products p LEFT JOIN inventory i ON p.id = i.product_id WHERE p.id = ?',
+      'SELECT p.id, p.name, i.quantity as stock FROM products p LEFT JOIN inventory i ON p.id = i.product_id WHERE p.id = ?',
       [product_id]
     );
 
@@ -79,10 +86,23 @@ export async function POST(request: NextRequest) {
         ]
       );
 
-      await query(
-        'UPDATE inventory SET quantity = quantity - 1, updated_at = datetime("now") WHERE product_id = ?',
+      const updateResult = await query(
+        'UPDATE inventory SET quantity = quantity - 1, updated_at = datetime("now") WHERE product_id = ? AND quantity >= 1',
         [product_id]
       );
+
+      if (updateResult.changes === 0) {
+        logMonitor('INVENTORY', 'VALIDATION_FAILED', {
+          action: 'QUICK_ORDER_INVENTORY',
+          operation: 'increment',
+          productId: product_id,
+          reason: 'CONCURRENT_CONFLICT'
+        });
+        return NextResponse.json(
+          { success: false, error: 'OUT_OF_STOCK', message: '库存不足' },
+          { status: 400 }
+        );
+      }
 
       logMonitor('INVENTORY', 'SUCCESS', { 
         action: 'QUICK_ORDER_INVENTORY', 

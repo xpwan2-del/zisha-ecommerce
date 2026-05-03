@@ -232,14 +232,35 @@ export async function POST(request: NextRequest) {
 
     const stockBefore = currentStock;
 
-    await query(
-      'UPDATE inventory SET quantity = quantity - ?, status_id = ? WHERE product_id = ?',
+    const updateResult = await query(
+      'UPDATE inventory SET quantity = quantity - ?, status_id = ? WHERE product_id = ? AND quantity >= ?',
       [
         quantity,
         calculateStockStatus(currentStock - quantity),
-        product_id
+        product_id,
+        quantity
       ]
     );
+
+    if (updateResult.changes === 0) {
+      logMonitor('INVENTORY', 'SUCCESS', {
+        action: 'CHECK_STOCK_CONCURRENT',
+        product_id,
+        requested: quantity,
+        available: currentStock,
+        result: 'CONCURRENT_CONFLICT'
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'INSUFFICIENT_STOCK',
+          message: `库存不足，当前库存已发生变化，请重新尝试`,
+          requested: quantity,
+          available: currentStock
+        },
+        { status: 400 }
+      );
+    }
 
     const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['sales_creat']);
     const transactionTypeId = typeResult.rows[0]?.id || 1;

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/products/init 初始化产品表结构
+ * @apiName InitProductsTable
+ * @apiGroup PRODUCTS
+ * @apiDescription 创建或更新 products、product_prices 等产品相关表。
+ */
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,8 +19,6 @@ export async function POST(request: NextRequest) {
         name VARCHAR(255) NOT NULL,
         name_en VARCHAR(255),
         name_ar VARCHAR(255),
-        price DECIMAL(10, 2) NOT NULL,
-        original_price DECIMAL(10, 2),
         stock INTEGER DEFAULT 0,
         category_id VARCHAR(50),
         image TEXT,
@@ -33,10 +38,6 @@ export async function POST(request: NextRequest) {
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)
-    `);
-
-    await query(`
-      CREATE INDEX IF NOT EXISTS idx_products_price ON products(price)
     `);
 
     logMonitor('PRODUCTS', 'SUCCESS', { action: 'INIT_PRODUCTS' });

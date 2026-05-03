@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/user-logs 获取用户操作日志
+ * @apiName GetUserLogs
+ * @apiGroup USER_LOGS
+ * @apiDescription 获取用户的操作日志记录。
+ */
+
 
 // GET /api/user-logs - 查询用户操作日志（用户查看自己的，管理员查看所有）
 export async function GET(request: NextRequest) {

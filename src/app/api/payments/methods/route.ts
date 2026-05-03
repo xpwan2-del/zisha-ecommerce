@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { PaymentService } from '@/lib/payment/PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {GET} /api/payments/methods 获取支付方式
+ * @apiName GetPaymentMethods
+ * @apiGroup PAYMENTS
+ * @apiDescription 获取当前可用的支付方式列表。
+ */
+
 
 export async function GET(request: Request) {
   try {

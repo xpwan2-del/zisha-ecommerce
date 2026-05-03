@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { logMonitor } from '@/lib/utils/logger';
+/**
+ * @api {POST} /api/theme-colors/alter 切换主题颜色
+ * @apiName AlterThemeColors
+ * @apiGroup THEMES
+ * @apiDescription 切换当前使用的主题配色方案。
+ */
+
 
 export async function POST(request: NextRequest) {
   try {
