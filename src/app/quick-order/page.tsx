@@ -505,10 +505,10 @@ function QuickOrderContent() {
 
     try {
       const response = await fetch(`/api/orders/${currentOrderDbId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'cancelled' })
+        body: JSON.stringify({ action: 'cancel' })
       });
 
       if (response.ok) {
