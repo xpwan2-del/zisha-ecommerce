@@ -283,9 +283,9 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
       case 'pending':
         return (<><button onClick={handlePayNow} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>立即支付</button><button onClick={handleCancelOrder} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs cursor-pointer hover:bg-gray-200 transition-colors">取消订单</button><button onClick={handleEditAddress} className="px-3 py-1.5 bg-blue-100 text-blue-600 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors">修改地址</button></>);
       case 'paid':
-        return (<><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>申请退款</button><button onClick={handleEditAddress} className="px-3 py-1.5 bg-blue-100 text-blue-600 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors">修改地址</button></>);
+        return (<><button onClick={handleRequestRefund} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>申请退款</button><button onClick={handleEditAddress} className="px-3 py-1.5 bg-blue-100 text-blue-600 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors">修改地址</button></>);
       case 'shipped':
-        return (<><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>申请退款</button><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--primary)', color: '#fff' }}>查看物流</button></>);
+        return (<><button onClick={handleRequestRefund} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>申请退款</button><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--primary)', color: '#fff' }}>查看物流</button></>);
       case 'reviewing':
         return (<><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--primary)', color: '#fff' }}>再来一单</button><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>评价商品</button></>);
       case 'refunding':
@@ -380,6 +380,26 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
       }
     } catch (err) {
       alert('取消请求失败');
+    }
+  };
+
+  const handleRequestRefund = async () => {
+    if (!confirm('确定要申请退款吗？')) return;
+    try {
+      const res = await fetch(`/api/orders/${order.id}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('退款申请已提交，请等待处理');
+        onAddressUpdated?.();
+      } else {
+        alert(data.error || '退款申请失败');
+      }
+    } catch (err) {
+      alert('退款请求失败');
     }
   };
 
