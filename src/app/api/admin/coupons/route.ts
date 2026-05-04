@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth, createSuccessResponse as createSharedSuccess, createErrorResponse as createSharedError, getPaginationParams, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
 
 /**
  * ============================================================
@@ -71,6 +72,56 @@ function createSuccessResponse(data: any, status: number = 200) {
       },
     }
   );
+}
+
+export async function GET(request: NextRequest) {
+  logApiRequest('ORDERS', 'GET', '/api/admin/coupons');
+  const auth = checkAdminAuth(request);
+  if (auth.response) return auth.response;
+
+  try {
+    const { page, limit, search, sortBy, sortOrder } = getPaginationParams(request);
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status') || '';
+    const type = searchParams.get('type') || '';
+
+    let whereClauses: string[] = [];
+    let params: any[] = [];
+
+    if (search) {
+      whereClauses.push('(code LIKE ? OR name LIKE ?)');
+      const s = `%${search}%`;
+      params.push(s, s);
+    }
+    if (status === 'active') { whereClauses.push('is_active = 1'); }
+    if (status === 'inactive') { whereClauses.push('is_active = 0'); }
+    if (type) { whereClauses.push('type = ?'); params.push(type); }
+
+    const whereSQL = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+    const countResult = await query(`SELECT COUNT(*) as total FROM coupons ${whereSQL}`, params);
+    const total = countResult.rows[0]?.total || 0;
+
+    const offset = (page - 1) * limit;
+    const dataResult = await query(
+      `SELECT c.*,
+              (SELECT COUNT(*) FROM user_coupons WHERE coupon_id = c.id) as claimed_count,
+              (SELECT COUNT(*) FROM user_coupons WHERE coupon_id = c.id AND status = 'used') as used_count
+       FROM coupons c ${whereSQL}
+       ORDER BY ${sortBy === 'name' ? 'c.name' : 'c.created_at'} ${sortOrder}
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    logApiSuccess('ORDERS', 'GET_COUPONS', { total });
+    return createSharedSuccess({
+      coupons: dataResult.rows,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    });
+  } catch (error) {
+    logApiError('ORDERS', 'GET_COUPONS', error);
+    return createSharedError('INTERNAL_ERROR', 500);
+  }
 }
 
 export async function POST(request: NextRequest) {

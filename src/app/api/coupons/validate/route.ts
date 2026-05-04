@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -58,15 +59,15 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    const userId = request.headers.get('x-user-id');
+    const authResult = requireAuth(request);
+    if (authResult.response) {
+      logMonitor('PROMOTIONS', 'AUTH_FAILED', { reason: 'Unauthorized' });
+      return authResult.response;
+    }
+    const userId = authResult.user.userId;
     const lang = getLangFromRequest(request);
     const body = await request.json();
     const { coupon_code, order_amount } = body;
-
-    if (!userId) {
-      logMonitor('PROMOTIONS', 'AUTH_FAILED', { reason: 'User not authenticated' });
-      return createErrorResponse('UNAUTHORIZED', 401);
-    }
 
     if (!coupon_code) {
       logMonitor('PROMOTIONS', 'VALIDATION_FAILED', {

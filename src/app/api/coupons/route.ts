@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -63,7 +64,6 @@ function createSuccessResponse(data: any, status: number = 200) {
 }
 
 export async function GET(request: NextRequest) {
-  const userId = request.headers.get('x-user-id');
   const lang = getLangFromRequest(request);
   const { searchParams } = new URL(request.url);
 
@@ -79,10 +79,12 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    if (!userId) {
-      logMonitor('PROMOTIONS', 'AUTH_FAILED', { reason: 'User not authenticated' });
-      return createErrorResponse('UNAUTHORIZED', 401);
+    const authResult = requireAuth(request);
+    if (authResult.response) {
+      logMonitor('PROMOTIONS', 'AUTH_FAILED', { reason: 'Unauthorized' });
+      return authResult.response;
     }
+    const userId = authResult.user.userId;
 
     if (status === 'available') {
       const countResult = await query(`
@@ -224,7 +226,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const userId = request.headers.get('x-user-id');
   const lang = getLangFromRequest(request);
 
   logMonitor('PROMOTIONS', 'REQUEST', {
@@ -233,10 +234,12 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    if (!userId) {
-      logMonitor('PROMOTIONS', 'AUTH_FAILED', { reason: 'User not authenticated' });
-      return createErrorResponse('UNAUTHORIZED', 401);
+    const authResult = requireAuth(request);
+    if (authResult.response) {
+      logMonitor('PROMOTIONS', 'AUTH_FAILED', { reason: 'Unauthorized' });
+      return authResult.response;
     }
+    const userId = authResult.user.userId;
 
     const body = await request.json();
     const { coupon_id } = body;

@@ -16,15 +16,12 @@ import { logMonitor } from '@/lib/utils/logger';  // @reuses: 复用 logger.ts �
  *   - logMonitor('ROUTER', 'RESPONSE') - 记录响应返回
  */
 export function middleware(request: NextRequest) {
-  // 获取高精度计时器
   const startTime = performance.now();
 
-  // 获取请求信息
   const url = request.url;
   const method = request.method;
   const pathname = request.nextUrl.pathname;
 
-  // @reuses: logMonitor - 记录请求进入
   logMonitor('ROUTER', 'REQUEST', {
     url,
     method,
@@ -33,17 +30,27 @@ export function middleware(request: NextRequest) {
     userAgent: request.headers.get('user-agent') || 'unknown'
   });
 
-  // 处理请求 - 添加缓存控制头
+  // ============================================================
+  // Admin 路由保护：检查 /admin/* 路径（排除登录页）
+  // ============================================================
+  if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
+    const token = request.cookies.get('access_token')?.value;
+    if (!token) {
+      logMonitor('ROUTER', 'AUTH_FAILED', { pathname, reason: 'No token, redirecting to login' });
+      const redirectResponse = NextResponse.redirect(new URL('/admin/login', request.url));
+      redirectResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      return redirectResponse;
+    }
+  }
+
   const response = NextResponse.next();
   response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.headers.set('Pragma', 'no-cache');
   response.headers.set('Expires', '0');
 
-  // 计算响应耗时
   const endTime = performance.now();
   const duration = `${(endTime - startTime).toFixed(2)}ms`;
 
-  // @reuses: logMonitor - 记录响应返回
   logMonitor('ROUTER', 'RESPONSE', {
     pathname,
     method,
@@ -63,8 +70,8 @@ export function middleware(request: NextRequest) {
  * @property matcher - 匹配的路由数组，支持通配符
  */
 export const config = {
-  // 匹配所有 API 路由
   matcher: [
     '/api/:path*',
+    '/admin/:path*',
   ],
 };

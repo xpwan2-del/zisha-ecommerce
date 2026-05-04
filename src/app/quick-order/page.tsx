@@ -443,7 +443,6 @@ function QuickOrderContent() {
             order_number: order_number,
             amount: (priceData?.total_usd ?? 0).toFixed(2) || '0',
             currency: 'USD',
-            source: 'quick-order',
             items: [{
               product_id: product.id,
               name: product.name,
@@ -474,8 +473,7 @@ function QuickOrderContent() {
           body: JSON.stringify({
             order_number: order_number,
             amount: (priceData?.total_cny ?? 0).toFixed(2) || '0',
-            currency: 'CNY',
-            source: 'quick-order'
+            currency: 'CNY'
           })
         });
 
@@ -505,10 +503,10 @@ function QuickOrderContent() {
 
     try {
       const response = await fetch(`/api/orders/${currentOrderDbId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'cancel' })
+        body: JSON.stringify({ status: 'cancelled' })
       });
 
       if (response.ok) {

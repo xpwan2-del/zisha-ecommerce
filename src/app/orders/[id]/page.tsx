@@ -106,7 +106,15 @@ export default function OrderDetailPage() {
   const [claimableCoupons, setClaimableCoupons] = useState<CouponItem[]>([]);
   const [couponTab, setCouponTab] = useState<'available' | 'expired' | 'used' | 'claimable'>('available');
   const [selectedCouponIds, setSelectedCouponIds] = useState<number[]>([]);
-  const [estimatedPrice, setEstimatedPrice] = useState<{ shippingFee: number; couponDiscount: number; finalAmount: number } | null>(null);
+  const [estimatedPrice, setEstimatedPrice] = useState<{
+    subtotal: number;
+    original_total: number;
+    product_discount: number;
+    coupon_discount: number;
+    shipping_fee: number;
+    final_amount: number;
+  } | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
   const getUserId = () => Number(user?.id) || 0;
@@ -179,7 +187,7 @@ export default function OrderDetailPage() {
     } catch { /* ignore */ }
   };
 
-  const fetchCoupons = async () => {
+  const fetchCoupons = async (addressId?: number) => {
     setIsLoadingCoupons(true);
     const uid = getUserId();
     if (!uid) { setIsLoadingCoupons(false); return; }
@@ -232,11 +240,47 @@ export default function OrderDetailPage() {
       });
       const data = await res.json();
       if (data.success) {
-        fetchCoupons();
+        fetchCoupons(selectedAddressId || undefined);
       } else {
         alert(data.error || '领取失败');
       }
     } catch { alert('领取请求失败'); }
+  };
+
+  const fetchEstimate = useCallback(async () => {
+    if (!order || !selectedAddressId) return;
+    setIsEstimating(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/estimate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          address_id: selectedAddressId,
+          coupon_ids: selectedCouponIds
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEstimatedPrice(data.data);
+      }
+    } catch (err) {
+      console.error('Estimate failed:', err);
+    } finally {
+      setIsEstimating(false);
+    }
+  }, [order, selectedAddressId, selectedCouponIds]);
+
+  useEffect(() => {
+    if (order && order.order_status === 'pending' && selectedAddressId) {
+      fetchEstimate();
+    }
+  }, [selectedAddressId, selectedCouponIds, fetchEstimate]);
+
+  const handleAddressChange = (addressId: number) => {
+    setSelectedAddressId(addressId);
+    fetchCoupons(addressId);
+    setSelectedCouponIds([]);
   };
 
   const handleSubmit = async () => {
@@ -383,7 +427,7 @@ export default function OrderDetailPage() {
               {addresses.map((addr) => (
                 <div
                   key={addr.id}
-                  onClick={() => setSelectedAddressId(addr.id)}
+                  onClick={() => handleAddressChange(addr.id)}
                   className={`p-3 border rounded-lg cursor-pointer transition-all ${
                     selectedAddressId === addr.id
                       ? 'border-[var(--accent)] bg-[var(--accent)]/5'
@@ -449,27 +493,38 @@ export default function OrderDetailPage() {
           <div className="mt-6 pt-4 border-t border-[var(--border)] space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">商品原价</span>
-              <span className="text-[var(--text)]">{formatPrice(order.total_original_price)}</span>
+              <span className="text-[var(--text)]">{formatPrice(estimatedPrice?.original_total ?? order.total_original_price)}</span>
             </div>
-            {order.order_final_discount_amount > 0 && (
+            {(estimatedPrice?.product_discount ?? order.order_final_discount_amount) > 0 && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-muted)]">促销折扣</span>
-                <span className="text-green-600">-{formatPrice(order.order_final_discount_amount)}</span>
+                <span className="text-green-600">-{formatPrice(estimatedPrice?.product_discount ?? order.order_final_discount_amount)}</span>
               </div>
             )}
-            {order.total_coupon_discount > 0 && (
+            {(estimatedPrice?.coupon_discount ?? order.total_coupon_discount) > 0 && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-muted)]">优惠券</span>
-                <span className="text-green-600">-{formatPrice(order.total_coupon_discount)}</span>
+                <span className="text-green-600">-{formatPrice(estimatedPrice?.coupon_discount ?? order.total_coupon_discount)}</span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">运费</span>
-              <span className="text-[var(--text)]">{order.shipping_fee > 0 ? formatPrice(order.shipping_fee) : '免运费'}</span>
+              <span className="text-[var(--text)]">
+                {estimatedPrice?.shipping_fee !== undefined 
+                  ? (estimatedPrice.shipping_fee > 0 ? formatPrice(estimatedPrice.shipping_fee) : '免运费')
+                  : (order.shipping_fee > 0 ? formatPrice(order.shipping_fee) : '免运费')
+                }
+              </span>
             </div>
             <div className="flex justify-between pt-2 border-t border-[var(--border)] font-bold text-lg">
               <span>应付总额</span>
-              <span className="text-[var(--accent)]">{formatPrice(order.final_amount)}</span>
+              <span className="text-[var(--accent)]">
+                {isEstimating ? (
+                  <span className="opacity-50">计算中...</span>
+                ) : (
+                  formatPrice(estimatedPrice?.final_amount ?? order.final_amount)
+                )}
+              </span>
             </div>
           </div>
         </div>

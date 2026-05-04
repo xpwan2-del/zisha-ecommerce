@@ -112,53 +112,9 @@ export async function GET(request: NextRequest) {
         { source, platform, cancelled_at: new Date().toISOString() }
       );
 
-      await query(
-        'UPDATE orders SET order_status = ?, payment_status = ?, updated_at = datetime(\'now\') WHERE id = ?',
-        ['cancelled', 'cancelled', orderId]
-      );
-
-      // 取消时立即归还库存
-      const itemsResult = await query(
-        `SELECT oi.product_id, oi.quantity, p.name
-         FROM order_items oi
-         JOIN products p ON oi.product_id = p.id
-         WHERE oi.order_id = ?`,
-        [orderId]
-      );
-      const cancelTypeResult = await query(
-        'SELECT id FROM transaction_type WHERE code = ?', ['sales_cancel']
-      );
-      const cancelTypeId = cancelTypeResult.rows[0]?.id || null;
-
-      for (const item of itemsResult.rows) {
-        const beforeResult = await query(
-          'SELECT quantity FROM inventory WHERE product_id = ?', [item.product_id]
-        );
-        const beforeStock = beforeResult.rows[0]?.quantity || 0;
-
-        await query(
-          'UPDATE inventory SET quantity = quantity + ? WHERE product_id = ?',
-          [item.quantity, item.product_id]
-        );
-
-        if (cancelTypeId) {
-          await query(
-            `INSERT INTO inventory_transactions (
-              product_id, product_name, transaction_type_id, quantity_change,
-              quantity_before, quantity_after, reason, reference_type, reference_id,
-              operator_id, operator_name, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-            [item.product_id, item.name, cancelTypeId, item.quantity,
-             beforeStock, beforeStock + item.quantity,
-             '支付取消，归还库存', 'payment_cancel', orderId, null, 'SYSTEM']
-          );
-        }
-      }
-
       logMonitor('PAYMENTS', 'SUCCESS', {
-        action: 'PAYMENT_CANCELLED_WITH_INVENTORY_RETURN',
-        orderId, orderNumber, platform, source,
-        itemsReturned: itemsResult.rows.length
+        action: 'PAYMENT_CANCELLED',
+        orderId, orderNumber, platform, source
       });
 
       const redirectUrl = new URL('/payment-result', request.url);

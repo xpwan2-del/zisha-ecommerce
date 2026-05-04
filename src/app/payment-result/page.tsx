@@ -66,9 +66,9 @@ function PaymentResultContent() {
           setErrorInfo({
             errorCode: 'USER_CANCEL',
             errorMessage: {
-              zh: '您取消了支付，订单已自动取消。如需购买请重新下单。',
-              en: 'Payment was cancelled. Your order has been cancelled. Please place a new order.',
-              ar: 'تم إلغاء الدفع. تم إلغاء طلبك. يرجى تقديم طلب جديد.',
+              zh: '您取消了支付，订单仍待支付。您可以重新支付或取消订单。',
+              en: 'Payment was cancelled. Your order is still pending. You can retry payment or cancel the order.',
+              ar: 'تم إلغاء الدفع. طلبك لا يزال معلقاً. يمكنك إعادة الدفع أو إلغاء الطلب.',
             },
           });
         } else {

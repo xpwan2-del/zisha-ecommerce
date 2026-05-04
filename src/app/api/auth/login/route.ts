@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     // 5. 生成 Token
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET,
       { expiresIn: '2h' }
     );
 

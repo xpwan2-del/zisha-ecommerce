@@ -115,23 +115,27 @@ export async function POST(request: NextRequest) {
     console.log('[Stripe] Using order_number:', order_number);
 
     // 服务端验证价格（重要安全检查）
-    console.log('Verifying prices on server...');
-    const { valid, errors } = await verifyPrices(items);
-    if (!valid) {
-      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { action: 'PRICE_VERIFICATION', errors });
-      console.error('Price verification failed:', errors);
-      return NextResponse.json({
-        success: false,
-        error: 'PRICE_VERIFICATION_FAILED',
-        message: '价格验证失败',
-        details: errors
-      }, { status: 400 });
+    if (source !== 're-pay') {
+      console.log('Verifying prices on server...');
+      const { valid, errors } = await verifyPrices(items);
+      if (!valid) {
+        logMonitor('PAYMENTS', 'VALIDATION_FAILED', { action: 'PRICE_VERIFICATION', errors });
+        console.error('Price verification failed:', errors);
+        return NextResponse.json({
+          success: false,
+          error: 'PRICE_VERIFICATION_FAILED',
+          message: '价格验证失败',
+          details: errors
+        }, { status: 400 });
+      }
+      console.log('Price verification passed');
     }
-    console.log('Price verification passed');
 
-    // 使用服务端计算的价格
+    // 使用服务端计算的价格（re-pay 使用订单锁定价格）
     const lineItems = await Promise.all(items.map(async (item: any) => {
-      const { price } = await calculateItemPrice(item.product_id, item.quantity);
+      const finalPrice = source === 're-pay'
+        ? parseFloat(item.price) || parseFloat(item.unit_amount) || 0
+        : (await calculateItemPrice(item.product_id, item.quantity)).price;
       return {
         price_data: {
           currency,
@@ -139,7 +143,7 @@ export async function POST(request: NextRequest) {
             name: item.name,
             images: [item.image],
           },
-          unit_amount: Math.round(price * 100),
+          unit_amount: Math.round(finalPrice * 100),
         },
         quantity: item.quantity,
       };

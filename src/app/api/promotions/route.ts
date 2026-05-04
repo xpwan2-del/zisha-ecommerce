@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { requireAdmin } from '@/lib/auth';
 
 /**
  * ============================================================
@@ -192,6 +193,11 @@ export async function POST(request: NextRequest) {
   });
 
   try {
+    const authResult = await requireAdmin(request);
+    if (authResult.response) {
+      return authResult.response;
+    }
+
     const data = await request.json();
     const {
       name, name_en, name_ar,
