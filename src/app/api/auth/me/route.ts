@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { getMessage } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -63,7 +64,10 @@ function getLangFromRequest(request: NextRequest): string {
  * @param status HTTP 状态码
  */
 function createErrorResponse(error: string, lang: string, status: number = 400) {
-  return NextResponse.json({ success: false, error }, { status });
+  return NextResponse.json(
+    { success: false, error, message: getMessage(error as any, lang) },
+    { status }
+  );
 }
 
 // ============================================================

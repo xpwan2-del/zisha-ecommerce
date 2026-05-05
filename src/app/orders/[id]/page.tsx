@@ -14,6 +14,7 @@ interface OrderDetailItem {
   product_image: string;
   quantity: number;
   original_price: number;
+  subtotal?: number;  // 后端返回的小计（折扣前）
   total_promotions_discount_amount: number;
 }
 
@@ -484,7 +485,7 @@ export default function OrderDetailPage() {
                   <p className="text-sm text-[var(--text-muted)] mt-1">x{item.quantity}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium text-[var(--text)]">{formatPrice(item.original_price * item.quantity)}</p>
+                  <p className="font-medium text-[var(--text)]">{formatPrice(item.subtotal ?? (item.original_price * item.quantity))}</p>
                 </div>
               </div>
             ))}

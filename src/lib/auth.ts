@@ -131,7 +131,7 @@ export function requireOwnerOrAdmin(
     return {
       user: null,
       response: NextResponse.json(
-        { success: false, error: 'Forbidden - Can only access your own data' },
+        { success: false, error: 'FORBIDDEN', message: 'Forbidden - Can only access your own data' },
         { status: 403 }
       )
     };

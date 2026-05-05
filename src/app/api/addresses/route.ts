@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { getMessage } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -49,6 +50,13 @@ function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||
          request.cookies.get('locale')?.value ||
          'zh';
+}
+
+function createErrorResponse(error: string, lang: string, status: number = 400) {
+  return NextResponse.json(
+    { success: false, error, message: getMessage(error as any, lang) },
+    { status }
+  );
 }
 
 async function logUserAction(
@@ -168,10 +176,7 @@ export async function GET(request: NextRequest) {
       action: 'GET_ADDRESSES',
       error: String(error)
     });
-    return NextResponse.json(
-      { success: false, error: 'Failed to get addresses' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
 
@@ -212,10 +217,7 @@ export async function POST(request: NextRequest) {
         reason: 'Missing required fields',
         required: ['contact_name', 'phone', 'country_name', 'city', 'street_address']
       });
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return createErrorResponse('MISSING_PARAMS', lang, 400);
     }
 
     const user_id = currentUser.userId;
@@ -302,10 +304,7 @@ export async function POST(request: NextRequest) {
       action: 'CREATE_ADDRESS',
       error: String(error)
     });
-    return NextResponse.json(
-      { success: false, error: 'Failed to create address' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
 
@@ -346,10 +345,7 @@ export async function PUT(request: NextRequest) {
       logMonitor('CART', 'VALIDATION_FAILED', {
         reason: 'Missing required field: id'
       });
-      return NextResponse.json(
-        { success: false, error: 'Address ID is required' },
-        { status: 400 }
-      );
+      return createErrorResponse('MISSING_PARAMS', lang, 400);
     }
 
     const user_id = currentUser.userId;
@@ -360,10 +356,7 @@ export async function PUT(request: NextRequest) {
     );
 
     if (!oldAddressResult.rows || oldAddressResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Address not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('NOT_FOUND', lang, 404);
     }
 
     const oldAddress = oldAddressResult.rows[0];
@@ -461,10 +454,7 @@ export async function PUT(request: NextRequest) {
       action: 'UPDATE_ADDRESS',
       error: String(error)
     });
-    return NextResponse.json(
-      { success: false, error: 'Failed to update address' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
 
@@ -491,10 +481,7 @@ export async function DELETE(request: NextRequest) {
       logMonitor('CART', 'VALIDATION_FAILED', {
         reason: 'Missing required field: id'
       });
-      return NextResponse.json(
-        { success: false, error: 'Address ID is required' },
-        { status: 400 }
-      );
+      return createErrorResponse('MISSING_PARAMS', lang, 400);
     }
 
     const user_id = currentUser.userId;
@@ -505,10 +492,7 @@ export async function DELETE(request: NextRequest) {
     );
 
     if (!addressResult.rows || addressResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Address not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('NOT_FOUND', lang, 404);
     }
 
     const address = addressResult.rows[0];
@@ -554,9 +538,6 @@ export async function DELETE(request: NextRequest) {
       action: 'DELETE_ADDRESS',
       error: String(error)
     });
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete address' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }

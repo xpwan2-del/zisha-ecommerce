@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getMessage } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -27,7 +28,10 @@ function getLangFromRequest(request: NextRequest): string {
 }
 
 function createErrorResponse(error: string, lang: string, status: number = 400) {
-  return NextResponse.json({ success: false, error }, { status });
+  return NextResponse.json(
+    { success: false, error, message: getMessage(error as any, lang) },
+    { status }
+  );
 }
 
 function createSuccessResponse(data: any, status: number = 200) {

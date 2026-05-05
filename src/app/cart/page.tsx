@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useCart } from '@/lib/contexts/CartContext';
-import { formatMultiPriceSync } from '@/lib/utils/currency';
+import { formatMultiPriceSync, convertFromUSD } from '@/lib/utils/currency';
 import { getDisplayPromotions } from '@/lib/pricing/promotionDisplay';
 import Image from 'next/image';
 
@@ -53,14 +53,13 @@ interface CartItem {
     priority: number;
   }>;
   total_discount_percent?: number;
+  subtotal_usd?: number;
 }
 
 interface CartData {
   items: CartItem[];
   total: number;
   total_usd?: number;
-  total_cny?: number;
-  total_aed?: number;
   total_items: number;
 }
 
@@ -463,10 +462,9 @@ export default function CartPage() {
 
   const getSelectedTotals = (): { usd: number; cny: number; aed: number } => {
     const selected = cartData.items.filter(item => selectedItems.includes(item.id));
-    const usd = selected.reduce((sum, item) => sum + (item.final_price_usd ?? item.price) * item.quantity, 0);
-    const cny = selected.reduce((sum, item) => sum + (item.final_price_cny ?? item.price_cny ?? 0) * item.quantity, 0);
-    const aed = selected.reduce((sum, item) => sum + (item.final_price_aed ?? item.price_aed ?? 0) * item.quantity, 0);
-    return { usd, cny, aed };
+    const totalUsd = selected.reduce((sum, item) => sum + (item.subtotal_usd ?? (item.final_price_usd ?? item.price) * item.quantity), 0);
+    const converted = convertFromUSD(totalUsd);
+    return { usd: converted.usd, cny: converted.cny, aed: converted.aed };
   };
 
   const getSelectedPromotionsDiscount = (): { usd: number; cny: number; aed: number; totalPercent: number } => {
@@ -1010,14 +1008,14 @@ export default function CartPage() {
 
                       <div className="hidden sm:block text-right ml-4">
                         <p className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
-                          {formatMultiPriceSync((item.final_price_usd ?? item.price_usd ?? item.price) * item.quantity)}
+                          {formatMultiPriceSync(item.subtotal_usd ?? (item.final_price_usd ?? item.price_usd ?? item.price) * item.quantity)}
                         </p>
                       </div>
                     </div>
 
                     <div className="sm:hidden mt-3 flex justify-between items-center">
                       <span className="text-lg font-bold" style={{ color: 'var(--primary)' }}>
-                        {formatMultiPriceSync((item.final_price_usd ?? item.price_usd ?? item.price) * item.quantity)}
+                        {formatMultiPriceSync(item.subtotal_usd ?? (item.final_price_usd ?? item.price_usd ?? item.price) * item.quantity)}
                       </span>
                     </div>
                   </div>

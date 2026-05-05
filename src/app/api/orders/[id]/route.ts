@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAuth, requireAdmin } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
+import { getMessage } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
+
+function getLangFromRequest(request: NextRequest): string {
+  return request.headers.get('x-lang') ||
+         request.cookies.get('locale')?.value ||
+         'zh';
+}
+
+function createErrorResponse(error: string, lang: string, status: number = 400) {
+  return NextResponse.json(
+    { success: false, error, message: getMessage(error as any, lang) },
+    { status }
+  );
+}
 
 /**
  * @api {GET} /api/orders/:id 获取订单详情
@@ -12,10 +26,10 @@ import { logMonitor } from '@/lib/utils/logger';
 
 // GET /api/orders/[id] - Get order details
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const lang = getLangFromRequest(request);
   try {
     logMonitor('ORDERS', 'REQUEST', { method: 'GET', action: 'GET_ORDER_DETAIL' });
     
-    // 验证登录
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -24,7 +38,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const orderId = id;
 
-    // Get order basic info
     const orderResult = await query(
       `SELECT
         o.*,
@@ -41,23 +54,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
 
     if (orderResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Order not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('NOT_FOUND', lang, 404);
     }
 
     const order = orderResult.rows[0];
 
-    // 验证权限：普通用户只能查看自己的订单
     if (authResult.user?.role !== 'admin' && order.user_id !== authResult.user?.userId) {
-      return NextResponse.json(
-        { success: false, error: 'Permission denied' },
-        { status: 403 }
-      );
+      return createErrorResponse('FORBIDDEN', lang, 403);
     }
 
-    // Get order items
     const itemsResult = await query(
       `SELECT
         oi.*,
@@ -71,7 +76,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       [orderId]
     );
 
-    // Get order logistics
+    const items = (itemsResult.rows || []).map(item => ({
+      ...item,
+      subtotal: (item.original_price || 0) * (item.quantity || 0)
+    }));
+
     const logisticsResult = await query(
       'SELECT * FROM order_logistics WHERE order_id = ?',
       [orderId]
@@ -96,7 +105,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       success: true,
       data: {
         ...order,
-        items: itemsResult.rows || [],
+        items,
         logistics: logisticsResult.rows || [],
         payment_logs: paymentLogsResult.rows || []
       }
@@ -104,10 +113,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   } catch (error: any) {
     logMonitor('ORDERS', 'ERROR', { action: 'GET_ORDER_DETAIL', error: error?.message || String(error) });
     console.error('Error fetching order details:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch order details' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
 
@@ -118,6 +124,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  * @apiDescription 用户取消待支付订单，自动归还库存。
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const lang = getLangFromRequest(request);
   try {
     logMonitor('ORDERS', 'REQUEST', { method: 'PATCH', action: 'CANCEL_ORDER' });
 
@@ -132,10 +139,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { action } = body;
 
     if (action !== 'cancel') {
-      return NextResponse.json(
-        { success: false, error: 'Invalid action' },
-        { status: 400 }
-      );
+      return createErrorResponse('INVALID_ACTION', lang, 400);
     }
 
     const orderResult = await query(
@@ -144,26 +148,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     );
 
     if (orderResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Order not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('NOT_FOUND', lang, 404);
     }
 
     const order = orderResult.rows[0];
 
     if (authResult.user?.role !== 'admin' && order.user_id !== authResult.user?.userId) {
-      return NextResponse.json(
-        { success: false, error: 'Permission denied' },
-        { status: 403 }
-      );
+      return createErrorResponse('FORBIDDEN', lang, 403);
     }
 
     if (order.order_status !== 'pending') {
-      return NextResponse.json(
-        { success: false, error: 'Only pending orders can be cancelled' },
-        { status: 400 }
-      );
+      return createErrorResponse('INVALID_ORDER_STATUS', lang, 400);
     }
 
     const itemsResult = await query(
@@ -255,9 +250,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   } catch (error: any) {
     logMonitor('ORDERS', 'ERROR', { action: 'CANCEL_ORDER', error: error?.message || String(error) });
     console.error('Error cancelling order:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to cancel order' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }

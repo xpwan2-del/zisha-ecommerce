@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { logMonitor } from '@/lib/utils/logger';
+import { getMessage } from '@/lib/messages';
 
 /**
  * ============================================================
@@ -67,7 +68,11 @@ function getLangFromRequest(request: NextRequest): string {
  * @param status HTTP 状态码
  */
 function createErrorResponse(error: string, lang: string, status: number = 400) {
-  return NextResponse.json({ success: false, error }, { status });
+  return NextResponse.json({ 
+    success: false, 
+    error, 
+    message: getMessage(error as any, lang) 
+  }, { status });
 }
 
 // ============================================================
@@ -124,13 +129,13 @@ export async function POST(request: NextRequest) {
     // 5. 生成 Token
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET!,
       { expiresIn: '2h' }
     );
 
     const refreshToken = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET!,
       { expiresIn: '30d' }
     );
 
@@ -156,16 +161,16 @@ export async function POST(request: NextRequest) {
     // 7. 设置 Cookie
     response.cookies.set('access_token', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 60 * 60 * 2,
       path: '/'
     });
 
     response.cookies.set('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 60 * 60 * 24 * 30,
       path: '/'
     });

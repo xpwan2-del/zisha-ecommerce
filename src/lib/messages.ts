@@ -1,4 +1,13 @@
 export interface MessageSet {
+  // 通用错误码
+  UNAUTHORIZED: string;
+  FORBIDDEN: string;
+  INTERNAL_ERROR: string;
+  MISSING_PARAMS: string;
+  INVALID_PARAMS: string;
+  NOT_FOUND: string;
+  
+  // 业务错误码
   INSUFFICIENT_STOCK: string;
   OUT_OF_STOCK: string;
   PRODUCT_NOT_FOUND: string;
@@ -22,6 +31,7 @@ export interface MessageSet {
   CART_UPDATE_FAILED: string;
   CART_REMOVE_FAILED: string;
   CART_CLEARED: string;
+  CART_ITEM_REMOVED: string;
   STOCK_ADJUSTED: string;
   STOCK_ADJUST_FAILED: string;
   CHECK_CREATED: string;
@@ -33,6 +43,15 @@ export interface MessageSet {
   UNKNOWN_ERROR: string;
   STOCK_LIMIT: string;
   SELECT_ONE_PRODUCT: string;
+  EMAIL_ALREADY_EXISTS: string;
+  REGISTRATION_FAILED: string;
+  INVALID_ACTION: string;
+  INVALID_ORDER_STATUS: string;
+  REFRESH_TOKEN_REQUIRED: string;
+  INVALID_REFRESH_TOKEN: string;
+  USER_NOT_FOUND: string;
+  INVALID_CREDENTIALS: string;
+  PROMOTION_EXPIRED: string;
   [key: string]: string;
 }
 
@@ -44,6 +63,23 @@ export interface Messages {
 
 export const messages: Messages = {
   zh: {
+    // 通用错误码
+    UNAUTHORIZED: '请先登录',
+    FORBIDDEN: '无权操作',
+    INTERNAL_ERROR: '服务器内部错误',
+    MISSING_PARAMS: '缺少必需参数',
+    INVALID_PARAMS: '参数无效',
+    NOT_FOUND: '资源不存在',
+    EMAIL_ALREADY_EXISTS: '邮箱已被注册',
+    REGISTRATION_FAILED: '注册失败',
+    INVALID_ACTION: '无效操作',
+    INVALID_ORDER_STATUS: '订单状态不支持此操作',
+    REFRESH_TOKEN_REQUIRED: '缺少刷新令牌',
+    INVALID_REFRESH_TOKEN: '刷新令牌无效或已过期',
+    USER_NOT_FOUND: '用户不存在',
+    INVALID_CREDENTIALS: '邮箱或密码错误',
+    PROMOTION_EXPIRED: '活动已结束，请返回商品页重新购买',
+    // 业务错误码
     INSUFFICIENT_STOCK: '库存不足',
     OUT_OF_STOCK: '已售罄',
     PRODUCT_NOT_FOUND: '商品不存在',
@@ -67,6 +103,7 @@ export const messages: Messages = {
     CART_UPDATE_FAILED: '更新数量失败',
     CART_REMOVE_FAILED: '移除商品失败',
     CART_CLEARED: '购物车已清空',
+    CART_ITEM_REMOVED: '商品已从购物车移除',
     STOCK_ADJUSTED: '库存调整成功',
     STOCK_ADJUST_FAILED: '库存调整失败',
     CHECK_CREATED: '盘点任务已创建',
@@ -80,6 +117,23 @@ export const messages: Messages = {
     SELECT_ONE_PRODUCT: '请至少选择一个商品',
   },
   en: {
+    // 通用错误码
+    UNAUTHORIZED: 'Unauthorized - Please login',
+    FORBIDDEN: 'Forbidden - No access permission',
+    INTERNAL_ERROR: 'Internal server error',
+    MISSING_PARAMS: 'Missing required parameters',
+    INVALID_PARAMS: 'Invalid parameters',
+    NOT_FOUND: 'Resource not found',
+    EMAIL_ALREADY_EXISTS: 'Email already exists',
+    REGISTRATION_FAILED: 'Registration failed',
+    INVALID_ACTION: 'Invalid action',
+    INVALID_ORDER_STATUS: 'Invalid order status for this action',
+    REFRESH_TOKEN_REQUIRED: 'Refresh token required',
+    INVALID_REFRESH_TOKEN: 'Invalid or expired refresh token',
+    USER_NOT_FOUND: 'User not found',
+    INVALID_CREDENTIALS: 'Invalid email or password',
+    PROMOTION_EXPIRED: 'Promotion has ended, please go back and repurchase',
+    // 业务错误码
     INSUFFICIENT_STOCK: 'Insufficient stock',
     OUT_OF_STOCK: 'Out of stock',
     PRODUCT_NOT_FOUND: 'Product not found',
@@ -103,6 +157,7 @@ export const messages: Messages = {
     CART_UPDATE_FAILED: 'Failed to update quantity',
     CART_REMOVE_FAILED: 'Failed to remove item',
     CART_CLEARED: 'Cart cleared',
+    CART_ITEM_REMOVED: 'Item removed from cart',
     STOCK_ADJUSTED: 'Stock adjusted successfully',
     STOCK_ADJUST_FAILED: 'Failed to adjust stock',
     CHECK_CREATED: 'Check task created',
@@ -116,6 +171,23 @@ export const messages: Messages = {
     SELECT_ONE_PRODUCT: 'Please select at least one product',
   },
   ar: {
+    // 通用错误码
+    UNAUTHORIZED: 'الرجاء تسجيل الدخول',
+    FORBIDDEN: 'غير مصرح',
+    INTERNAL_ERROR: 'خطأ داخلي في الخادم',
+    MISSING_PARAMS: 'معلمات مفقودة',
+    INVALID_PARAMS: 'معلمات غير صالحة',
+    NOT_FOUND: 'غير موجود',
+    EMAIL_ALREADY_EXISTS: 'البريد الإلكتروني مسجل بالفعل',
+    REGISTRATION_FAILED: 'فشل التسجيل',
+    INVALID_ACTION: 'إجراء غير صالح',
+    INVALID_ORDER_STATUS: 'حالة الطلب لا تدعم هذا الإجراء',
+    REFRESH_TOKEN_REQUIRED: 'رمز التحديث مطلوب',
+    INVALID_REFRESH_TOKEN: 'رمز التحديث غير صالح أو منتهي الصلاحية',
+    USER_NOT_FOUND: 'المستخدم غير موجود',
+    INVALID_CREDENTIALS: 'بريد إلكتروني أو كلمة مرور غير صالحة',
+    PROMOTION_EXPIRED: 'انتهى العرض، يرجى العودة وإعادة الشراء',
+    // 业务错误码
     INSUFFICIENT_STOCK: 'المخزون غير كافٍ',
     OUT_OF_STOCK: 'نفد المخزون',
     PRODUCT_NOT_FOUND: 'المنتج غير موجود',
@@ -139,6 +211,7 @@ export const messages: Messages = {
     CART_UPDATE_FAILED: 'فشل في تحديث الكمية',
     CART_REMOVE_FAILED: 'فشل في إزالة العنصر',
     CART_CLEARED: 'تم إفراغ السلة',
+    CART_ITEM_REMOVED: 'تمت إزالة العنصر من السلة',
     STOCK_ADJUSTED: 'تم تعديل المخزون بنجاح',
     STOCK_ADJUST_FAILED: 'فشل في تعديل المخزون',
     CHECK_CREATED: 'تم إنشاء مهمة الجرد',

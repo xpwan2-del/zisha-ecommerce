@@ -120,6 +120,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    if (order_number && session.metadata?.order_number && session.metadata.order_number !== order_number) {
+      logMonitor('PAYMENTS', 'AUTH_FAILED', {
+        action: 'STRIPE_ORDER_NUMBER_MISMATCH',
+        session_id,
+        provided_order_number: order_number,
+        session_order_number: session.metadata.order_number
+      });
+      return NextResponse.json({
+        success: false,
+        error: 'ORDER_NUMBER_MISMATCH',
+        message: await getStripeErrorMessage('AMOUNT_MISMATCH', lang)
+      }, { status: 403 });
+    }
+
     const orderResult = await query(
       'SELECT id, user_id, order_number, final_amount, payment_status, order_status FROM orders WHERE order_number = ?',
       [stripeOrderNumber]

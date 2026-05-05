@@ -452,10 +452,7 @@ export async function GET(request: NextRequest) {
       action: 'GET_CART',
       error: String(error)
     });
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch cart' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
 
@@ -637,10 +634,7 @@ export async function POST(request: NextRequest) {
       action: 'ADD_TO_CART',
       error: String(error)
     });
-    return NextResponse.json(
-      { success: false, error: 'Failed to add to cart' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
 
@@ -918,10 +912,7 @@ export async function DELETE(request: NextRequest) {
       logMonitor('CART', 'VALIDATION_FAILED', {
         reason: 'Missing required param: id'
       });
-      return NextResponse.json(
-        { success: false, error: 'Item ID is required' },
-        { status: 400 }
-      );
+      return createErrorResponse('MISSING_PARAMS', lang, 400);
     }
 
     const itemToDelete = await query(
@@ -1001,9 +992,6 @@ export async function DELETE(request: NextRequest) {
       action: 'DELETE_CART_ITEM',
       error: String(error)
     });
-    return NextResponse.json(
-      { success: false, error: 'Failed to remove from cart' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }

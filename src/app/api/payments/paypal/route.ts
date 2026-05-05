@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
       }],
       application_context: {
         return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart?order_id=${order_number}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}&status=cancel&platform=paypal`,
       },
     };
 

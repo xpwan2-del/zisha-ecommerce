@@ -68,7 +68,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const [cart, setCart] = useState<CartItem[]>(() => {
-    // 初始状态：访客从 Cookie 读取，已登录用户从 API 获取
     if (!isAuthenticated) {
       const guestCart = getGuestCartFromCookie();
       if (guestCart && Array.isArray(guestCart)) {
@@ -77,6 +76,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
     return [];
   });
+  const [totalAmount, setTotalAmount] = useState<number>(0);
 
   // 访客购物车：Cart 变化时同步到 Cookie
   useEffect(() => {
@@ -95,6 +95,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .then(data => {
         if (data.success && data.data?.items) {
           setCart(data.data.items);
+          setTotalAmount(data.data.total_usd || 0);
         }
       })
       .catch(err => console.error('Failed to fetch cart:', err));
@@ -198,6 +199,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (cartResponse.ok) {
           const cartData = await cartResponse.json();
           setCart(cartData.data?.items || []);
+          setTotalAmount(cartData.data?.total_usd || 0);
         }
 
         return { success: true };
@@ -276,6 +278,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (response.ok) {
           const data = await response.json();
           setCart(data.data?.items || []);
+          setTotalAmount(data.data?.total_usd || 0);
         }
       } catch (error) {
         console.error('Failed to refresh cart:', error);
@@ -284,7 +287,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
-  const totalAmount = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  // const totalAmount = cart.reduce((total, item) => total + (item.price * item.quantity), 0); // 已改为从 API 获取 total_usd
 
   const debug = () => {
     const guestCart = getGuestCartFromCookie();

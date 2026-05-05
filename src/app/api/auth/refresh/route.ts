@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import jwt from 'jsonwebtoken';
+import { getMessage } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -29,7 +30,10 @@ function getLangFromRequest(request: NextRequest): string {
 }
 
 function createErrorResponse(error: string, lang: string, status: number = 400) {
-  return NextResponse.json({ success: false, error }, { status });
+  return NextResponse.json(
+    { success: false, error, message: getMessage(error as any, lang) },
+    { status }
+  );
 }
 
 function createSuccessResponse(data: any, status: number = 200) {
@@ -71,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     let decoded: any;
     try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET || 'your-secret-key');
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET!);
     } catch (error) {
       logMonitor('AUTH', 'VALIDATION_FAILED', {
         reason: 'INVALID_REFRESH_TOKEN'
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET!,
       { expiresIn: '2h' }
     );
 
@@ -102,8 +106,8 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set('access_token', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 60 * 60 * 2,
       path: '/'
     });

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { logMonitor } from '@/lib/utils/logger';
+import { getMessage } from '@/lib/messages';
 /**
  * @api {POST} /api/auth/register 用户注册
  * @apiName Register
@@ -105,16 +106,16 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set('access_token', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 60 * 60 * 2,
       path: '/'
     });
 
     response.cookies.set('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 60 * 60 * 24 * 30,
       path: '/'
     });

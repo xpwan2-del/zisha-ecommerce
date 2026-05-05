@@ -328,6 +328,35 @@ export async function POST(request: NextRequest) {
       errorIssue: responseData.details?.[0]?.issue
     });
 
+    const responseReferenceId = responseData?.purchase_units?.[0]?.reference_id;
+    if (responseReferenceId && responseReferenceId !== order_number) {
+      logMonitor('PAYMENTS', 'AUTH_FAILED', {
+        action: 'PAYPAL_REFERENCE_ID_MISMATCH',
+        paypalOrderId: platformOrderId,
+        order_number,
+        response_reference_id: responseReferenceId
+      });
+      await savePayPalLog(
+        order.id,
+        order_number,
+        platformOrderId,
+        responseStatus,
+        responseData.name || null,
+        'REFERENCE_ID_MISMATCH',
+        `reference_id ${responseReferenceId} does not match order_number ${order_number}`,
+        JSON.stringify(responseData),
+        false,
+        parseFloat(order.final_amount),
+        'USD'
+      );
+      return NextResponse.json({
+        success: false,
+        status: 'fail',
+        error_code: 'REFERENCE_ID_MISMATCH',
+        message: lang === 'zh' ? '订单号不匹配' : lang === 'ar' ? 'رقم الطلب غير متطابق' : 'Order number mismatch'
+      }, { status: 403 });
+    }
+
     const issues: Array<{ issue: string; description?: string }> = Array.isArray(responseData?.details)
       ? responseData.details.map((d: any) => ({ issue: d.issue, description: d.description }))
       : [];

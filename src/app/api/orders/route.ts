@@ -42,10 +42,9 @@ function createErrorResponse(key: string, lang: string, status: number = 400) {
 
 // GET /api/orders - Get orders (user's own or all if admin)
 export async function GET(request: NextRequest) {
+  const lang = getLangFromRequest(request);
   try {
     logMonitor('ORDERS', 'REQUEST', { method: 'GET' });
-    
-    const lang = getLangFromRequest(request);
 
     const authResult = requireAuth(request);
     if (authResult.response) {
@@ -133,20 +132,16 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     logMonitor('ORDERS', 'ERROR', { action: 'GET_ORDERS', error: error?.message || String(error) });
     console.error('Error fetching orders:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch orders' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
 
 // POST /api/orders - Create new order
 export async function POST(request: NextRequest) {
+  const lang = getLangFromRequest(request);
   try {
     logMonitor('ORDERS', 'REQUEST', { method: 'POST', action: 'CREATE_ORDER' });
     
-    const lang = getLangFromRequest(request);
-
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -156,10 +151,7 @@ export async function POST(request: NextRequest) {
     const { items, shipping_address_id, coupon_code } = data;
 
     if (!items || items.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Order items are required' },
-        { status: 400 }
-      );
+      return createErrorResponse('MISSING_PARAMS', lang, 400);
     }
 
     // Calculate order total
@@ -182,15 +174,7 @@ export async function POST(request: NextRequest) {
         const now = new Date();
         for (const promo of promoCheck.rows) {
           if (promo.end_time && new Date(promo.end_time) < now) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: '活动已结束',
-                message: `商品活动已结束，请返回商品页重新购买`,
-                expired_promo: promo.promo_name
-              },
-              { status: 400 }
-            );
+            return createErrorResponse('PROMOTION_EXPIRED', lang, 400);
           }
         }
 
@@ -224,10 +208,7 @@ export async function POST(request: NextRequest) {
         // 没有促销，使用产品原价
         const productResult = await query('SELECT pp.price FROM product_prices pp WHERE pp.product_id = ? AND pp.currency = ?', [item.product_id, 'USD']);
         if (productResult.rows.length === 0) {
-          return NextResponse.json(
-            { success: false, error: `Product ${item.product_id} not found` },
-            { status: 404 }
-          );
+          return createErrorResponse('PRODUCT_NOT_FOUND', lang, 404);
         }
         const productPrice = parseFloat(productResult.rows[0].price);
         itemPromoInfo.set(item.product_id, {
@@ -425,15 +406,13 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     logMonitor('ORDERS', 'ERROR', { action: 'CREATE_ORDER', error: error?.message || String(error) });
     console.error('Error creating order:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create order' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
 
 // PUT /api/orders - Update order status (admin only)
 export async function PUT(request: NextRequest) {
+  const lang = getLangFromRequest(request);
   try {
     logMonitor('ORDERS', 'REQUEST', { method: 'PUT', action: 'UPDATE_ORDER_STATUS' });
     
@@ -449,10 +428,7 @@ export async function PUT(request: NextRequest) {
     const { status } = body;
 
     if (!orderId || !status) {
-      return NextResponse.json(
-        { success: false, error: 'Order ID and status are required' },
-        { status: 400 }
-      );
+      return createErrorResponse('MISSING_PARAMS', lang, 400);
     }
 
     await query(
@@ -473,9 +449,6 @@ export async function PUT(request: NextRequest) {
   } catch (error: any) {
     logMonitor('ORDERS', 'ERROR', { action: 'UPDATE_ORDER_STATUS', error: error?.message || String(error) });
     console.error('Error updating order:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update order' },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', lang, 500);
   }
 }
