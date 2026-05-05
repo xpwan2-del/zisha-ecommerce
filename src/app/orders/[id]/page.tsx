@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatMultiPriceSync, getCountdown } from '@/lib/utils/currency';
 
 interface OrderDetailItem {
   id: number;
@@ -29,6 +30,16 @@ interface PaymentLogEntry {
   created_at: string;
 }
 
+interface OrderCoupon {
+  order_coupon_id: number;
+  coupon_id: number;
+  coupon_code: string;
+  coupon_name: string;
+  coupon_type: string;
+  coupon_value: number;
+  discount_applied: number;
+}
+
 interface OrderDetail {
   id: number;
   order_number: string;
@@ -47,6 +58,8 @@ interface OrderDetail {
   address_phone: string;
   address_detail: string;
   items: OrderDetailItem[];
+  coupons?: OrderCoupon[];
+  selected_coupon_ids?: number[];
   payment_logs: PaymentLogEntry[];
 }
 
@@ -117,16 +130,9 @@ export default function OrderDetailPage() {
   } | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  const [countdown, setCountdown] = useState<ReturnType<typeof getCountdown> | null>(null);
 
   const getUserId = () => Number(user?.id) || 0;
-
-  const isStackableSelected = () => {
-    if (selectedCouponIds.length === 0) return false;
-    return selectedCouponIds.some((id) => {
-      const c = availableCoupons.find((c) => c.id === id);
-      return c && c.is_stackable === 1;
-    });
-  };
 
   const hasUnstackableSelected = () => {
     return selectedCouponIds.some((id) => {
@@ -152,6 +158,7 @@ export default function OrderDetailPage() {
 
       if (data.success) {
         setOrder(data.data);
+        setSelectedCouponIds(data.data.selected_coupon_ids || []);
       } else {
         setError(data.error || '订单不存在');
       }
@@ -161,6 +168,17 @@ export default function OrderDetailPage() {
       setIsLoading(false);
     }
   }, [orderId]);
+
+  useEffect(() => {
+    if (order && order.order_status === 'pending' && order.created_at) {
+      const tick = () => setCountdown(getCountdown(order.created_at));
+      tick();
+      const timer = setInterval(tick, 1000);
+      return () => clearInterval(timer);
+    } else {
+      setCountdown(null);
+    }
+  }, [order?.order_status, order?.created_at]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -188,7 +206,7 @@ export default function OrderDetailPage() {
     } catch { /* ignore */ }
   };
 
-  const fetchCoupons = async (addressId?: number) => {
+  const fetchCoupons = async () => {
     setIsLoadingCoupons(true);
     const uid = getUserId();
     if (!uid) { setIsLoadingCoupons(false); return; }
@@ -208,9 +226,24 @@ export default function OrderDetailPage() {
         description: uc.description || '', expires_at: uc.expires_at || '',
         status
       });
+      const mappedUsedCoupons = (usedData.data?.user_coupons || []).map((uc: any) => mapCoupon(uc, 'used'));
+      const selectedOrderCoupons = (order?.coupons || [])
+        .filter((coupon) => !mappedUsedCoupons.some((usedCoupon: CouponItem) => usedCoupon.id === coupon.coupon_id))
+        .map((coupon) => ({
+          id: coupon.coupon_id,
+          coupon_id: coupon.coupon_id,
+          code: coupon.coupon_code,
+          name: coupon.coupon_name,
+          type: coupon.coupon_type,
+          value: coupon.coupon_value,
+          is_stackable: selectedCouponIds.length > 1 ? 1 : 0,
+          description: '',
+          expires_at: '',
+          status: 'used'
+        }));
       setAvailableCoupons((activeData.data?.user_coupons || []).map((uc: any) => mapCoupon(uc, 'active')));
       setExpiredCoupons((expiredData.data?.user_coupons || []).map((uc: any) => mapCoupon(uc, 'expired')));
-      setUsedCoupons((usedData.data?.user_coupons || []).map((uc: any) => mapCoupon(uc, 'used')));
+      setUsedCoupons([...mappedUsedCoupons, ...selectedOrderCoupons]);
       setClaimableCoupons((claimableData.data?.available_coupons || []).map((c: any) => ({
         id: 0, coupon_id: c.id, code: c.code, name: c.name, type: c.type, value: c.value,
         is_stackable: c.is_stackable || 0, description: c.description || '',
@@ -241,7 +274,7 @@ export default function OrderDetailPage() {
       });
       const data = await res.json();
       if (data.success) {
-        fetchCoupons(selectedAddressId || undefined);
+        fetchCoupons();
       } else {
         alert(data.error || '领取失败');
       }
@@ -278,9 +311,15 @@ export default function OrderDetailPage() {
     }
   }, [selectedAddressId, selectedCouponIds, fetchEstimate]);
 
+  useEffect(() => {
+    if (order) {
+      fetchCoupons();
+    }
+  }, [order?.id, order?.coupons]);
+
   const handleAddressChange = (addressId: number) => {
     setSelectedAddressId(addressId);
-    fetchCoupons(addressId);
+    fetchCoupons();
     setSelectedCouponIds([]);
   };
 
@@ -406,9 +445,20 @@ export default function OrderDetailPage() {
             </button>
             <h1 className="text-2xl font-bold text-[var(--text)]">订单详情</h1>
           </div>
-          <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${statusInfo.color}`}>
-            {statusInfo.zh}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${statusInfo.color}`}>
+              {statusInfo.zh}
+            </span>
+            {isPending && countdown && countdown.urgency !== 'expired' && (
+              <span className={`text-sm font-mono font-bold ${
+                countdown.urgency === 'critical' ? 'text-red-600 animate-pulse' :
+                countdown.urgency === 'warning' ? 'text-orange-500' :
+                'text-amber-500'
+              }`}>
+                ⏱ {countdown.display}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="bg-[var(--card)] rounded-xl shadow-sm border border-[var(--border)] p-6">
@@ -508,6 +558,21 @@ export default function OrderDetailPage() {
                 <span className="text-green-600">-{formatPrice(estimatedPrice?.coupon_discount ?? order.total_coupon_discount)}</span>
               </div>
             )}
+            {!!order.coupons?.length && (
+              <div className="pt-1">
+                <div className="text-[var(--text-muted)] mb-1">已占用优惠券</div>
+                <div className="flex flex-wrap gap-2">
+                  {order.coupons.map((coupon) => (
+                    <span
+                      key={coupon.order_coupon_id}
+                      className="px-2 py-1 rounded-full text-xs bg-[var(--accent)]/10 text-[var(--accent)]"
+                    >
+                      {coupon.coupon_name}（{coupon.coupon_code}）
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">运费</span>
               <span className="text-[var(--text)]">
@@ -584,7 +649,7 @@ export default function OrderDetailPage() {
                 </div>
 
                 {couponTab === 'available' && (
-                  <div className="space-y-2">
+                  <>
                     {selectedCouponIds.length > 0 && (
                       <div
                         onClick={() => setSelectedCouponIds([])}
@@ -596,40 +661,65 @@ export default function OrderDetailPage() {
                     {availableCoupons.length === 0 ? (
                       <p className="text-sm text-[var(--text-muted)] py-4 text-center">暂无可用优惠券</p>
                     ) : (
-                      availableCoupons.map((c) => {
-                        const selected = selectedCouponIds.includes(c.id);
-                        const selectable = isCouponSelectable(c);
-                        return (
-                          <div
-                            key={c.id}
-                            onClick={(e) => selectable && handleCouponSelect(c, e)}
-                            className={`p-3 border rounded-lg transition-all ${
-                              selected
-                                ? 'border-[var(--accent)] bg-[var(--accent)]/5 cursor-pointer'
-                                : selectable
-                                ? 'border-[var(--border)] hover:border-[var(--accent)]/40 cursor-pointer'
-                                : 'border-[var(--border)] opacity-40 cursor-not-allowed'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <span className={`text-sm font-medium ${selected ? 'text-[var(--accent)]' : 'text-[var(--text)]'}`}>
-                                  {c.name}
-                                </span>
-                                <span className="text-xs text-[var(--text-muted)] ml-2">{c.code}</span>
+                      <div className="grid grid-cols-2 gap-3">
+                        {availableCoupons.map((c) => {
+                          const isSelected = selectedCouponIds.includes(c.id);
+                          const selectable = isCouponSelectable(c);
+                          const isDisabled = !selectable;
+                          const discountText = c.type === 'percentage'
+                            ? `${c.value}%`
+                            : `${c.value}`;
+                          const daysLeft = Math.max(0, Math.ceil((new Date(c.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                          return (
+                            <div
+                              key={c.id}
+                              onClick={(e) => !isDisabled && handleCouponSelect(c, e)}
+                              style={{ backgroundColor: 'var(--card)' }}
+                              className={`rounded-lg overflow-hidden transition-all duration-200 cursor-pointer border ${
+                                isSelected
+                                  ? 'border-[var(--accent)] shadow-lg'
+                                  : isDisabled
+                                  ? 'border-[var(--border)] opacity-50 cursor-not-allowed'
+                                  : 'border-[var(--border)] hover:border-[var(--accent)]/40 shadow-md'
+                              }`}
+                            >
+                              <div className="flex h-full">
+                                <div className={`w-[120px] shrink-0 p-2 flex flex-col items-center justify-center ${
+                                  isSelected
+                                    ? 'bg-gradient-to-br from-accent to-accent-hover'
+                                    : 'bg-gradient-to-br from-accent to-accent'
+                                }`}>
+                                  <span className="text-white text-[10px] font-bold text-center leading-tight">{c.name}</span>
+                                  <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
+                                    {c.is_stackable === 1 ? '可叠加' : '不可叠加'}
+                                  </span>
+                                </div>
+                                <div className="flex-1 p-2">
+                                  <div className="flex justify-between items-start mb-1">
+                                    <div>
+                                      <span className="text-[var(--accent)] font-bold">{discountText}</span>
+                                      <p className="text-[10px] text-[var(--text-muted)]">{c.code}</p>
+                                    </div>
+                                    {isSelected && (
+                                      <span className="bg-green-500 text-white text-[10px] px-1 py-0.5 rounded">
+                                        ✓
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] mb-1 text-[var(--text)] truncate">{c.description}</p>
+                                  <div className="flex flex-wrap gap-1 text-[10px]">
+                                    <span className="bg-gray-100 px-1 py-0.5 rounded text-[var(--text-muted)]">
+                                      剩{daysLeft}天
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                              <span className={`text-sm font-bold ${selected ? 'text-[var(--accent)]' : 'text-[var(--text)]'}`}>
-                                {c.type === 'percentage' ? `${c.value}%` : `$${c.value}`}
-                              </span>
                             </div>
-                            {c.description && (
-                              <p className="text-xs text-[var(--text-muted)] mt-1">{c.description}</p>
-                            )}
-                          </div>
-                        );
-                      })
+                          );
+                        })}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
 
                 {couponTab === 'expired' && (
@@ -728,7 +818,7 @@ export default function OrderDetailPage() {
                     <span className="text-sm opacity-60 ml-2">(美元支付)</span>
                   </div>
                   <span className="font-bold text-[var(--accent)]">
-                    ${Number(order.final_amount).toFixed(2)} USD
+                    ${Number(estimatedPrice?.final_amount ?? order.final_amount).toFixed(2)} USD
                   </span>
                 </div>
               </div>
@@ -761,7 +851,7 @@ export default function OrderDetailPage() {
                     <span className="text-sm opacity-60 ml-2">(人民币支付)</span>
                   </div>
                   <span className="font-bold text-[var(--accent)]">
-                    ¥{(Number(order.final_amount) * 7.19).toFixed(2)} CNY
+                    ¥{Number((estimatedPrice?.final_amount ?? order.final_amount) * 7.19).toFixed(2)} CNY
                   </span>
                 </div>
               </div>
@@ -794,11 +884,80 @@ export default function OrderDetailPage() {
                     <span className="text-sm opacity-60 ml-2">(美元支付)</span>
                   </div>
                   <span className="font-bold text-[var(--accent)]">
-                    ${Number(order.final_amount).toFixed(2)} USD
+                    ${Number(estimatedPrice?.final_amount ?? order.final_amount).toFixed(2)} USD
                   </span>
                 </div>
               </div>
             </div>
+
+        {isPending && estimatedPrice && (
+          <div className="bg-[var(--card)]/80 rounded-lg shadow-md border border-[var(--border)] overflow-hidden mt-6">
+            <div className="px-6 py-4 border-b border-[var(--border)]">
+              <h2 className="text-lg font-semibold text-[var(--text)]">
+                价格明细
+              </h2>
+            </div>
+            <div className="p-6 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="opacity-70">商品总价</span>
+                <span className="line-through opacity-50">
+                  {formatMultiPriceSync(estimatedPrice.original_total ?? order.total_original_price)}
+                </span>
+              </div>
+              {estimatedPrice.product_discount > 0 && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="opacity-70">促销优惠</span>
+                    <span className="text-green-600">
+                      -{formatMultiPriceSync(estimatedPrice.product_discount)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-green-600 pl-4 opacity-70">
+                    = {formatMultiPriceSync(estimatedPrice.original_total ?? 0)} - {formatMultiPriceSync(estimatedPrice.product_discount)}
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="opacity-70">促销后小计</span>
+                <span>{formatMultiPriceSync(estimatedPrice.subtotal)}</span>
+              </div>
+              {(estimatedPrice.coupon_discount ?? 0) > 0 && (
+                <>
+                  <div className="pt-2 border-t border-dashed border-[var(--border)]"></div>
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>优惠券优惠</span>
+                    <span>-{formatMultiPriceSync(estimatedPrice.coupon_discount)}</span>
+                  </div>
+                  <div className="text-xs text-green-600 pl-4 opacity-70">
+                    = {formatMultiPriceSync(estimatedPrice.subtotal)} - {formatMultiPriceSync(estimatedPrice.coupon_discount)}
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="opacity-70">券后小计</span>
+                    <span>{formatMultiPriceSync(estimatedPrice.subtotal - (estimatedPrice.coupon_discount ?? 0))}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="opacity-70">运费</span>
+                <span>
+                  {(estimatedPrice.shipping_fee ?? 0) > 0
+                    ? formatMultiPriceSync(estimatedPrice.shipping_fee ?? 0)
+                    : '免费'}
+                </span>
+              </div>
+              <div className="pt-3 border-t border-[var(--border)]">
+                <div className="flex justify-between">
+                  <span className="font-medium">合计</span>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-[var(--accent)]">
+                      {formatMultiPriceSync(estimatedPrice.final_amount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
             <div className="mt-6">
               <button
@@ -818,8 +977,8 @@ export default function OrderDetailPage() {
                   </div>
                 ) : (
                   `提交订单 (${selectedPayment === 'alipay'
-                    ? `¥${(Number(order.final_amount) * 7.19).toFixed(2)} CNY`
-                    : `$${Number(order.final_amount).toFixed(2)} USD`
+                    ? `¥${Number((estimatedPrice?.final_amount ?? order.final_amount) * 7.19).toFixed(2)} CNY`
+                    : `$${Number(estimatedPrice?.final_amount ?? order.final_amount).toFixed(2)} USD`
                   })`
                 )}
               </button>

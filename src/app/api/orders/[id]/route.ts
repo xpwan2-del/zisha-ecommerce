@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { releaseOrderResources } from '@/lib/order-release-service';
+import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
 import { getMessage } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
@@ -59,6 +61,45 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const order = orderResult.rows[0];
 
+    if (order.order_status === 'pending' && order.created_at) {
+      const expiredResult = await query(
+        `SELECT id FROM orders WHERE id = ? AND order_status = 'pending' AND datetime(created_at, '+30 minutes') < datetime('now')`,
+        [orderId]
+      );
+      if (expiredResult.rows.length > 0) {
+        try {
+          await releaseOrderResources({
+            orderId: Number(orderId),
+            userId: order.user_id,
+            transactionTypeCode: 'order_cancel',
+            inventoryReason: '订单超时自动取消，归还库存',
+            referenceType: 'order_timeout',
+            operatorId: null,
+            operatorName: 'SYSTEM'
+          });
+          const statusResult = await OrderStatusService.changeStatus(
+            Number(orderId),
+            OrderEvent.TIMEOUT_CANCEL,
+            { type: OperatorType.SYSTEM, id: 0, name: 'SYSTEM' },
+            { reason: 'order_timeout', expiredAfterMinutes: 30 }
+          );
+          if (!statusResult.success) {
+            await query(`UPDATE orders SET order_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`, [orderId]);
+          }
+          await query(`UPDATE orders SET payment_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`, [orderId]);
+          await query(
+            `INSERT INTO payment_logs (order_id, order_number, payment_method, status, error_code, error_message, is_success, payment_stage, amount, currency, extra_data, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            [Number(orderId), order.order_number, order.payment_method || 'unknown', 'cancelled', 'TIMEOUT', 'Order expired (lazy cleanup on GET)', 0, 'timeout', order.final_amount || 0, 'USD', JSON.stringify({ reason: 'timeout', source: 'order_get_lazy_cleanup' })]
+          );
+          order.order_status = 'cancelled';
+          order.payment_status = 'cancelled';
+        } catch (e) {
+          console.error('[Orders GET] Lazy cleanup error:', e);
+        }
+      }
+    }
+
     if (authResult.user?.role !== 'admin' && order.user_id !== authResult.user?.userId) {
       return createErrorResponse('FORBIDDEN', lang, 403);
     }
@@ -95,6 +136,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       [orderId]
     );
 
+    const orderCouponsResult = await query(
+      `SELECT
+        oc.id as order_coupon_id,
+        oc.coupon_id,
+        oc.discount_applied,
+        oc.status,
+        oc.applied_at,
+        c.code as coupon_code,
+        c.name as coupon_name,
+        c.type as coupon_type,
+        c.value as coupon_value
+       FROM order_coupons oc
+       LEFT JOIN coupons c ON oc.coupon_id = c.id
+       WHERE oc.order_id = ? AND oc.user_id = ? AND oc.status = 'applied'`,
+      [orderId, order.user_id]
+    );
+
     logMonitor('ORDERS', 'SUCCESS', { 
       action: 'GET_ORDER_DETAIL', 
       orderId,
@@ -106,6 +164,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       data: {
         ...order,
         items,
+        coupons: orderCouponsResult.rows || [],
+        selected_coupon_ids: (orderCouponsResult.rows || []).map((coupon: any) => Number(coupon.coupon_id)),
         logistics: logisticsResult.rows || [],
         payment_logs: paymentLogsResult.rows || []
       }
@@ -161,81 +221,87 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return createErrorResponse('INVALID_ORDER_STATUS', lang, 400);
     }
 
-    const itemsResult = await query(
-      `SELECT oi.product_id, oi.quantity, p.name
-       FROM order_items oi
-       JOIN products p ON oi.product_id = p.id
-       WHERE oi.order_id = ?`,
-      [orderId]
-    );
+    const releaseResult = await releaseOrderResources({
+      orderId,
+      userId: order.user_id,
+      transactionTypeCode: 'sales_cancel',
+      inventoryReason: '用户取消订单',
+      referenceType: 'order_cancel',
+      operatorId: authResult.user?.userId || null,
+      operatorName: authResult.user?.name || 'User'
+    });
 
-    const cancelTypeResult = await query(
-      'SELECT id FROM transaction_type WHERE code = ?',
-      ['sales_cancel']
-    );
-    const cancelTypeId = cancelTypeResult.rows[0]?.id || null;
-
-    for (const item of itemsResult.rows) {
-      const beforeResult = await query(
-        'SELECT quantity FROM inventory WHERE product_id = ?',
-        [item.product_id]
-      );
-      const beforeStock = beforeResult.rows[0]?.quantity || 0;
-
-      await query(
-        'UPDATE inventory SET quantity = quantity + ? WHERE product_id = ?',
-        [item.quantity, item.product_id]
-      );
-
-      if (cancelTypeId) {
-        await query(
-          `INSERT INTO inventory_transactions (
-            product_id, product_name, transaction_type_id, quantity_change,
-            quantity_before, quantity_after, reason, reference_type, reference_id,
-            operator_id, operator_name, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-          [
-            item.product_id, item.name, cancelTypeId, item.quantity,
-            beforeStock, beforeStock + item.quantity,
-            '用户取消订单', 'order_cancel', orderId,
-            authResult.user?.userId, authResult.user?.name || 'User'
-          ]
-        );
+    const statusResult = await OrderStatusService.changeStatus(
+      Number(orderId),
+      OrderEvent.USER_CANCEL,
+      {
+        type: OperatorType.USER,
+        id: authResult.user?.userId || 0,
+        name: authResult.user?.name || 'User'
+      },
+      {
+        reason: 'user_cancel',
+        releasedCouponCount: releaseResult.couponsReleased,
+        restoredItemCount: releaseResult.itemsReleased
       }
-    }
-
-    const orderCouponsResult = await query(
-      `SELECT oc.id as order_coupon_id, oc.coupon_id as user_coupon_id, oc.discount_applied
-       FROM order_coupons oc
-       JOIN user_coupons uc ON oc.coupon_id = uc.id 
-         AND oc.user_id = uc.user_id AND uc.status = 'used'
-       WHERE oc.order_id = ? AND oc.status = 'applied'`,
-      [orderId]
     );
 
-    for (const row of orderCouponsResult.rows) {
+    if (!statusResult.success) {
+      logMonitor('ORDERS', 'ERROR', {
+        action: 'CANCEL_ORDER_STATUS_TRANSITION_FAILED',
+        orderId,
+        error: statusResult.error || 'UNKNOWN_STATUS_ERROR'
+      });
+
       await query(
-        `UPDATE user_coupons SET status = 'active', used_order_id = NULL 
-         WHERE id = ? AND user_id = ?`,
-        [row.user_coupon_id, order.user_id]
-      );
-      await query(
-        `UPDATE order_coupons SET status = 'refunded', refunded_at = datetime('now') 
+        `UPDATE orders SET
+          order_status = 'cancelled',
+          updated_at = datetime('now')
          WHERE id = ?`,
-        [row.order_coupon_id]
+        [orderId]
       );
     }
 
     await query(
-      `UPDATE orders SET order_status = 'cancelled', payment_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE orders SET
+        payment_status = 'cancelled',
+        updated_at = datetime('now')
+       WHERE id = ?`,
       [orderId]
+    );
+
+    await query(
+      `INSERT INTO payment_logs (
+        order_id, order_number, payment_method, status,
+        error_code, error_message, is_success,
+        payment_stage, amount, currency, extra_data, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [
+        orderId,
+        order.order_number,
+        order.payment_method || 'unknown',
+        'cancelled',
+        'USER_CANCEL',
+        'User manually cancelled the order, inventory released and coupons restored',
+        0,
+        'user_cancel',
+        order.final_amount || 0,
+        'USD',
+        JSON.stringify({
+          reason: 'user_cancel',
+          cancelled_at: new Date().toISOString(),
+          released_coupon_count: releaseResult.couponsReleased,
+          restored_item_count: releaseResult.itemsReleased
+        })
+      ]
     );
 
     logMonitor('ORDERS', 'SUCCESS', {
       action: 'CANCEL_ORDER',
       orderId,
       orderNumber: order.order_number,
-      itemsReturned: itemsResult.rows.length
+      itemsReturned: releaseResult.itemsReleased,
+      couponsReturned: releaseResult.couponsReleased
     });
 
     return NextResponse.json({
@@ -244,7 +310,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         order_id: orderId,
         order_number: order.order_number,
         status: 'cancelled',
-        items_returned: itemsResult.rows.length
+        items_returned: releaseResult.itemsReleased,
+        coupons_returned: releaseResult.couponsReleased
       }
     });
   } catch (error: any) {

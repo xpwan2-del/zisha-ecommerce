@@ -29,9 +29,11 @@ function PaymentResultContent() {
       }
 
       try {
-        fetch('/api/inventory/release-expired', {
-          method: 'POST',
-        }).catch(() => {});
+        if (status !== 'cancel' && status !== 'fail') {
+          fetch('/api/inventory/release-expired', {
+            method: 'POST',
+          }).catch(() => {});
+        }
 
         // 优先用 orderId 精确获取，其次用 orderNumber
         let fetchedOrder = null;

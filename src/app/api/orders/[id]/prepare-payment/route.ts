@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
+import { releaseOrderResources } from '@/lib/order-release-service';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -201,6 +203,46 @@ export async function POST(request: NextRequest) {
 
     const order = orderResult.rows[0];
 
+    if (order.order_status === 'pending' && order.created_at) {
+      const expiredCheck = await query(
+        `SELECT id FROM orders WHERE id = ? AND order_status = 'pending' AND datetime(created_at, '+30 minutes') < datetime('now')`,
+        [orderId]
+      );
+      if (expiredCheck.rows.length > 0) {
+        try {
+          await releaseOrderResources({
+            orderId: Number(orderId),
+            userId: userId,
+            transactionTypeCode: 'order_cancel',
+            inventoryReason: '订单超时自动取消，归还库存',
+            referenceType: 'order_timeout',
+            operatorId: null,
+            operatorName: 'SYSTEM'
+          });
+          await OrderStatusService.changeStatus(
+            Number(orderId),
+            OrderEvent.TIMEOUT_CANCEL,
+            { type: OperatorType.SYSTEM, id: 0, name: 'SYSTEM' },
+            { reason: 'order_timeout', expiredAfterMinutes: 30 }
+          );
+          await query(`UPDATE orders SET order_status = 'cancelled', payment_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`, [orderId]);
+          await query(
+            `INSERT INTO payment_logs (order_id, order_number, payment_method, status, error_code, error_message, is_success, payment_stage, amount, currency, extra_data, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            [Number(orderId), order.order_number, order.payment_method || 'unknown', 'cancelled', 'TIMEOUT', 'Order expired before payment', 0, 'timeout', order.final_amount || 0, 'USD', JSON.stringify({ reason: 'timeout', source: 'prepare_payment_timeout_check' })]
+          );
+        } catch (e) {
+          console.error('[Prepare Payment] Timeout cancel error:', e);
+        }
+        logMonitor('ORDERS', 'VALIDATION_FAILED', {
+          reason: 'Order expired',
+          orderId,
+          orderNumber: order.order_number
+        });
+        return NextResponse.json({ success: false, error: 'ORDER_EXPIRED', message: '订单已过期' }, { status: 400 });
+      }
+    }
+
     if (order.order_status !== 'pending') {
       logMonitor('ORDERS', 'VALIDATION_FAILED', {
         reason: 'Order status is not pending',
@@ -231,21 +273,50 @@ export async function POST(request: NextRequest) {
     const subtotal = Number(order.total_after_promotions_amount) || 0;
     const originalTotal = Number(order.total_original_price) || 0;
     const productDiscount = Math.max(0, originalTotal - subtotal);
+    const requestedCouponIds = Array.isArray(coupon_ids)
+      ? coupon_ids.map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id))
+      : [];
     let couponDiscount = 0;
     let couponIdsJson = '[]';
 
-    if (coupon_ids && coupon_ids.length > 0) {
-      for (const couponId of coupon_ids) {
+    if (requestedCouponIds.length > 0) {
+      for (const couponId of requestedCouponIds) {
         const { discount } = await applyCouponDiscount(couponId, userId, subtotal);
         couponDiscount += discount;
       }
       couponDiscount = Math.min(couponDiscount, subtotal);
-      couponIdsJson = JSON.stringify(coupon_ids);
+      couponIdsJson = JSON.stringify(requestedCouponIds);
     }
 
     const totalDiscount = productDiscount + couponDiscount;
 
     const finalAmount = Math.max(0, subtotal - couponDiscount + shippingFee);
+
+    const existingCouponRows = await query(
+      `SELECT oc.id, oc.coupon_id
+       FROM order_coupons oc
+       WHERE oc.order_id = ? AND oc.user_id = ? AND oc.status = 'applied'`,
+      [orderId, userId]
+    );
+
+    const existingCouponIds = existingCouponRows.rows.map((row: any) => Number(row.coupon_id));
+    const couponIdsToRelease = existingCouponRows.rows.filter(
+      (row: any) => !requestedCouponIds.includes(Number(row.coupon_id))
+    );
+    const couponIdsToApply = requestedCouponIds.filter(
+      (couponId: number) => !existingCouponIds.includes(couponId)
+    );
+
+    for (const row of couponIdsToRelease) {
+      await query(
+        `UPDATE user_coupons SET status = 'active', used_order_id = NULL WHERE id = ? AND user_id = ?`,
+        [row.coupon_id, userId]
+      );
+      await query(
+        `UPDATE order_coupons SET status = 'refunded', refunded_at = datetime('now') WHERE id = ?`,
+        [row.id]
+      );
+    }
 
     await query(
       `UPDATE orders SET 
@@ -256,6 +327,7 @@ export async function POST(request: NextRequest) {
         total_coupon_discount = ?,
         order_final_discount_amount = ?,
         final_amount = ?,
+        created_at = datetime('now'),
         updated_at = datetime('now')
        WHERE id = ? AND user_id = ?`,
       [
@@ -271,8 +343,8 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    if (coupon_ids && coupon_ids.length > 0) {
-      for (const couponId of coupon_ids) {
+    if (couponIdsToApply.length > 0) {
+      for (const couponId of couponIdsToApply) {
         await query(
           `UPDATE user_coupons SET status = 'used', used_order_id = ? WHERE id = ? AND user_id = ?`,
           [orderId, couponId, userId]
@@ -280,7 +352,7 @@ export async function POST(request: NextRequest) {
         await query(
           `INSERT INTO order_coupons (order_id, coupon_id, user_id, discount_applied, status, applied_at)
            VALUES (?, ?, ?, ?, 'applied', datetime('now'))`,
-          [orderId, couponId, userId, couponDiscount / coupon_ids.length]
+          [orderId, couponId, userId, couponDiscount / requestedCouponIds.length]
         );
       }
     }
@@ -299,7 +371,7 @@ export async function POST(request: NextRequest) {
       product_id: item.product_id,
       name: item.product_name,
       quantity: item.quantity,
-      unit_amount: item.original_price,
+      price: item.original_price,
       original_price: item.original_price
     }));
 
@@ -335,7 +407,7 @@ export async function POST(request: NextRequest) {
         city: address.city,
         country_name: address.country_name
       },
-      coupons: coupon_ids || [],
+      coupons: requestedCouponIds,
       items
     });
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
+import { releaseOrderResources } from '@/lib/order-release-service';
 import { logMonitor } from '@/lib/utils/logger';
 /**
  * @api {GET} /api/orders-list 获取用户订单列表
@@ -19,12 +21,57 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
 
+    const user_id = authResult.user.userId;
+
+    try {
+      const expiredOrders = await query(
+        `SELECT o.id, o.user_id, o.order_number, o.payment_method, o.final_amount
+         FROM orders o
+         WHERE o.order_status = 'pending'
+           AND o.user_id = ?
+           AND o.created_at IS NOT NULL
+           AND datetime(o.created_at, '+30 minutes') < datetime('now')`,
+        [user_id]
+      );
+      for (const eo of expiredOrders.rows) {
+        try {
+          await releaseOrderResources({
+            orderId: eo.id,
+            userId: eo.user_id,
+            transactionTypeCode: 'order_cancel',
+            inventoryReason: '订单超时自动取消，归还库存',
+            referenceType: 'order_timeout',
+            operatorId: null,
+            operatorName: 'SYSTEM'
+          });
+          const statusResult = await OrderStatusService.changeStatus(
+            eo.id,
+            OrderEvent.TIMEOUT_CANCEL,
+            { type: OperatorType.SYSTEM, id: 0, name: 'SYSTEM' },
+            { reason: 'order_timeout', expiredAfterMinutes: 30 }
+          );
+          if (!statusResult.success) {
+            await query(`UPDATE orders SET order_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`, [eo.id]);
+          }
+          await query(`UPDATE orders SET payment_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`, [eo.id]);
+          await query(
+            `INSERT INTO payment_logs (order_id, order_number, payment_method, status, error_code, error_message, is_success, payment_stage, amount, currency, extra_data, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            [eo.id, eo.order_number, eo.payment_method || 'unknown', 'cancelled', 'TIMEOUT', 'Order expired (lazy cleanup on list)', 0, 'timeout', eo.final_amount || 0, 'USD', JSON.stringify({ reason: 'timeout', source: 'orders_list_lazy_cleanup' })]
+          );
+        } catch (e) {
+          console.error('[Orders List] Lazy cleanup error for order', eo.id, e);
+        }
+      }
+    } catch (e) {
+      console.error('[Orders List] Cleanup scan error:', e);
+    }
+
     const { searchParams } = new URL(request.url);
     const order_status = searchParams.get('order_status');
     const order_number = searchParams.get('order_number');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '100');
-    const user_id = authResult.user.userId;
 
     let ordersSql = `
       SELECT 

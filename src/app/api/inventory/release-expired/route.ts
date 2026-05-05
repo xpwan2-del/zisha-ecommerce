@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
+import { releaseOrderResources } from '@/lib/order-release-service';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
 
@@ -15,15 +17,7 @@ import { logMonitor } from '@/lib/utils/logger';
  * @apiSuccess {Array} details 详情列表
  */
 
-function getLangFromRequest(request: NextRequest): string {
-  return request.headers.get('x-lang') ||
-         request.cookies.get('locale')?.value ||
-         'zh';
-}
-
-export async function POST(request: NextRequest) {
-  const lang = getLangFromRequest(request);
-
+export async function POST() {
   logMonitor('INVENTORY', 'REQUEST', {
     method: 'POST',
     path: '/api/inventory/release-expired'
@@ -31,7 +25,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const expiredOrdersResult = await query(
-      `SELECT o.id, o.order_number, o.final_amount, o.payment_method
+      `SELECT o.id, o.user_id, o.order_number, o.final_amount, o.payment_method
        FROM orders o
        WHERE o.order_status = 'pending'
          AND o.created_at IS NOT NULL
@@ -43,65 +37,54 @@ export async function POST(request: NextRequest) {
     let restoredItems = 0;
     const details: any[] = [];
 
-    const cancelTypeResult = await query(
-      'SELECT id FROM transaction_type WHERE code = ?',
-      ['order_cancel']
-    );
-    const cancelTypeId = cancelTypeResult.rows[0]?.id || null;
-
     for (const order of expiredOrders) {
       try {
-        const itemsResult = await query(
-          'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
-          [order.id]
+        const releaseResult = await releaseOrderResources({
+          orderId: order.id,
+          userId: order.user_id,
+          transactionTypeCode: 'order_cancel',
+          inventoryReason: '订单超时自动取消，归还库存',
+          referenceType: 'order_timeout',
+          operatorId: null,
+          operatorName: 'SYSTEM'
+        });
+
+        restoredItems += releaseResult.itemsReleased;
+
+        const statusResult = await OrderStatusService.changeStatus(
+          order.id,
+          OrderEvent.TIMEOUT_CANCEL,
+          {
+            type: OperatorType.SYSTEM,
+            id: 0,
+            name: 'SYSTEM'
+          },
+          {
+            reason: 'order_timeout',
+            expiredAfterMinutes: 30,
+            releasedCouponCount: releaseResult.couponsReleased,
+            restoredItemCount: releaseResult.itemsReleased
+          }
         );
 
-        for (const item of itemsResult.rows) {
-          const productResult = await query(
-            'SELECT name FROM products WHERE id = ?',
-            [item.product_id]
-          );
-          const productName = productResult.rows[0]?.name || 'Product';
+        if (!statusResult.success) {
+          logMonitor('INVENTORY', 'ERROR', {
+            action: 'TIMEOUT_CANCEL_STATUS_TRANSITION_FAILED',
+            orderId: order.id,
+            error: statusResult.error || 'UNKNOWN_STATUS_ERROR'
+          });
 
-          const beforeResult = await query(
-            'SELECT quantity FROM inventory WHERE product_id = ?',
-            [item.product_id]
-          );
-          const beforeStock = beforeResult.rows[0]?.quantity || 0;
           await query(
-            'UPDATE inventory SET quantity = quantity + ? WHERE product_id = ?',
-            [item.quantity, item.product_id]
+            `UPDATE orders SET
+              order_status = 'cancelled',
+              updated_at = datetime('now')
+             WHERE id = ?`,
+            [order.id]
           );
-
-          if (cancelTypeId) {
-            await query(
-              `INSERT INTO inventory_transactions (
-                product_id, product_name, transaction_type_id, quantity_change,
-                quantity_before, quantity_after, reason, reference_type, reference_id,
-                operator_id, operator_name, created_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-              [
-                item.product_id,
-                productName,
-                cancelTypeId,
-                item.quantity,
-                beforeStock,
-                beforeStock + item.quantity,
-                '订单超时自动取消，归还库存',
-                'order_timeout',
-                order.id,
-                null,
-                'SYSTEM'
-              ]
-            );
-          }
-
-          restoredItems++;
         }
 
         await query(
           `UPDATE orders SET
-            order_status = 'cancelled',
             payment_status = 'cancelled',
             updated_at = datetime('now')
            WHERE id = ?`,
@@ -120,18 +103,25 @@ export async function POST(request: NextRequest) {
             order.payment_method || 'unknown',
             'cancelled',
             'TIMEOUT',
-            'Order expired, inventory released',
+            'Order expired, inventory released and coupons restored',
             0,
             'timeout',
             order.final_amount || 0,
             'USD',
-            JSON.stringify({ reason: 'timeout', released_at: new Date().toISOString() })
+            JSON.stringify({
+              reason: 'timeout',
+              released_at: new Date().toISOString(),
+              released_coupon_count: releaseResult.couponsReleased,
+              restored_item_count: releaseResult.itemsReleased
+            })
           ]
         );
+
         details.push({
           orderId: order.id,
           orderNumber: order.order_number,
-          itemsRestored: itemsResult.rows.length
+          itemsRestored: releaseResult.itemsReleased,
+          couponsReleased: releaseResult.couponsReleased
         });
 
         releasedOrders++;

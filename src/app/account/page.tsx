@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AddressList, AddressForm } from '@/components/addresses';
+import { getCountdown } from '@/lib/utils/currency';
 
 interface UserCoupon {
   id: number;
@@ -266,6 +267,18 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showNewAddressForm, setShowNewAddressForm] = useState(false);
+  const [countdown, setCountdown] = useState<ReturnType<typeof getCountdown> | null>(null);
+
+  useEffect(() => {
+    if (order.order_status === 'pending' && order.created_at) {
+      const tick = () => setCountdown(getCountdown(order.created_at));
+      tick();
+      const timer = setInterval(tick, 1000);
+      return () => clearInterval(timer);
+    } else {
+      setCountdown(null);
+    }
+  }, [order.order_status, order.created_at]);
 
   const statusMap: Record<string, { label: string; bg: string }> = {
     pending: { label: '待付款', bg: 'bg-yellow-500' },
@@ -423,6 +436,15 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
           <span className="font-mono text-xs" style={{ color: 'var(--text)' }}>{order.order_number}</span>
         </div>
         <span className="text-white text-xs px-2 py-0.5 rounded font-medium" style={{ background: s.bg.includes('var') ? 'var(--accent)' : s.bg }}>{s.label}</span>
+        {order.order_status === 'pending' && countdown && countdown.urgency !== 'expired' && (
+          <span className={`text-xs font-mono font-bold ${
+            countdown.urgency === 'critical' ? 'text-red-600 animate-pulse' :
+            countdown.urgency === 'warning' ? 'text-orange-500' :
+            'text-amber-500'
+          }`}>
+            ⏱ {countdown.display}
+          </span>
+        )}
       </div>
       <div className="p-3">
         <div className="space-y-2">

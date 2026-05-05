@@ -27,65 +27,6 @@ function getPayPalConfig() {
   };
 }
 
-async function calculateItemPrice(productId: number): Promise<number> {
-  const productResult = await query(
-    'SELECT price FROM product_prices WHERE product_id = ? AND currency = ?',
-    [productId, 'USD']
-  );
-
-  if (productResult.rows?.length === 0) {
-    throw new Error(`Product ${productId} not found`);
-  }
-
-  const originalPrice = parseFloat(productResult.rows[0].price) || 0;
-
-  const promoResult = await query(
-    `SELECT
-      pr.discount_percent,
-      pp.can_stack
-    FROM product_promotions pp
-    JOIN promotions pr ON pp.promotion_id = pr.id
-    WHERE pp.product_id = ?
-      AND datetime(pp.start_time) <= datetime('now')
-      AND datetime(pp.end_time) >= datetime('now')`,
-    [productId]
-  );
-
-  const promos = promoResult.rows || [];
-  let finalPrice = originalPrice;
-
-  if (promos.length > 0) {
-    const exclusive = promos.find((p: any) => p.can_stack === 1);
-
-    if (exclusive) {
-      finalPrice = originalPrice * (1 - exclusive.discount_percent / 100);
-    } else {
-      let multiplier = 1;
-      promos.forEach((p: any) => {
-        multiplier *= (1 - p.discount_percent / 100);
-      });
-      finalPrice = originalPrice * multiplier;
-    }
-  }
-
-  return finalPrice;
-}
-
-async function verifyPrices(items: any[]): Promise<{ valid: boolean; errors: string[] }> {
-  const errors: string[] = [];
-
-  for (const item of items) {
-    const price = await calculateItemPrice(item.product_id);
-    const frontendPrice = parseFloat(item.price) || 0;
-
-    if (Math.abs(price - frontendPrice) > 0.01) {
-      errors.push(`Price mismatch for product ${item.product_id}: frontend=${frontendPrice}, calculated=${price}`);
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
 async function getAccessToken(): Promise<string> {
   const config = getPayPalConfig();
   const auth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64');
@@ -184,7 +125,7 @@ export async function POST(req: NextRequest) {
     await PaymentService.initialize();
 
     const body = await req.json();
-    const { amount, currency = 'USD', items, order_number } = body;
+    const { order_number, currency = 'USD' } = body;
 
     if (!order_number) {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
@@ -197,45 +138,105 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const { valid, errors } = await verifyPrices(items);
-    if (!valid) {
+    const orderResult = await query(
+      `SELECT id, order_number, final_amount, shipping_fee,
+              total_original_price, order_final_discount_amount,
+              total_coupon_discount, order_status, payment_method
+       FROM orders WHERE order_number = ?`,
+      [order_number]
+    );
+
+    if (orderResult.rows.length === 0) {
+      logMonitor('PAYMENTS', 'NOT_FOUND', { order_number });
+      return NextResponse.json({
+        success: false,
+        error: 'ORDER_NOT_FOUND',
+        message: '订单不存在'
+      }, { status: 404 });
+    }
+
+    const order = orderResult.rows[0];
+
+    if (order.order_status !== 'pending') {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
-        reason: 'Price verification failed',
-        errors
+        reason: 'Order not in pending status',
+        orderStatus: order.order_status
       });
       return NextResponse.json({
         success: false,
-        error: 'PRICE_VERIFICATION_FAILED',
-        message: '价格验证失败'
+        error: 'ORDER_STATUS_INVALID',
+        message: '订单状态不允许支付'
       }, { status: 400 });
     }
 
-    const calculatedItems = await Promise.all(items.map(async (item: any) => {
-      const price = await calculateItemPrice(item.product_id);
-      return {
-        name: sanitizeProductName(item.name) || `Product ${item.product_id}`,
-        unit_amount: {
-          currency_code: currency,
-          value: parseFloat(price.toFixed(2)),
-        },
-        quantity: item.quantity.toString(),
-        category: 'PHYSICAL_GOODS',
-      };
-    }));
+    const itemsResult = await query(
+      `SELECT oi.product_id, p.name as product_name, oi.quantity, oi.original_price
+       FROM order_items oi
+       JOIN products p ON oi.product_id = p.id
+       WHERE oi.order_id = ?`,
+      [order.id]
+    );
 
-    const verifiedAmount = calculatedItems.reduce((sum: number, item: any) => {
-      return sum + (parseFloat(item.unit_amount.value) * parseInt(item.quantity, 10));
-    }, 0);
+    if (itemsResult.rows.length === 0) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
+        reason: 'Order has no items',
+        orderId: order.id
+      });
+      return NextResponse.json({
+        success: false,
+        error: 'ORDER_EMPTY',
+        message: '订单无商品'
+      }, { status: 400 });
+    }
+
+    const finalAmount = parseFloat(order.final_amount) || 0;
+    const shippingFee = parseFloat(order.shipping_fee) || 0;
+    const itemTotal = parseFloat(order.total_original_price) || 0;
+    const discountAmount = parseFloat(order.order_final_discount_amount) || 0;
+
+    const paypalItems = itemsResult.rows.map((item: any) => ({
+      name: sanitizeProductName(item.product_name) || `Product ${item.product_id}`,
+      unit_amount: {
+        currency_code: currency,
+        value: parseFloat(parseFloat(item.original_price).toFixed(2)),
+      },
+      quantity: String(item.quantity),
+      category: 'PHYSICAL_GOODS',
+    }));
 
     logMonitor('PAYMENTS', 'INFO', {
       action: 'PAYPAL_BUILDING_ORDER',
       order_number,
-      currency,
-      verifiedAmount,
-      itemsCount: calculatedItems.length
+      orderId: order.id,
+      finalAmount,
+      shippingFee,
+      itemTotal,
+      discountAmount,
+      itemsCount: paypalItems.length
     });
 
     const accessToken = await getAccessToken();
+
+    const breakdown: any = {
+      item_total: {
+        currency_code: currency,
+        value: parseFloat(itemTotal.toFixed(2)),
+      },
+    };
+
+    if (shippingFee > 0) {
+      breakdown.shipping = {
+        currency_code: currency,
+        value: parseFloat(shippingFee.toFixed(2)),
+      };
+    }
+
+    if (discountAmount > 0) {
+      breakdown.discount = {
+        currency_code: currency,
+        value: parseFloat(discountAmount.toFixed(2)),
+      };
+    }
 
     const paypalOrderData = {
       intent: 'CAPTURE',
@@ -244,15 +245,10 @@ export async function POST(req: NextRequest) {
         custom_id: order_number,
         amount: {
           currency_code: currency,
-          value: parseFloat(verifiedAmount.toFixed(2)),
-          breakdown: {
-            item_total: {
-              currency_code: currency,
-              value: parseFloat(verifiedAmount.toFixed(2)),
-            },
-          },
+          value: parseFloat(finalAmount.toFixed(2)),
+          breakdown,
         },
-        items: calculatedItems,
+        items: paypalItems,
       }],
       application_context: {
         return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}`,

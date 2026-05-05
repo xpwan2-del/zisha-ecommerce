@@ -111,3 +111,24 @@ export const supportedCurrencies = [
   { code: 'usd', name: 'US Dollar', symbol: '$' },
   { code: 'cny', name: 'Chinese Yuan', symbol: '¥' }
 ];
+
+export const COUNTDOWN_MINUTES = 30;
+
+export function getCountdown(createdAt: string): { remaining: number; display: string; urgency: 'normal' | 'warning' | 'critical' | 'expired' } {
+  const now = Date.now();
+  const created = new Date(createdAt + 'Z').getTime();
+  const deadline = created + COUNTDOWN_MINUTES * 60 * 1000;
+  const remaining = Math.max(0, Math.floor((deadline - now) / 1000));
+
+  if (remaining <= 0) return { remaining: 0, display: '00:00', urgency: 'expired' };
+
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  const display = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+  let urgency: 'normal' | 'warning' | 'critical' = 'normal';
+  if (remaining <= 300) urgency = 'critical';
+  else if (remaining <= 600) urgency = 'warning';
+
+  return { remaining, display, urgency };
+}

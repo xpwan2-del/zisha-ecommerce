@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     // 使用服务端计算的价格（re-pay 使用订单锁定价格）
     const lineItems = await Promise.all(items.map(async (item: any) => {
       const finalPrice = source === 're-pay'
-        ? parseFloat(item.price) || parseFloat(item.unit_amount) || 0
+        ? parseFloat(item.price) || parseFloat(item.original_price) || 0
         : (await calculateItemPrice(item.product_id, item.quantity)).price;
       return {
         price_data: {
