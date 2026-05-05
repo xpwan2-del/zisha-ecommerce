@@ -1,43 +1,44 @@
+// src/app/api/payments/alipay/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+import { getPaymentOrderData, PaymentDataError } from '@/lib/payment/order-data-service';
+import { AlipayAdapter } from '@/lib/payment/alipay-adapter';
+
+const alipayAdapter = new AlipayAdapter();
+
+function getLangFromRequest(request: NextRequest): string {
+  return request.headers.get('x-lang') ||
+         request.cookies.get('locale')?.value ||
+         'zh';
+}
 
 /**
- * @api {GET} /api/payments/alipay 创建支付宝支付
- * @apiName CreateAlipayPayment
- * @apiGroup PAYMENTS
- * @apiDescription 根据订单 ID 创建支付宝支付链接，跳转支付宝支付页面。
+ * GET /api/payments/alipay - 创建支付宝支付（重定向模式）
  *
- * @api {POST} /api/payments/alipay 支付宝支付成功回调
- * @apiName AlipaySuccess
- * @apiGroup PAYMENTS
- * @apiDescription 支付宝支付成功后前端跳转页面，更新订单支付状态。
+ * 前端跳转：GET /api/payments/alipay?order_number=xxx&source=cart
+ * 后端从 DB 获取订单 final_amount，构造支付宝支付 URL 并 302 跳转
  */
-
-const EXCHANGE_RATES = {
-  aed: 1,
-  usd: 0.2722,
-  cny: 1.9558
-};
-
 export async function GET(request: NextRequest) {
+  const lang = getLangFromRequest(request);
+
+  logMonitor('PAYMENTS', 'REQUEST', {
+    method: 'GET',
+    path: '/api/payments/alipay',
+    lang,
+  });
+
   try {
-    logMonitor('PAYMENTS', 'REQUEST', { method: 'GET', action: 'ALIPAY_CREATE_PAYMENT' });
-    
     const { searchParams } = new URL(request.url);
-    const orderId = parseInt(searchParams.get('order_id') || '0', 10);
-    const amount = searchParams.get('amount');
-    const currency = searchParams.get('currency') || 'USD';
     const order_number = searchParams.get('order_number');
     const source = searchParams.get('source') || 'cart';
 
-    if (!orderId || !amount) {
-      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { error: 'Missing order_id or amount' });
-      return NextResponse.json(
-        { success: false, error: 'Missing order_id or amount' },
-        { status: 400 }
-      );
+    if (!order_number) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { reason: 'Missing order_number' });
+      return NextResponse.json({
+        success: false,
+        error: 'MISSING_ORDER_NUMBER',
+      }, { status: 400 });
     }
 
     const authResult = requireAuth(request);
@@ -46,102 +47,72 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
 
-    const orderResult = await query(
-      'SELECT * FROM orders WHERE id = ? AND user_id = ?',
-      [orderId, authResult.user.userId]
-    );
+    const orderData = await getPaymentOrderData(order_number, 'alipay');
 
-    if (orderResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Order not found' },
-        { status: 404 }
-      );
-    }
+    const result = await alipayAdapter.createPayment(orderData, {
+      order_number,
+      source,
+      lang,
+    });
 
-    const order = orderResult.rows[0];
+    logMonitor('PAYMENTS', 'SUCCESS', {
+      action: 'ALIPAY_REDIRECT',
+      orderNumber: order_number,
+      finalAmount: orderData.finalAmount,
+    });
 
-    if (order.payment_method !== 'alipay') {
-      return NextResponse.json(
-        { success: false, error: 'Invalid payment method for this order' },
-        { status: 400 }
-      );
-    }
-
-    const alipayPartner = process.env.ALIPAY_PARTNER_ID;
-    const alipaySellerId = process.env.ALIPAY_SELLER_ID;
-    const alipayPrivateKey = process.env.ALIPAY_PRIVATE_KEY;
-    const alipayGateway = process.env.ALIPAY_GATEWAY_URL || 'https://openapi.alipaydev.com/gateway.do';
-
-    if (!alipayPartner || !alipaySellerId || !alipayPrivateKey) {
-      const mockPaymentUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}&payment_method=alipay`;
-
-      return NextResponse.redirect(mockPaymentUrl);
-    }
-
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-
-    const bizContent = {
-      out_trade_no: order_number,
-      total_amount: amount,
-      subject: `Order Payment - ${order_number}`,
-      product_code: 'FAST_INSTANT_TRADE_PAY'
-    };
-
-    const bizContentStr = JSON.stringify(bizContent);
-
-    const params: Record<string, string> = {
-      app_id: process.env.ALIPAY_APP_ID || '',
-      method: 'alipay.trade.page.pay',
-      charset: 'utf-8',
-      sign_type: 'RSA2',
-      timestamp: new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0],
-      version: '1.0',
-      notify_url: `${baseUrl}/api/payments/alipay/notify`,
-      return_url: `${baseUrl}/api/payments/result?order_number=${order_number}&trade_no={TRADE_NO}&source=${source}&platform=alipay`,
-      biz_content: bizContentStr
-    };
-
-    const queryString = new URLSearchParams(params).toString();
-
-    const sign = generateRSA2Sign(queryString, alipayPrivateKey);
-    params.sign = sign;
-
-    const paymentUrl = `${alipayGateway}?${new URLSearchParams(params).toString()}`;
-
-    return NextResponse.redirect(paymentUrl);
+    return NextResponse.redirect(result.redirectUrl);
 
   } catch (error: any) {
-    logMonitor('PAYMENTS', 'ERROR', { action: 'ALIPAY_CREATE_PAYMENT', error: error?.message || String(error) });
-    console.error('Error in Alipay payment API:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to process Alipay payment' },
-      { status: 500 }
-    );
+    if (error instanceof PaymentDataError) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
+        action: 'ALIPAY_CREATE',
+        code: error.code,
+        message: error.message,
+      });
+      return NextResponse.json({
+        success: false,
+        error: error.code,
+        message: error.message,
+      }, { status: error.status });
+    }
+
+    logMonitor('PAYMENTS', 'ERROR', {
+      action: 'ALIPAY_CREATE',
+      error: String(error),
+    });
+    return NextResponse.json({
+      success: false,
+      error: 'INTERNAL_ERROR',
+    }, { status: 500 });
   }
 }
 
-function generateRSA2Sign(content: string, privateKey: string): string {
-  const crypto = require('crypto');
-  const sign = crypto.sign('RSA-SHA256', Buffer.from(content), {
-    key: privateKey,
-    padding: crypto.constants.RSA_PKCS1_PADDING
-  });
-  return sign.toString('base64');
-}
-
+/**
+ * POST /api/payments/alipay - 创建支付宝支付（JSON 模式）
+ *
+ * 前端调用：POST /api/payments/alipay { order_number, source }
+ * 后端从 DB 获取订单 final_amount，返回支付 URL 给前端自行跳转
+ */
 export async function POST(request: NextRequest) {
-  try {
-    logMonitor('PAYMENTS', 'REQUEST', { method: 'POST', action: 'ALIPAY_CREATE_PAYMENT' });
-    
-    const body = await request.json();
-    const { order_id, amount, currency, order_number, source = 'cart' } = body;
+  const lang = getLangFromRequest(request);
 
-    if (!order_id || !amount) {
-      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { error: 'Missing order_id or amount' });
-      return NextResponse.json(
-        { success: false, error: 'Missing order_id or amount' },
-        { status: 400 }
-      );
+  logMonitor('PAYMENTS', 'REQUEST', {
+    method: 'POST',
+    path: '/api/payments/alipay',
+    lang,
+  });
+
+  try {
+    const body = await request.json();
+    const { order_number, source = 'cart' } = body;
+
+    if (!order_number) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { reason: 'Missing order_number' });
+      return NextResponse.json({
+        success: false,
+        error: 'MISSING_ORDER_NUMBER',
+      }, { status: 400 });
     }
 
     const authResult = requireAuth(request);
@@ -150,48 +121,50 @@ export async function POST(request: NextRequest) {
       return authResult.response;
     }
 
-    const orderResult = await query(
-      'SELECT * FROM orders WHERE id = ? AND user_id = ?',
-      [order_id, authResult.user.userId]
-    );
+    const orderData = await getPaymentOrderData(order_number, 'alipay');
 
-    if (orderResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Order not found' },
-        { status: 404 }
-      );
-    }
+    const result = await alipayAdapter.createPayment(orderData, {
+      order_number,
+      source,
+      lang,
+    });
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-
-    logMonitor('PAYMENTS', 'SUCCESS', { 
-      action: 'ALIPAY_CREATE_PAYMENT', 
-      orderId: order_id,
+    logMonitor('PAYMENTS', 'SUCCESS', {
+      action: 'ALIPAY_CREATED',
       orderNumber: order_number,
-      amount,
-      currency,
-      paymentMethod: 'alipay'
+      finalAmount: orderData.finalAmount,
     });
 
     return NextResponse.json({
       success: true,
       data: {
-        order_id,
         order_number,
         payment_method: 'alipay',
-        amount,
-        currency,
-        payment_url: `${baseUrl}/api/payments/alipay?order_id=${order_id}&amount=${amount}&currency=${currency}&order_number=${order_number}`,
-        qr_code_url: `${baseUrl}/api/payments/alipay/qrcode?order_id=${order_id}&amount=${amount}&currency=${currency}&order_number=${order_number}`
-      }
+        payment_url: result.redirectUrl,
+      },
     });
 
   } catch (error: any) {
-    logMonitor('PAYMENTS', 'ERROR', { action: 'ALIPAY_CREATE_PAYMENT', error: error?.message || String(error) });
-    console.error('Error in Alipay payment API (POST):', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to process Alipay payment' },
-      { status: 500 }
-    );
+    if (error instanceof PaymentDataError) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
+        action: 'ALIPAY_CREATE',
+        code: error.code,
+        message: error.message,
+      });
+      return NextResponse.json({
+        success: false,
+        error: error.code,
+        message: error.message,
+      }, { status: error.status });
+    }
+
+    logMonitor('PAYMENTS', 'ERROR', {
+      action: 'ALIPAY_CREATE',
+      error: String(error),
+    });
+    return NextResponse.json({
+      success: false,
+      error: 'INTERNAL_ERROR',
+    }, { status: 500 });
   }
 }
