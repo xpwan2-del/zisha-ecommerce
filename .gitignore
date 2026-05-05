@@ -40,3 +40,11 @@ coverage/
 *.tsbuildinfo
 node_modules
 .worktrees/
+
+# Local plans
+.trae/plans/
+
+# Local databases and backups
+*.sqlite
+*.sqlite.*
+zishang.db
