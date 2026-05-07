@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { createInventoryTransaction } from '@/lib/inventory-transactions';
 
 interface ReleaseOrderResourcesParams {
   orderId: number | string;
@@ -32,12 +33,6 @@ export async function releaseOrderResources({
     [orderId]
   );
 
-  const cancelTypeResult = await query(
-    'SELECT id FROM transaction_type WHERE code = ?',
-    [transactionTypeCode]
-  );
-  const cancelTypeId = cancelTypeResult.rows[0]?.id || null;
-
   for (const item of itemsResult.rows) {
     const beforeResult = await query(
       'SELECT quantity FROM inventory WHERE product_id = ?',
@@ -50,28 +45,19 @@ export async function releaseOrderResources({
       [item.quantity, item.product_id]
     );
 
-    if (cancelTypeId) {
-      await query(
-        `INSERT INTO inventory_transactions (
-          product_id, product_name, transaction_type_id, quantity_change,
-          quantity_before, quantity_after, reason, reference_type, reference_id,
-          operator_id, operator_name, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [
-          item.product_id,
-          item.name || 'Product',
-          cancelTypeId,
-          item.quantity,
-          beforeStock,
-          beforeStock + item.quantity,
-          inventoryReason,
-          referenceType,
-          orderId,
-          operatorId,
-          operatorName,
-        ]
-      );
-    }
+    await createInventoryTransaction({
+      productId: item.product_id,
+      productName: item.name || 'Product',
+      transactionTypeCode,
+      quantityChange: item.quantity,
+      quantityBefore: beforeStock,
+      quantityAfter: beforeStock + item.quantity,
+      reason: inventoryReason,
+      referenceType,
+      referenceId: orderId,
+      operatorId,
+      operatorName,
+    });
   }
 
   const orderCouponsResult = await query(

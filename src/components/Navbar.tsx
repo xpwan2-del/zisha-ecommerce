@@ -1,11 +1,14 @@
 "use client";
 
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCart } from '@/lib/contexts/CartContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 export function Navbar() {
+  const router = useRouter();
   const { t, i18n: i18nInstance } = useTranslation();
   const { totalItems } = useCart();
   const { isAuthenticated, user, logout } = useAuth();
@@ -20,7 +23,7 @@ export function Navbar() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/products?search=${encodeURIComponent(searchQuery)}`;
+      router.push(`/products?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 
@@ -35,15 +38,15 @@ export function Navbar() {
       <div className="bg-dark py-2 px-4">
         <div className="max-w-7xl mx-auto flex justify-end items-center">
           <div className="flex items-center space-x-8">
-            <a href="/reviews" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
+            <Link href="/reviews" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
               {t('nav.reviews')}
-            </a>
-            <a href="/about" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
+            </Link>
+            <Link href="/about" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
               {t('nav.about')}
-            </a>
-            <a href="/contact" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
+            </Link>
+            <Link href="/contact" className="text-xs text-text-muted hover:text-accent transition-colors duration-300 tracking-wide">
               {t('nav.contact')}
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -52,28 +55,28 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-20">
           {/* Logo - Luxury Style */}
-          <a href="/" className="flex-shrink-0 flex items-center">
+          <Link href="/" className="flex-shrink-0 flex items-center">
             <img 
               src="/logo.png" 
               alt="丝路砂" 
               className="h-12 w-auto max-w-[120px] object-contain"
             />
-          </a>
+          </Link>
           
           {/* Navigation links - Luxury Style */}
           <div className="flex items-center space-x-10">
-            <a href="/deals" className="text-sm font-medium text-accent border-b-2 border-accent pb-5 tracking-wide transition-all duration-300">
+            <Link href="/deals" className="text-sm font-medium text-accent border-b-2 border-accent pb-5 tracking-wide transition-all duration-300">
               {t('nav.deals')}
-            </a>
-            <a href="/products" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
+            </Link>
+            <Link href="/products" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
               {t('nav.products')}
-            </a>
-            <a href="/customize" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
+            </Link>
+            <Link href="/customize" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
               {t('nav.customize')}
-            </a>
-            <a href="/flash-sale" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
+            </Link>
+            <Link href="/flash-sale" className="text-sm font-medium text-dark hover:text-accent pb-5 tracking-wide transition-colors duration-300">
               {t('nav.flash_sale')}
-            </a>
+            </Link>
           </div>
           
           {/* Search bar and user controls - Luxury Style */}
@@ -128,7 +131,7 @@ export function Navbar() {
               >
                 {t('common.ar')}
               </button>
-              <a href="/cart" className="relative group">
+              <Link href="/cart" className="relative group">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-dark group-hover:text-accent transition-colors duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
@@ -137,7 +140,7 @@ export function Navbar() {
                     {totalItems}
                   </span>
                 )}
-              </a>
+              </Link>
               <div className="relative">
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)}
@@ -162,15 +165,15 @@ export function Navbar() {
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
                     {isAuthenticated ? (
                       <>
-                        <a href="/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        <Link href="/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           {t('nav.account')}
-                        </a>
-                        <a href="/account?tab=orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        </Link>
+                        <Link href="/account?tab=orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           {t('nav.orders')}
-                        </a>
-                        <a href="/account?tab=settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        </Link>
+                        <Link href="/account?tab=settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           {t('account.profile')}
-                        </a>
+                        </Link>
                         <button 
                           onClick={handleLogout}
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -180,12 +183,12 @@ export function Navbar() {
                       </>
                     ) : (
                       <>
-                        <a href="/login" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        <Link href="/login" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           {t('nav.login')}
-                        </a>
-                        <a href="/register" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        </Link>
+                        <Link href="/register" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           {t('nav.register')}
-                        </a>
+                        </Link>
                       </>
                     )}
                   </div>

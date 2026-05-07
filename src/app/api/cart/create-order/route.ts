@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { applyPromotions } from '@/lib/pricing/cartPricing';
+import { calculateOrderPricing, persistOrderPricing } from '@/lib/order-pricing-service';
 import { getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
@@ -16,95 +19,6 @@ function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||
          request.cookies.get('locale')?.value ||
          'zh';
-}
-
-async function applyMultipleCoupons(
-  couponIds: number[],
-  subtotal: number,
-  userId: number
-): Promise<{ totalDiscount: number; couponDetails: Array<{ id: number; discount: number; code: string; type: string; value: number }> }> {
-  if (!couponIds || couponIds.length === 0) {
-    return { totalDiscount: 0, couponDetails: [] };
-  }
-
-  const couponDetails: Array<{ id: number; discount: number; code: string; type: string; value: number }> = [];
-  const percentageCoupons: Array<{ id: number; code: string; value: number }> = [];
-  const fixedCoupons: Array<{ id: number; code: string; value: number }> = [];
-
-  for (const couponId of couponIds) {
-    const couponResult = await query(`
-      SELECT c.type, c.value, c.code, c.is_stackable
-      FROM user_coupons uc
-      JOIN coupons c ON uc.coupon_id = c.id
-      WHERE uc.id = ? AND uc.user_id = ? AND uc.status = 'active'
-        AND datetime('now') < uc.expires_at
-        AND c.is_active = 1
-    `, [couponId, userId]);
-
-    if (couponResult.rows.length === 0) continue;
-    const coupon = couponResult.rows[0];
-
-    if (coupon.is_stackable === 0 && couponDetails.length > 0) {
-      continue;
-    }
-
-    if (coupon.type === 'percentage') {
-      percentageCoupons.push({
-        id: couponId,
-        code: coupon.code || '',
-        value: parseFloat(coupon.value)
-      });
-    } else if (coupon.type === 'fixed') {
-      fixedCoupons.push({
-        id: couponId,
-        code: coupon.code || '',
-        value: parseFloat(coupon.value)
-      });
-    }
-  }
-
-  let remainingSubtotal = subtotal;
-  let totalDiscount = 0;
-
-  if (percentageCoupons.length > 0) {
-    const multiplier = percentageCoupons.reduce((acc, c) => acc * (1 - c.value / 100), 1);
-    const afterPercentage = subtotal * multiplier;
-    const percentageDiscount = subtotal - afterPercentage;
-    const totalPercentageValue = percentageCoupons.reduce((acc, c) => acc + c.value, 0);
-
-    for (const c of percentageCoupons) {
-      const discount = totalPercentageValue > 0
-        ? percentageDiscount * (c.value / totalPercentageValue)
-        : 0;
-
-      totalDiscount += discount;
-      remainingSubtotal = afterPercentage;
-      couponDetails.push({
-        id: c.id,
-        discount: Math.round(discount * 100) / 100,
-        code: c.code,
-        type: 'percentage',
-        value: c.value
-      });
-    }
-  }
-
-  if (fixedCoupons.length > 0) {
-    for (const c of fixedCoupons) {
-      const discount = Math.min(c.value, remainingSubtotal);
-      totalDiscount += discount;
-      remainingSubtotal -= discount;
-      couponDetails.push({
-        id: c.id,
-        discount,
-        code: c.code,
-        type: 'fixed',
-        value: c.value
-      });
-    }
-  }
-
-  return { totalDiscount, couponDetails };
 }
 
 export async function POST(request: NextRequest) {
@@ -248,17 +162,8 @@ export async function POST(request: NextRequest) {
 
     const totalOriginalUsd = round2(items.reduce((sum, i) => sum + i.original_price_usd * i.quantity, 0));
     const subtotalUsd = round2(items.reduce((sum, i) => sum + i.price_usd * i.quantity, 0));
-
-    const { totalDiscount, couponDetails } = await applyMultipleCoupons(couponIds, subtotalUsd, userId);
-    const couponDiscount = Math.min(round2(totalDiscount), subtotalUsd);
-
-    const shippingFee = 0;
-    const finalUsd = Math.max(0, round2(subtotalUsd - couponDiscount + shippingFee));
-
     const productDiscountUsd = Math.max(0, round2(totalOriginalUsd - subtotalUsd));
-    const orderFinalDiscountAmount = round2(productDiscountUsd + couponDiscount);
-
-    const orderNumber = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const orderNumber = `ORD-${randomUUID()}`;
 
     await query('BEGIN TRANSACTION');
     try {
@@ -276,16 +181,16 @@ export async function POST(request: NextRequest) {
           'pending',
           subtotalUsd,
           totalOriginalUsd,
-          couponDiscount,
-          orderFinalDiscountAmount,
-          finalUsd,
+          0,
+          productDiscountUsd,
+          subtotalUsd,
           addressId,
-          shippingFee,
+          0,
           JSON.stringify(couponIds)
         ]
       );
 
-      const orderId = orderInsert.lastInsertRowid;
+      const orderId = Number(orderInsert.lastInsertRowid);
 
       for (const item of items) {
         const discountAmount = round2((item.original_price_usd - item.price_usd) * item.quantity);
@@ -347,44 +252,35 @@ export async function POST(request: NextRequest) {
         const productInfo = await query('SELECT name FROM products WHERE id = ?', [item.product_id]);
         const productName = productInfo.rows[0]?.name || 'Product';
 
-        const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['sales_creat']);
-        const transactionTypeId = typeResult.rows[0]?.id || 1;
-
-        await query(
-          `INSERT INTO inventory_transactions (
-            product_id, product_name, transaction_type_id, quantity_change,
-            quantity_before, quantity_after, reason, reference_type, reference_id,
-            operator_id, operator_name, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-          [
-            item.product_id,
-            productName,
-            transactionTypeId,
-            -item.quantity,
-            beforeStock,
-            beforeStock - item.quantity,
-            `Order ${orderNumber}`,
-            'order',
-            orderId,
-            userId,
-            authResult.user?.name || 'User'
-          ]
-        );
+        await createInventoryTransaction({
+          productId: item.product_id,
+          productName: productName,
+          transactionTypeCode: InventoryTransactionCode.ORDER_CREATE,
+          quantityChange: -item.quantity,
+          quantityBefore: beforeStock,
+          quantityAfter: beforeStock - item.quantity,
+          reason: `Order ${orderNumber}`,
+          referenceType: 'order',
+          referenceId: orderId,
+          operatorId: userId,
+          operatorName: authResult.user?.name,
+        });
       }
 
-      if (couponIds.length > 0) {
-        for (const couponId of couponIds) {
-          await query(
-            `UPDATE user_coupons SET status = 'used' WHERE id = ? AND user_id = ?`,
-            [couponId, userId]
-          );
-          await query(
-            `INSERT INTO order_coupons (order_id, coupon_id, user_id, discount_applied, status, applied_at)
-             VALUES (?, ?, ?, ?, 'applied', datetime('now'))`,
-            [orderId, couponId, userId, couponDiscount / couponIds.length]
-          );
-        }
-      }
+      const pricing = await calculateOrderPricing({
+        orderId,
+        userId,
+        addressId,
+        couponIds,
+      });
+
+      await persistOrderPricing({
+        orderId,
+        userId,
+        addressId,
+        couponIds,
+        paymentMethod,
+      });
 
       await query('COMMIT');
 
@@ -394,9 +290,9 @@ export async function POST(request: NextRequest) {
           order_id: orderId,
           order_number: orderNumber,
           payment_method: paymentMethod,
-          amount_usd: finalUsd,
-          coupon_discount: couponDiscount,
-          coupon_details: couponDetails,
+          amount_usd: pricing.total_usd,
+          coupon_discount: pricing.coupon_discount,
+          coupon_details: pricing.coupon_details,
           items: items.map((i) => ({
             product_id: i.product_id,
             name: i.name,

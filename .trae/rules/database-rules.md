@@ -139,3 +139,30 @@ total\_promotions\_discount\_amount DECIMAL DEFAULT 0
 3. **待发货直接退款**：paid → refunding（跳过 refunding-payment，因为货未发）
 4. **待收货退款需审核**：shipped → refunding-payment → refunding（货已发，需管理员判断）
 
+## 当前 transaction_type 字典表
+
+| id | code | name_zh | name_en | operation_type | description |
+|---|---|---|---|---|---|
+| 1 | `sales_creat` | 创建购买 | Create Purchase | 扣除 | 从商品详情直接购买扣除库存 |
+| 2 | `sales_increase` | 增加购买 | Increase Purchase | 扣除 | 快速购买页面点击加号扣除库存 |
+| 3 | `sales_reduce` | 减少购买 | Reduce Purchase | 归还 | 快速购买页面点击减号按钮归还库存 |
+| 4 | `sales_return` | 退货已收到 | Return Received | 归还 | 客户退货已收到归还库存 |
+| 5 | `sales_cancel` | 购买取消 | Purchase Cancelled | 归还 | 客户取消销售订单归还库存 |
+| 6 | `sales_delete` | 购买删除 | Purchase Deleted | 归还 | 客户删除销售订单归还库存 |
+| 7 | `cat_creat` | 创建购物车 | Create Cart | 扣除 | 创建购物车扣除库存 |
+| 8 | `cat_increase` | 增加购物车 | Increase Cart | 扣除 | 购物车点击加号扣除库存 |
+| 9 | `cat_reduce` | 减少购物车 | Reduce Cart | 归还 | 购物车点击减号归还库存 |
+| 10 | `cat_delete` | 删除购物车 | Delete Cart | 归还 | 购物车点击删除购物车归还库存 |
+| 11 | `stock_gain` | 盘盈 | Stock Gain | 增加 | 盘点盘盈增加库存 |
+| 12 | `stock_lose` | 盘亏 | Stock Loss | 扣除 | 盘点盘亏扣除库存 |
+| 14 | `self_estock` | 入库 | Self Stock | 增加 | 普通入库增加库存 |
+| 15 | `sup_restock` | 采购入库 | Supplier Restock | 增加 | 采购入库增加库存 |
+| 16 | `expired` | 过期 | Expired | 扣除 | 商品过期减少库存 |
+| 17 | `sup_return` | 供应商退货 | Supplier Return | 扣除 | 退回商品到供应商扣除库存 |
+| 18 | `stock_damage` | 商品损坏 | Stock Damaged | 扣除 | 商品破损扣除库存 |
+| 19 | `order_cancel` | 订单超时取消 | Order Timeout Cancelled | 归还 | 订单超时自动取消归还库存 |
+| 20 | `refund_return` | 退款返还库存 | Refund Return | 归还 | 退款完成后归还库存 |
+| 21 | `admin_adjust_increase` | 后台加库存 | Admin Adjust Increase | 增加 | 管理员后台手工增加库存 |
+| 22 | `admin_adjust_reduce` | 后台减库存 | Admin Adjust Reduce | 扣除 | 管理员后台手工减少库存 |
+
+

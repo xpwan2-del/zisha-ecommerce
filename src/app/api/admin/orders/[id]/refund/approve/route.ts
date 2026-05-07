@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { releaseOrderResources } from '@/lib/order-release-service';
+import { InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +23,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (cur.order_status !== 'refunding') return createErrorResponse('INVALID_ORDER_STATUS', 400);
 
     await query("UPDATE orders SET order_status = 'refunded', payment_status = 'refunded', updated_at = datetime('now') WHERE id = ?", [orderId]);
+
+    await releaseOrderResources({
+      orderId,
+      userId: cur.user_id,
+      transactionTypeCode: InventoryTransactionCode.REFUND_RETURN,
+      inventoryReason: '退款完成，归还库存',
+      referenceType: 'refund',
+      operatorId,
+      operatorName,
+    });
 
     await query(
       `INSERT INTO order_status_logs (order_id, old_status, new_status, change_reason, changed_by, created_at, order_number, operator_type, operator_name)

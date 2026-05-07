@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { applyPromotions } from '@/lib/pricing/cartPricing';
+import { round2 } from '@/lib/pricing/orderAmountMath';
 
 /**
  * ============================================================
@@ -215,22 +217,8 @@ export async function GET(request: NextRequest) {
 
       // 计算最终价格（按新逻辑：独占can_stack=1优先 or 叠加计算can_stack=0）
       const calculateFinalPrice = (originalPrice: number, promos: any[]) => {
-        if (promos.length === 0) return originalPrice;
-
-        // 检查是否有独占活动（can_stack=1）
-        const exclusive = promos.find(p => p.can_stack === 1);
-        if (exclusive) {
-          // 有独占促销 → 直接使用独占促销折扣
-          return originalPrice * (1 - exclusive.discount_percent / 100);
-        }
-
-        // 没有独占促销，按priority从小到大叠加
-        const sortedPromos = [...promos].sort((a, b) => a.priority - b.priority);
-        let multiplier = 1;
-        sortedPromos.forEach(p => {
-          multiplier *= (1 - p.discount_percent / 100);
-        });
-        return originalPrice * multiplier;
+        if (promos.length === 0) return round2(originalPrice);
+        return round2(applyPromotions(round2(originalPrice), promos).finalPrice);
       };
 
       // 计算总折扣和公式（can_stack=1是独占，can_stack=0是可叠加）
@@ -241,7 +229,7 @@ export async function GET(request: NextRequest) {
         const exclusive = promos.find(p => p.can_stack === 1);
         if (exclusive) {
           return {
-            discount: exclusive.discount_percent,
+            discount: round2(parseFloat(exclusive.discount_percent) || 0),
             formula: `${exclusive.discount_percent}% (独占)`,
             multiplier: 1 - exclusive.discount_percent / 100
           };
@@ -253,7 +241,7 @@ export async function GET(request: NextRequest) {
           parts.push(`(1-${p.discount_percent}%)`);
         });
         const multiplier = sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1);
-        const totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
+        const totalDiscount = round2(Math.round((1 - multiplier) * 10000) / 100);
         return {
           discount: totalDiscount,
           formula: parts.join(' × ') + ` = ${totalDiscount}%`,
@@ -263,9 +251,9 @@ export async function GET(request: NextRequest) {
 
       const discountInfo = calculateDiscount(promotions);
 
-      // 选择priority最小的作为主促销
       const mainPromo = promotions.length > 0 ? [...promotions].sort((a, b) => a.priority - b.priority)[0] : null;
-      const finalPrice = mainPromo ? calculateFinalPrice(parseFloat(row.price), promotions) : parseFloat(row.price);
+      const originalPrice = round2(parseFloat(row.price_usd) || 0);
+      const finalPrice = mainPromo ? calculateFinalPrice(originalPrice, promotions) : originalPrice;
 
       const promotion = mainPromo ? {
         id: mainPromo.promotion_id,
@@ -280,7 +268,7 @@ export async function GET(request: NextRequest) {
         priority: mainPromo.priority,
         can_stack: mainPromo.can_stack,
         promotion_price: finalPrice,
-        original_price: mainPromo.original_price || row.price
+        original_price: originalPrice
       } : null;
 
       // 返回促销（如果有独占只显示独占的，否则显示所有可叠加的）
@@ -388,8 +376,8 @@ export async function GET(request: NextRequest) {
           color: promotion.color,
           priority: promotion.priority,
           can_stack: promotion.can_stack,
-          original_price: parseFloat(row.price),
-          promotion_price: parseFloat(row.price) * (1 - promotion.discount_percent / 100)
+          original_price: originalPrice,
+          promotion_price: finalPrice
         } : null,
         promotions: allPromotions.map((promo: any) => ({
           id: promo.id,

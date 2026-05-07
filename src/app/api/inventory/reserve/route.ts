@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import {
+  createInventoryTransaction,
+  getInventoryTransactionTypeId,
+  InventoryTransactionCode,
+} from '@/lib/inventory-transactions';
 import { logMonitor } from '@/lib/utils/logger';
 import { getMessage } from '@/lib/messages';
+import { applyPromotions } from '@/lib/pricing/cartPricing';
+import { buildRoundedOrderAmounts, round2 } from '@/lib/pricing/orderAmountMath';
 
 /**
  * ============================================================
@@ -232,38 +240,51 @@ export async function POST(request: NextRequest) {
 
     const stockBefore = currentStock;
 
-    await query(
-      'UPDATE inventory SET quantity = quantity - ?, status_id = ? WHERE product_id = ?',
+    const updateResult = await query(
+      'UPDATE inventory SET quantity = quantity - ?, status_id = ? WHERE product_id = ? AND quantity >= ?',
       [
         quantity,
         calculateStockStatus(currentStock - quantity),
-        product_id
-      ]
-    );
-
-    const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['sales_creat']);
-    const transactionTypeId = typeResult.rows[0]?.id || 1;
-
-    await query(
-      `INSERT INTO inventory_transactions (
-        product_id, product_name, transaction_type_id, quantity_change,
-        quantity_before, quantity_after, reason, reference_type, reference_id,
-        operator_id, operator_name, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [
         product_id,
-        product.name,
-        transactionTypeId,
-        -quantity,
-        stockBefore,
-        stockBefore - quantity,
-        'Buy Now - 立即购买',
-        'buy_now',
-        null,
-        userId,
-        authResult.user?.name || 'User'
+        quantity
       ]
     );
+
+    if (updateResult.changes === 0) {
+      logMonitor('INVENTORY', 'SUCCESS', {
+        action: 'CHECK_STOCK_CONCURRENT',
+        product_id,
+        requested: quantity,
+        available: currentStock,
+        result: 'CONCURRENT_CONFLICT'
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'INSUFFICIENT_STOCK',
+          message: `库存不足，当前库存已发生变化，请重新尝试`,
+          requested: quantity,
+          available: currentStock
+        },
+        { status: 400 }
+      );
+    }
+
+    const transactionTypeId = await getInventoryTransactionTypeId(InventoryTransactionCode.ORDER_CREATE);
+
+    await createInventoryTransaction({
+      productId: product_id,
+      productName: product.name,
+      transactionTypeCode: InventoryTransactionCode.ORDER_CREATE,
+      quantityChange: -quantity,
+      quantityBefore: stockBefore,
+      quantityAfter: stockBefore - quantity,
+      reason: 'Buy Now - 立即购买',
+      referenceType: 'buy_now',
+      referenceId: null,
+      operatorId: userId,
+      operatorName: authResult.user?.name,
+    });
 
     const activePromotionsResult = await query(
       `SELECT pp.promotion_id, pr.discount_percent, pp.can_stack
@@ -278,30 +299,21 @@ export async function POST(request: NextRequest) {
     const promotionIds = activePromotionsResult.rows.map((row: any) => row.promotion_id);
     const promotionIdsJson = JSON.stringify(promotionIds);
 
-    const originalPrice = parseFloat(product.price_usd) || 0;
-    let finalPrice = originalPrice;
+    const originalPrice = round2(parseFloat(product.price_usd) || 0);
+    const promotionResult = applyPromotions(originalPrice, activePromotionsResult.rows);
+    const finalPrice = round2(promotionResult.finalPrice);
+    const {
+      totalOriginalPrice,
+      totalAfterPromotionsAmount: totalAmount,
+      productDiscountAmount: discountAmount,
+      finalAmount,
+    } = buildRoundedOrderAmounts({
+      originalPrice,
+      finalPrice,
+      quantity,
+    });
 
-    if (activePromotionsResult.rows.length > 0) {
-      const promos = activePromotionsResult.rows;
-      const exclusive = promos.find((p: any) => p.can_stack === 1);
-
-      if (exclusive) {
-        finalPrice = originalPrice * (1 - exclusive.discount_percent / 100);
-      } else {
-        let multiplier = 1;
-        promos.forEach((p: any) => {
-          multiplier *= (1 - p.discount_percent / 100);
-        });
-        finalPrice = originalPrice * multiplier;
-      }
-    }
-
-    const totalOriginalPrice = originalPrice * quantity;
-    const totalAmount = finalPrice * quantity;
-    const discountAmount = (originalPrice - finalPrice) * quantity;
-    const finalAmount = totalAmount;
-
-    const orderNumber = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const orderNumber = `ORD-${randomUUID()}`;
 
     const orderInsertResult = await query(
       `INSERT INTO orders (
@@ -321,7 +333,7 @@ export async function POST(request: NextRequest) {
         'pending',
         'pending',
         null,
-        promotionIdsJson,
+        '[]',
         0,
         finalAmount,
         null
@@ -330,7 +342,7 @@ export async function POST(request: NextRequest) {
 
     const orderId = orderInsertResult.lastInsertRowid;
 
-    const productDiscount = (originalPrice - finalPrice) * quantity;
+    const productDiscount = discountAmount;
 
     await query(
       `INSERT INTO order_items (

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { buildPaymentSuccessPersistence } from '@/lib/payment/payment-success-persistence';
+import { AlipayAdapter } from '@/lib/payment/alipay-adapter';
+
+const alipayAdapter = new AlipayAdapter();
 
 /**
  * ============================================================
@@ -182,8 +186,57 @@ export async function GET(request: NextRequest) {
       transactionId = captureResult.payment_intent || '';
     } else if (detectedPlatform === 'alipay' && tradeNo) {
       platformOrderId = tradeNo;
-      captureResult = { trade_no: tradeNo, status: 'TRADE_SUCCESS' };
-      transactionId = tradeNo;
+      try {
+        logMonitor('PAYMENTS', 'INFO', {
+          action: 'ALIPAY_VERIFY_START',
+          orderNumber,
+          tradeNo
+        });
+
+        const alipayResult = await alipayAdapter.queryPayment(orderNumber, tradeNo);
+
+        if (alipayResult.trade_status !== 'TRADE_SUCCESS' && alipayResult.trade_status !== 'TRADE_FINISHED') {
+          logMonitor('PAYMENTS', 'ERROR', {
+            action: 'ALIPAY_VERIFY_FAILED',
+            orderNumber,
+            tradeNo,
+            tradeStatus: alipayResult.trade_status
+          });
+          throw new Error(`Alipay payment not completed: ${alipayResult.trade_status}`);
+        }
+
+        const paidAmount = parseFloat(alipayResult.total_amount);
+        const orderAmount = parseFloat(order.final_amount);
+        if (Math.abs(paidAmount - orderAmount) > 0.01) {
+          logMonitor('PAYMENTS', 'ERROR', {
+            action: 'ALIPAY_AMOUNT_MISMATCH',
+            orderNumber,
+            tradeNo,
+            paidAmount,
+            orderAmount
+          });
+          throw new Error(`Alipay amount mismatch: paid ${paidAmount}, expected ${orderAmount}`);
+        }
+
+        logMonitor('PAYMENTS', 'SUCCESS', {
+          action: 'ALIPAY_VERIFY_SUCCESS',
+          orderNumber,
+          tradeNo,
+          tradeStatus: alipayResult.trade_status,
+          paidAmount
+        });
+
+        captureResult = { trade_no: tradeNo, status: alipayResult.trade_status };
+        transactionId = tradeNo;
+      } catch (error) {
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'ALIPAY_VERIFY_ERROR',
+          orderNumber,
+          tradeNo,
+          error: String(error)
+        });
+        throw error;
+      }
     } else {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
         reason: 'Unknown platform or missing verification params',
@@ -197,6 +250,15 @@ export async function GET(request: NextRequest) {
       redirectUrl.searchParams.set('order_id', String(orderId));
       return NextResponse.redirect(redirectUrl);
     }
+    const persistence = buildPaymentSuccessPersistence({
+      orderId,
+      orderNumber,
+      detectedPlatform,
+      transactionId: transactionId || platformOrderId || orderNumber,
+      platformOrderId: platformOrderId || transactionId || orderNumber,
+      amount: Number(order.final_amount || 0),
+    });
+
     // 记录支付成功日志
     await recordPaymentLog(
       orderId, orderNumber, detectedPlatform,
@@ -208,8 +270,33 @@ export async function GET(request: NextRequest) {
 
     // 更新订单为已支付
     await query(
-      'UPDATE orders SET order_status = ?, payment_status = ?, payment_method = ?, paid_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?',
-      ['paid', 'paid', detectedPlatform, orderId]
+      'UPDATE orders SET order_status = ?, payment_status = ?, payment_method = ?, reference_id = ?, paid_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?',
+      [
+        persistence.orderUpdate.orderStatus,
+        persistence.orderUpdate.paymentStatus,
+        persistence.orderUpdate.paymentMethod,
+        persistence.orderUpdate.referenceId,
+        orderId,
+      ]
+    );
+
+    await query(
+      `INSERT INTO order_payments
+       (order_id, payment_method, transaction_id, amount, payment_status, paid_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+       ON CONFLICT(transaction_id) DO UPDATE SET
+         payment_method = excluded.payment_method,
+         amount = excluded.amount,
+         payment_status = excluded.payment_status,
+         paid_at = excluded.paid_at,
+         updated_at = excluded.updated_at`,
+      [
+        persistence.orderPayment.orderId,
+        persistence.orderPayment.paymentMethod,
+        persistence.orderPayment.transactionId,
+        persistence.orderPayment.amount,
+        persistence.orderPayment.paymentStatus,
+      ]
     );
 
     logMonitor('PAYMENTS', 'SUCCESS', {

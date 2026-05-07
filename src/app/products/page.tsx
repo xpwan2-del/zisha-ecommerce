@@ -19,13 +19,7 @@ function ProductsContent() {
   const searchParams = useSearchParams();
   const { t, i18n } = useTranslation();
   const [categories, setCategories] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
-
-  // Sync selectedCategory with URL when URL changes
-  useEffect(() => {
-    const categoryFromUrl = searchParams.get('category') || 'all';
-    setSelectedCategory(categoryFromUrl);
-  }, [searchParams]);
+  const selectedCategory = searchParams.get('category') || 'all';
 
   // 加载分类
   useEffect(() => {

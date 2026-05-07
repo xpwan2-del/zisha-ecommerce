@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAuth } from '@/lib/auth';
-import { releaseOrderResources } from '@/lib/order-release-service';
-import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
-import { getMessage } from '@/lib/messages';
+import { requireAuth, requireAdmin } from '@/lib/auth';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { logMonitor } from '@/lib/utils/logger';
-
-function getLangFromRequest(request: NextRequest): string {
-  return request.headers.get('x-lang') ||
-         request.cookies.get('locale')?.value ||
-         'zh';
-}
-
-function createErrorResponse(error: string, lang: string, status: number = 400) {
-  return NextResponse.json(
-    { success: false, error, message: getMessage(error as any, lang) },
-    { status }
-  );
-}
+import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
 
 /**
  * @api {GET} /api/orders/:id 获取订单详情
@@ -28,10 +14,10 @@ function createErrorResponse(error: string, lang: string, status: number = 400) 
 
 // GET /api/orders/[id] - Get order details
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const lang = getLangFromRequest(request);
   try {
     logMonitor('ORDERS', 'REQUEST', { method: 'GET', action: 'GET_ORDER_DETAIL' });
     
+    // 验证登录
     const authResult = requireAuth(request);
     if (authResult.response) {
       return authResult.response;
@@ -40,6 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const orderId = id;
 
+    // Get order basic info
     const orderResult = await query(
       `SELECT
         o.*,
@@ -56,54 +43,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
 
     if (orderResult.rows.length === 0) {
-      return createErrorResponse('NOT_FOUND', lang, 404);
+      return NextResponse.json(
+        { success: false, error: 'Order not found' },
+        { status: 404 }
+      );
     }
 
     const order = orderResult.rows[0];
 
-    if (order.order_status === 'pending' && order.created_at) {
-      const expiredResult = await query(
-        `SELECT id FROM orders WHERE id = ? AND order_status = 'pending' AND datetime(created_at, '+30 minutes') < datetime('now')`,
-        [orderId]
-      );
-      if (expiredResult.rows.length > 0) {
-        try {
-          await releaseOrderResources({
-            orderId: Number(orderId),
-            userId: order.user_id,
-            transactionTypeCode: 'order_cancel',
-            inventoryReason: '订单超时自动取消，归还库存',
-            referenceType: 'order_timeout',
-            operatorId: null,
-            operatorName: 'SYSTEM'
-          });
-          const statusResult = await OrderStatusService.changeStatus(
-            Number(orderId),
-            OrderEvent.TIMEOUT_CANCEL,
-            { type: OperatorType.SYSTEM, id: 0, name: 'SYSTEM' },
-            { reason: 'order_timeout', expiredAfterMinutes: 30 }
-          );
-          if (!statusResult.success) {
-            await query(`UPDATE orders SET order_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`, [orderId]);
-          }
-          await query(`UPDATE orders SET payment_status = 'cancelled', updated_at = datetime('now') WHERE id = ?`, [orderId]);
-          await query(
-            `INSERT INTO payment_logs (order_id, order_number, payment_method, status, error_code, error_message, is_success, payment_stage, amount, currency, extra_data, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-            [Number(orderId), order.order_number, order.payment_method || 'unknown', 'cancelled', 'TIMEOUT', 'Order expired (lazy cleanup on GET)', 0, 'timeout', order.final_amount || 0, 'USD', JSON.stringify({ reason: 'timeout', source: 'order_get_lazy_cleanup' })]
-          );
-          order.order_status = 'cancelled';
-          order.payment_status = 'cancelled';
-        } catch (e) {
-          console.error('[Orders GET] Lazy cleanup error:', e);
-        }
-      }
-    }
-
+    // 验证权限：普通用户只能查看自己的订单
     if (authResult.user?.role !== 'admin' && order.user_id !== authResult.user?.userId) {
-      return createErrorResponse('FORBIDDEN', lang, 403);
+      return NextResponse.json(
+        { success: false, error: 'Permission denied' },
+        { status: 403 }
+      );
     }
 
+    // Get order items
     const itemsResult = await query(
       `SELECT
         oi.*,
@@ -117,11 +73,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       [orderId]
     );
 
-    const items = (itemsResult.rows || []).map(item => ({
-      ...item,
-      subtotal: (item.original_price || 0) * (item.quantity || 0)
-    }));
-
+    // Get order logistics
     const logisticsResult = await query(
       'SELECT * FROM order_logistics WHERE order_id = ?',
       [orderId]
@@ -136,23 +88,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       [orderId]
     );
 
-    const orderCouponsResult = await query(
-      `SELECT
-        oc.id as order_coupon_id,
-        oc.coupon_id,
-        oc.discount_applied,
-        oc.status,
-        oc.applied_at,
-        c.code as coupon_code,
-        c.name as coupon_name,
-        c.type as coupon_type,
-        c.value as coupon_value
-       FROM order_coupons oc
-       LEFT JOIN coupons c ON oc.coupon_id = c.id
-       WHERE oc.order_id = ? AND oc.user_id = ? AND oc.status = 'applied'`,
-      [orderId, order.user_id]
-    );
-
     logMonitor('ORDERS', 'SUCCESS', { 
       action: 'GET_ORDER_DETAIL', 
       orderId,
@@ -163,9 +98,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       success: true,
       data: {
         ...order,
-        items,
-        coupons: orderCouponsResult.rows || [],
-        selected_coupon_ids: (orderCouponsResult.rows || []).map((coupon: any) => Number(coupon.coupon_id)),
+        items: itemsResult.rows || [],
         logistics: logisticsResult.rows || [],
         payment_logs: paymentLogsResult.rows || []
       }
@@ -173,7 +106,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   } catch (error: any) {
     logMonitor('ORDERS', 'ERROR', { action: 'GET_ORDER_DETAIL', error: error?.message || String(error) });
     console.error('Error fetching order details:', error);
-    return createErrorResponse('INTERNAL_ERROR', lang, 500);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch order details' },
+      { status: 500 }
+    );
   }
 }
 
@@ -184,7 +120,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  * @apiDescription 用户取消待支付订单，自动归还库存。
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const lang = getLangFromRequest(request);
   try {
     logMonitor('ORDERS', 'REQUEST', { method: 'PATCH', action: 'CANCEL_ORDER' });
 
@@ -199,7 +134,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { action } = body;
 
     if (action !== 'cancel') {
-      return createErrorResponse('INVALID_ACTION', lang, 400);
+      return NextResponse.json(
+        { success: false, error: 'Invalid action' },
+        { status: 400 }
+      );
     }
 
     const orderResult = await query(
@@ -208,100 +146,112 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     );
 
     if (orderResult.rows.length === 0) {
-      return createErrorResponse('NOT_FOUND', lang, 404);
+      return NextResponse.json(
+        { success: false, error: 'Order not found' },
+        { status: 404 }
+      );
     }
 
     const order = orderResult.rows[0];
 
     if (authResult.user?.role !== 'admin' && order.user_id !== authResult.user?.userId) {
-      return createErrorResponse('FORBIDDEN', lang, 403);
-    }
-
-    if (order.order_status !== 'pending') {
-      return createErrorResponse('INVALID_ORDER_STATUS', lang, 400);
-    }
-
-    const releaseResult = await releaseOrderResources({
-      orderId,
-      userId: order.user_id,
-      transactionTypeCode: 'sales_cancel',
-      inventoryReason: '用户取消订单',
-      referenceType: 'order_cancel',
-      operatorId: authResult.user?.userId || null,
-      operatorName: authResult.user?.name || 'User'
-    });
-
-    const statusResult = await OrderStatusService.changeStatus(
-      Number(orderId),
-      OrderEvent.USER_CANCEL,
-      {
-        type: OperatorType.USER,
-        id: authResult.user?.userId || 0,
-        name: authResult.user?.name || 'User'
-      },
-      {
-        reason: 'user_cancel',
-        releasedCouponCount: releaseResult.couponsReleased,
-        restoredItemCount: releaseResult.itemsReleased
-      }
-    );
-
-    if (!statusResult.success) {
-      logMonitor('ORDERS', 'ERROR', {
-        action: 'CANCEL_ORDER_STATUS_TRANSITION_FAILED',
-        orderId,
-        error: statusResult.error || 'UNKNOWN_STATUS_ERROR'
-      });
-
-      await query(
-        `UPDATE orders SET
-          order_status = 'cancelled',
-          updated_at = datetime('now')
-         WHERE id = ?`,
-        [orderId]
+      return NextResponse.json(
+        { success: false, error: 'Permission denied' },
+        { status: 403 }
       );
     }
 
-    await query(
-      `UPDATE orders SET
-        payment_status = 'cancelled',
-        updated_at = datetime('now')
-       WHERE id = ?`,
+    if (order.order_status !== 'pending') {
+      return NextResponse.json(
+        { success: false, error: 'Only pending orders can be cancelled' },
+        { status: 400 }
+      );
+    }
+
+    const itemsResult = await query(
+      `SELECT oi.product_id, oi.quantity, p.name
+       FROM order_items oi
+       JOIN products p ON oi.product_id = p.id
+       WHERE oi.order_id = ?`,
       [orderId]
     );
 
-    await query(
-      `INSERT INTO payment_logs (
-        order_id, order_number, payment_method, status,
-        error_code, error_message, is_success,
-        payment_stage, amount, currency, extra_data, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [
-        orderId,
-        order.order_number,
-        order.payment_method || 'unknown',
-        'cancelled',
-        'USER_CANCEL',
-        'User manually cancelled the order, inventory released and coupons restored',
-        0,
-        'user_cancel',
-        order.final_amount || 0,
-        'USD',
-        JSON.stringify({
-          reason: 'user_cancel',
-          cancelled_at: new Date().toISOString(),
-          released_coupon_count: releaseResult.couponsReleased,
-          restored_item_count: releaseResult.itemsReleased
-        })
-      ]
+    for (const item of itemsResult.rows) {
+      const beforeResult = await query(
+        'SELECT quantity FROM inventory WHERE product_id = ?',
+        [item.product_id]
+      );
+      const beforeStock = beforeResult.rows[0]?.quantity || 0;
+
+      await query(
+        'UPDATE inventory SET quantity = quantity + ? WHERE product_id = ?',
+        [item.quantity, item.product_id]
+      );
+
+      await createInventoryTransaction({
+        productId: item.product_id,
+        productName: item.name,
+        transactionTypeCode: InventoryTransactionCode.SALES_CANCEL,
+        quantityChange: item.quantity,
+        quantityBefore: beforeStock,
+        quantityAfter: beforeStock + item.quantity,
+        reason: '用户取消订单',
+        referenceType: 'order_cancel',
+        referenceId: orderId,
+        operatorId: authResult.user?.userId,
+        operatorName: authResult.user?.name,
+      });
+    }
+
+    const orderCouponsResult = await query(
+      `SELECT oc.id as order_coupon_id, oc.coupon_id as user_coupon_id, oc.discount_applied
+       FROM order_coupons oc
+       JOIN user_coupons uc ON oc.coupon_id = uc.id 
+         AND oc.user_id = uc.user_id AND uc.status = 'used'
+       WHERE oc.order_id = ? AND oc.status = 'applied'`,
+      [orderId]
     );
+
+    for (const row of orderCouponsResult.rows) {
+      await query(
+        `UPDATE user_coupons SET status = 'active', used_order_id = NULL 
+         WHERE id = ? AND user_id = ?`,
+        [row.user_coupon_id, order.user_id]
+      );
+      await query(
+        `UPDATE order_coupons SET status = 'refunded', refunded_at = datetime('now') 
+         WHERE id = ?`,
+        [row.order_coupon_id]
+      );
+    }
+
+    // 通过 OrderStatusService 进行状态变更（校验状态转换是否合法）
+    // 只有 pending 状态才允许 user_cancel 事件
+    const statusResult = await OrderStatusService.changeStatus(
+      Number(orderId),
+      OrderEvent.USER_CANCEL,
+      { type: OperatorType.USER, id: authResult.user?.userId || 0, name: authResult.user?.name || 'User' },
+      { reason: 'user_cancelled', itemsReturned: itemsResult.rows.length }
+    );
+
+    if (!statusResult.success) {
+      logMonitor('ORDERS', 'ERROR', { 
+        action: 'CANCEL_ORDER_FAILED', 
+        orderId,
+        orderNumber: order.order_number,
+        error: statusResult.error 
+      });
+      return NextResponse.json(
+        { success: false, error: statusResult.error || 'CANCEL_FAILED' },
+        { status: 400 }
+      );
+    }
 
     logMonitor('ORDERS', 'SUCCESS', {
       action: 'CANCEL_ORDER',
       orderId,
       orderNumber: order.order_number,
-      itemsReturned: releaseResult.itemsReleased,
-      couponsReturned: releaseResult.couponsReleased
+      itemsReturned: itemsResult.rows.length
     });
 
     return NextResponse.json({
@@ -310,13 +260,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         order_id: orderId,
         order_number: order.order_number,
         status: 'cancelled',
-        items_returned: releaseResult.itemsReleased,
-        coupons_returned: releaseResult.couponsReleased
+        items_returned: itemsResult.rows.length
       }
     });
   } catch (error: any) {
     logMonitor('ORDERS', 'ERROR', { action: 'CANCEL_ORDER', error: error?.message || String(error) });
     console.error('Error cancelling order:', error);
-    return createErrorResponse('INTERNAL_ERROR', lang, 500);
+    return NextResponse.json(
+      { success: false, error: 'Failed to cancel order' },
+      { status: 500 }
+    );
   }
 }

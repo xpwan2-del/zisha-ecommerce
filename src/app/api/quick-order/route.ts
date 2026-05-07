@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+import { applyPromotions } from '@/lib/pricing/cartPricing';
+import { round2 } from '@/lib/pricing/orderAmountMath';
 
 /**
  * ============================================================
@@ -63,7 +65,7 @@ async function calculateProductPrice(productId: number): Promise<{ originalPrice
     }
 
     const priceValue = productResult.rows[0]?.price;
-    const originalPrice = typeof priceValue === 'number' ? priceValue : parseFloat(String(priceValue)) || 0;
+    const originalPrice = round2(typeof priceValue === 'number' ? priceValue : parseFloat(String(priceValue)) || 0);
 
     const promoResult = await query(`
       SELECT
@@ -83,34 +85,32 @@ async function calculateProductPrice(productId: number): Promise<{ originalPrice
     let finalPrice = originalPrice;
 
     if (promos.length > 0) {
+      const promotionResult = applyPromotions(originalPrice, promos);
+      finalPrice = round2(promotionResult.finalPrice);
       const exclusive = promos.find((p: any) => p && p.can_stack === 1);
 
       if (exclusive && exclusive.discount_percent) {
-        finalPrice = originalPrice * (1 - exclusive.discount_percent / 100);
         promotions.push({
           id: exclusive.promo_id,
           name: exclusive.promo_name || '促销活动',
-          discount: originalPrice - finalPrice,
-          percent: exclusive.discount_percent
+          discount: round2(originalPrice - finalPrice),
+          percent: round2(parseFloat(exclusive.discount_percent) || 0)
         });
       } else {
-        let multiplier = 1;
         promos.forEach((p: any) => {
           if (p && p.discount_percent) {
-            multiplier *= (1 - p.discount_percent / 100);
             promotions.push({
               id: p.promo_id,
               name: p.promo_name || '促销活动',
-              discount: originalPrice * p.discount_percent / 100,
-              percent: p.discount_percent
+              discount: round2(originalPrice * p.discount_percent / 100),
+              percent: round2(parseFloat(p.discount_percent) || 0)
             });
           }
         });
-        finalPrice = originalPrice * multiplier;
       }
     }
 
-    const discount = originalPrice - finalPrice;
+    const discount = round2(originalPrice - finalPrice);
 
     return { originalPrice, finalPrice, discount, promotions };
   } catch (error) {

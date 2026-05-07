@@ -48,12 +48,13 @@ interface Coupon {
 }
 
 interface PriceData {
-  subtotal: number;
-  original_subtotal: number;
-  original_price: number;
-  product_discount: number;
-  coupon_discount: number;
+  total_original_price: number;
+  total_promotions_discount_amount: number;
+  total_after_promotions_amount: number;
+  total_coupon_discount: number;
+  order_final_discount_amount: number;
   shipping_fee: number;
+  final_amount: number;
   total_aed: number;
   total_usd: number;
   total_cny: number;
@@ -81,6 +82,25 @@ interface PriceData {
 }
 
 function QuickOrderContent() {
+  const mapPriceData = (d: any): PriceData => ({
+    total_original_price: d.total_original_price ?? d.original_subtotal_usd ?? d.original_subtotal ?? d.original_price ?? 0,
+    total_promotions_discount_amount: d.total_promotions_discount_amount ?? d.discount_amount ?? d.product_discount ?? 0,
+    total_after_promotions_amount: d.total_after_promotions_amount ?? d.subtotal_usd ?? d.subtotal ?? 0,
+    total_coupon_discount: d.total_coupon_discount ?? d.coupon_discount_usd ?? d.coupon_discount ?? 0,
+    order_final_discount_amount: d.order_final_discount_amount ?? ((d.total_promotions_discount_amount ?? d.product_discount ?? 0) + (d.total_coupon_discount ?? d.coupon_discount ?? 0)),
+    shipping_fee: d.shipping_fee ?? d.shipping_fee_usd ?? 0,
+    final_amount: d.final_amount ?? d.total_usd ?? d.subtotal_usd ?? 0,
+    total_usd: d.total_usd ?? d.final_amount ?? d.subtotal_usd ?? 0,
+    total_cny: d.total_cny ?? d.price_cny ?? 0,
+    total_aed: d.total_aed ?? d.price_aed ?? 0,
+    display_currency: d.display_currency,
+    display_total: d.display_total,
+    address: d.address,
+    coupon: d.coupon,
+    promotions: d.product_promotions || d.promotions || [],
+    payment_method: d.payment_method,
+  });
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useTranslation();
@@ -179,21 +199,9 @@ function QuickOrderContent() {
             setSelectedAddressId(data.data.addresses[0].id);
           }
 
-          if (data.data.subtotal !== undefined) {
+          if (data.data.total_original_price !== undefined || data.data.subtotal !== undefined) {
             const d = data.data;
-            setPriceData({
-              original_subtotal: d.original_subtotal_usd ?? d.original_subtotal ?? d.original_price ?? 84.47,
-              subtotal: d.subtotal_usd ?? d.subtotal ?? 59.13,
-              original_price: d.original_price ?? 84.47,
-              product_discount: d.discount_amount ?? d.product_discount ?? 25.34,
-              coupon_discount: 0,
-              shipping_fee: 0,
-              total_usd: d.total_usd ?? d.subtotal_usd ?? 59.13,
-              total_cny: d.price_cny ?? 652.1,
-              total_aed: d.price_aed ?? 310,
-              coupon: undefined,
-              promotions: d.product_promotions || []
-            });
+            setPriceData(mapPriceData(d));
           }
         } else {
           setError(data.error || 'Failed to load quick order data');
@@ -222,6 +230,7 @@ function QuickOrderContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             product_id: product.id,
+            order_id: currentOrderDbId,
             quantity,
             address_id: selectedAddressId,
             coupon_ids: selectedCouponIds.length > 0 ? selectedCouponIds : undefined,
@@ -232,19 +241,7 @@ function QuickOrderContent() {
         const data = await response.json();
         if (response.ok && data.success) {
           const d = data.data;
-          setPriceData({
-            original_subtotal: d.original_subtotal_usd ?? d.original_subtotal ?? d.original_price ?? 84.47,
-            subtotal: d.subtotal_usd ?? d.subtotal ?? 59.13,
-            original_price: d.original_price ?? 84.47,
-            product_discount: d.product_discount_usd ?? d.product_discount ?? 25.34,
-            coupon_discount: d.coupon_discount_usd ?? d.coupon_discount ?? 0,
-            shipping_fee: d.shipping_fee_usd ?? d.shipping_fee ?? 0,
-            total_usd: d.total_usd ?? d.subtotal_usd ?? 59.13,
-            total_cny: d.total_cny ?? d.price_cny ?? 652.1,
-            total_aed: d.total_aed ?? d.price_aed ?? 310,
-            coupon: d.coupon,
-            promotions: d.product_promotions || []
-          });
+          setPriceData(mapPriceData(d));
         }
       } catch (err) {
         console.error('Price calculation error:', err);
@@ -258,7 +255,7 @@ function QuickOrderContent() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [product, quantity, selectedAddressId, selectedCouponIds]);
+  }, [product, quantity, selectedAddressId, selectedCouponIds, currentOrderDbId, paymentMethod]);
 
   const handleIncrementStock = async () => {
     if (!product) return;
@@ -272,6 +269,7 @@ function QuickOrderContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           product_id: product.id,
+          order_id: currentOrderDbId,
           action: 'increment',
           quantity: 1
         })
@@ -297,6 +295,7 @@ function QuickOrderContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           product_id: product.id,
+          order_id: currentOrderDbId,
           action: 'decrement',
           quantity: 1
         })
@@ -356,11 +355,14 @@ function QuickOrderContent() {
 
       if (response.ok) {
         const orderId = searchParams.get('order_id');
+        const orderNumber = searchParams.get('order_number');
         const productId = searchParams.get('product_id');
         const qty = parseInt(searchParams.get('quantity') || '1', 10);
         let url = '/api/quick-order?';
         if (orderId) {
           url += `order_id=${orderId}`;
+        } else if (orderNumber) {
+          url += `order_number=${orderNumber}`;
         } else {
           url += `product_id=${productId}&quantity=${qty}`;
         }
@@ -417,8 +419,7 @@ function QuickOrderContent() {
           order_id: dbOrderId,
           address_id: selectedAddressId,
           payment_method: paymentMethod,
-          coupon_ids: selectedCouponIds.length > 0 ? selectedCouponIds : undefined,
-          order_final_discount_amount: priceData ? (priceData.product_discount + priceData.coupon_discount) : 0
+          coupon_ids: selectedCouponIds.length > 0 ? selectedCouponIds : undefined
         })
       });
 
@@ -441,14 +442,8 @@ function QuickOrderContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             order_number: order_number,
-            amount: (priceData?.total_usd ?? 0).toFixed(2) || '0',
             currency: 'USD',
-            items: [{
-              product_id: product.id,
-              name: product.name,
-              price: priceData ? (priceData.subtotal ?? priceData.total_usd ?? 0) / quantity : 0,
-              quantity: quantity
-            }]
+            source: 'quick-order'
           })
         });
 
@@ -473,7 +468,8 @@ function QuickOrderContent() {
           body: JSON.stringify({
             order_number: order_number,
             amount: (priceData?.total_cny ?? 0).toFixed(2) || '0',
-            currency: 'CNY'
+            currency: 'CNY',
+            source: 'quick-order'
           })
         });
 
@@ -503,10 +499,10 @@ function QuickOrderContent() {
 
     try {
       const response = await fetch(`/api/orders/${currentOrderDbId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'cancelled' })
+        body: JSON.stringify({ action: 'cancel' })
       });
 
       if (response.ok) {
@@ -1091,9 +1087,9 @@ function QuickOrderContent() {
               <div className="p-6 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="opacity-70">{t('quick_order.original_price', '商品总价')}</span>
-                  <span className="line-through opacity-50">{formatMultiPriceSync(priceData.original_subtotal ?? priceData.original_price ?? 0)}</span>
+                  <span className="line-through opacity-50">{formatMultiPriceSync(priceData.total_original_price ?? 0)}</span>
                 </div>
-                {priceData.product_discount > 0 && (
+                {priceData.total_promotions_discount_amount > 0 && (
                   <>
                     {priceData.promotions && priceData.promotions.length > 0 ? (
                       priceData.promotions.map((promo: any, idx: number) => (
@@ -1106,7 +1102,7 @@ function QuickOrderContent() {
                             <span className="text-green-600">-{formatMultiPriceSync(promo.discount)}</span>
                           </div>
                           <div className="text-xs text-green-600 pl-4 opacity-70">
-                              = {formatMultiPriceSync(priceData.original_subtotal ?? 0)} × {promo.percent}%
+                              = {formatMultiPriceSync(priceData.total_original_price ?? 0)} × {promo.percent}%
                             </div>
                         </div>
                       ))
@@ -1114,10 +1110,10 @@ function QuickOrderContent() {
                       <>
                         <div className="flex justify-between text-sm">
                           <span className="opacity-70">{t('quick_order.promotion_discount', '促销优惠')}</span>
-                          <span className="text-green-600">-{formatMultiPriceSync(priceData.product_discount ?? 0)}</span>
+                          <span className="text-green-600">-{formatMultiPriceSync(priceData.total_promotions_discount_amount ?? 0)}</span>
                         </div>
                         <div className="text-xs text-green-600 pl-4 opacity-70">
-                          = {formatMultiPriceSync(priceData.original_subtotal ?? 0)} - {formatMultiPriceSync(priceData.product_discount ?? 0)}
+                          = {formatMultiPriceSync(priceData.total_original_price ?? 0)} - {formatMultiPriceSync(priceData.total_promotions_discount_amount ?? 0)}
                         </div>
                       </>
                     )}
@@ -1125,13 +1121,13 @@ function QuickOrderContent() {
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="opacity-70">{t('quick_order.after_promotion', '促销后小计')}</span>
-                  <span>{formatMultiPriceSync(priceData.subtotal ?? priceData.total_usd ?? 0)}</span>
+                  <span>{formatMultiPriceSync(priceData.total_after_promotions_amount ?? priceData.total_usd ?? 0)}</span>
                 </div>
-                {priceData.coupon_discount > 0 && (
+                {priceData.total_coupon_discount > 0 && (
                   <>
                     <div className="pt-2 border-t border-dashed border-[var(--border)]"></div>
                     {(() => {
-                      let remaining = priceData.subtotal ?? priceData.total_usd ?? 0;
+                      let remaining = priceData.total_after_promotions_amount ?? priceData.total_usd ?? 0;
                       const details = priceData.coupon?.details || [];
                       return details.map((detail: any, idx: number) => {
                         const prevRemaining = remaining;
@@ -1163,16 +1159,16 @@ function QuickOrderContent() {
                     <div className="pt-2 border-t border-dashed border-[var(--border)]"></div>
                     <div className="flex justify-between text-sm text-green-600">
                       <span>{t('quick_order.coupon_discount', '优惠券优惠')}</span>
-                      <span>-{formatMultiPriceSync(priceData.coupon_discount ?? 0)}</span>
+                      <span>-{formatMultiPriceSync(priceData.total_coupon_discount ?? 0)}</span>
                     </div>
                     <div className="text-xs text-green-600 pl-4 opacity-70">
-                      = {formatMultiPriceSync(priceData.subtotal ?? 0)} - {formatMultiPriceSync(priceData.coupon_discount ?? 0)}
+                      = {formatMultiPriceSync(priceData.total_after_promotions_amount ?? 0)} - {formatMultiPriceSync(priceData.total_coupon_discount ?? 0)}
                     </div>
                   </>
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="opacity-70">{t('quick_order.after_coupon', '券后小计')}</span>
-                  <span>{formatMultiPriceSync((priceData.subtotal ?? 0) - (priceData.coupon_discount ?? 0))}</span>
+                  <span>{formatMultiPriceSync((priceData.total_after_promotions_amount ?? 0) - (priceData.total_coupon_discount ?? 0))}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="opacity-70">{t('quick_order.shipping_fee', '运费')}</span>
@@ -1185,7 +1181,7 @@ function QuickOrderContent() {
                     <span className="font-medium">{t('quick_order.total', '合计')}</span>
                     <div className="text-right">
                       <span className="text-2xl font-bold text-[var(--accent)]">
-                        {formatMultiPriceSync(priceData.total_usd ?? 0)}
+                        {formatMultiPriceSync(priceData.final_amount ?? priceData.total_usd ?? 0)}
                       </span>
                     </div>
                   </div>

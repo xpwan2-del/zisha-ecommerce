@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import {
+  createInventoryTransaction,
+  getInventoryTransactionTypeId,
+  InventoryTransactionCode,
+} from '@/lib/inventory-transactions';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -216,23 +221,23 @@ export async function POST(request: NextRequest) {
 
     let newQuantity = currentQuantity;
     let quantityChange = 0;
-    let transactionTypeCode = change_type;
+    let movementTransactionTypeCode = change_type;
 
     switch (change_type) {
       case 'increase':
         newQuantity = currentQuantity + quantity;
         quantityChange = quantity;
-        transactionTypeCode = 'stock_gain';
+        movementTransactionTypeCode = 'stock_gain';
         break;
       case 'decrease':
         newQuantity = Math.max(0, currentQuantity - quantity);
         quantityChange = -quantity;
-        transactionTypeCode = 'stock_lose';
+        movementTransactionTypeCode = 'stock_lose';
         break;
       case 'set':
         quantityChange = quantity - currentQuantity;
         newQuantity = quantity;
-        transactionTypeCode = quantityChange >= 0 ? 'stock_gain' : 'stock_lose';
+        movementTransactionTypeCode = quantityChange >= 0 ? 'stock_gain' : 'stock_lose';
         break;
       default:
         return NextResponse.json(
@@ -246,34 +251,25 @@ export async function POST(request: NextRequest) {
       [newQuantity, calculateStatusId(newQuantity), product_id]
     );
 
-    let transactionTypeId = 13;
-    if (transactionTypeCode === 'stock_gain') {
-      const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['stock_gain']);
-      transactionTypeId = typeResult.rows[0]?.id || 11;
-    } else if (transactionTypeCode === 'stock_lose') {
-      const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['stock_lose']);
-      transactionTypeId = typeResult.rows[0]?.id || 12;
-    }
+    const transactionTypeCode =
+      quantityChange >= 0
+        ? InventoryTransactionCode.STOCK_GAIN
+        : InventoryTransactionCode.STOCK_LOSE;
+    const transactionTypeId = await getInventoryTransactionTypeId(transactionTypeCode);
 
-    const insertResult = await query(
-      `INSERT INTO inventory_transactions (
-        product_id, product_name, transaction_type_id, quantity_change,
-        quantity_before, quantity_after, reason, reference_type, reference_id,
-        operator_name, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [
-        product_id,
-        productName,
-        transactionTypeId,
-        quantityChange,
-        currentQuantity,
-        newQuantity,
-        reason || 'Manual adjustment',
-        'adjustment',
-        null,
-        operator_name
-      ]
-    );
+    const insertResult = await createInventoryTransaction({
+      productId: product_id,
+      productName,
+      transactionTypeCode,
+      quantityChange,
+      quantityBefore: currentQuantity,
+      quantityAfter: newQuantity,
+      reason: reason || 'Manual adjustment',
+      referenceType: 'adjustment',
+      referenceId: null,
+      operatorId: null,
+      operatorName: operator_name,
+    });
 
     logMonitor('INVENTORY', 'SUCCESS', {
       action: 'ADJUST_INVENTORY',
@@ -292,7 +288,7 @@ export async function POST(request: NextRequest) {
         product_id,
         product_name: productName,
         transaction_type_id: transactionTypeId,
-        transaction_code: transactionTypeCode,
+        transaction_code: movementTransactionTypeCode,
         quantity_change: quantityChange,
         quantity_before: currentQuantity,
         quantity_after: newQuantity,

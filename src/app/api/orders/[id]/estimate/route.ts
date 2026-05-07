@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+import { estimateOrderPricing } from '@/lib/order-pricing-service';
 
 /**
  * ============================================================
@@ -52,76 +53,6 @@ function createSuccessResponse(data: any, status: number = 200) {
       },
     }
   );
-}
-
-async function calculateShipping(city: string): Promise<number> {
-  try {
-    const shippingResult = await query(`
-      SELECT shipping_fee FROM shipping_rates
-      WHERE city = ? AND is_active = 1
-      LIMIT 1
-    `, [city]);
-
-    if (shippingResult.rows.length > 0) {
-      return parseFloat(shippingResult.rows[0].shipping_fee) || 0;
-    }
-
-    const defaultShipping = await query(`
-      SELECT shipping_fee FROM shipping_rates
-      WHERE is_default = 1 AND is_active = 1
-      LIMIT 1
-    `);
-
-    if (defaultShipping.rows.length > 0) {
-      return parseFloat(defaultShipping.rows[0].shipping_fee) || 0;
-    }
-
-    return 0;
-  } catch (error) {
-    console.error('calculateShipping error:', error);
-    return 0;
-  }
-}
-
-async function applyCouponDiscount(couponId: number, userId: number, subtotal: number): Promise<{
-  discount: number;
-  finalAmount: number;
-  couponCode?: string;
-  couponType?: string;
-  couponValue?: number;
-}> {
-  const couponResult = await query(`
-    SELECT c.type, c.value, c.code
-    FROM user_coupons uc
-    JOIN coupons c ON uc.coupon_id = c.id
-    WHERE uc.id = ? AND uc.user_id = ? AND uc.status = 'active'
-      AND datetime('now') < uc.expires_at
-      AND c.is_active = 1
-  `, [couponId, userId]);
-
-  if (couponResult.rows.length === 0) {
-    return { discount: 0, finalAmount: subtotal };
-  }
-
-  const coupon = couponResult.rows[0];
-  let discount = 0;
-
-  if (coupon.type === 'percentage') {
-    discount = subtotal * (coupon.value / 100);
-  } else if (coupon.type === 'fixed') {
-    discount = coupon.value;
-  }
-
-  discount = Math.min(discount, subtotal);
-  const finalAmount = Math.max(0, subtotal - discount);
-
-  return {
-    discount,
-    finalAmount,
-    couponCode: coupon.code,
-    couponType: coupon.type,
-    couponValue: coupon.value
-  };
 }
 
 // ============================================================
@@ -210,76 +141,42 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('ADDRESS_NOT_FOUND', lang, 404);
     }
 
-    const address = addressResult.rows[0];
-
-    // 计算运费
-    const shippingFee = await calculateShipping(address.city);
-
-    // 计算价格
-    const subtotal = Number(order.total_after_promotions_amount) || 0;
-    const originalTotal = Number(order.total_original_price) || 0;
-    const productDiscount = Math.max(0, originalTotal - subtotal);
-
-    let couponDiscount = 0;
-    let couponDetails: Array<{
-      id: number;
-      discount: number;
-      code: string;
-      type: 'percentage' | 'fixed';
-      value: number;
-    }> = [];
-
-    if (coupon_ids && coupon_ids.length > 0) {
-      for (const couponId of coupon_ids) {
-        const { discount, couponCode, couponType, couponValue } = await applyCouponDiscount(couponId, userId, subtotal);
-        couponDiscount += discount;
-        couponDetails.push({
-          id: couponId,
-          discount,
-          code: couponCode || '',
-          type: couponType as 'percentage' | 'fixed',
-          value: couponValue || 0
-        });
-      }
-      couponDiscount = Math.min(couponDiscount, subtotal);
-    }
-
-    const finalAmount = Math.max(0, subtotal - couponDiscount + shippingFee);
+    const pricing = await estimateOrderPricing({
+      orderId: Number(orderId),
+      userId,
+      addressId: address_id,
+      couponIds: coupon_ids || [],
+    });
 
     logMonitor('ORDERS', 'SUCCESS', {
       action: 'ESTIMATE_ORDER',
       orderId,
       addressId: address_id,
-      shippingFee,
-      productDiscount,
-      couponDiscount,
-      finalAmount
+      shippingFee: pricing.shipping_fee,
+      promotionsDiscount: pricing.total_promotions_discount_amount,
+      couponDiscount: pricing.total_coupon_discount,
+      finalAmount: pricing.final_amount
     });
 
     return createSuccessResponse({
       order_id: Number(orderId),
       order_number: order.order_number,
-      subtotal,
-      original_total: originalTotal,
-      product_discount: productDiscount,
-      coupon_discount: couponDiscount,
-      shipping_fee: shippingFee,
-      final_amount: finalAmount,
-      total_usd: finalAmount,
-      total_cny: finalAmount * 7.32,
-      total_aed: finalAmount * 3.67,
-      address: {
-        id: address.id,
-        contact_name: address.contact_name,
-        phone: address.phone,
-        street_address: address.street_address,
-        city: address.city,
-        country_name: address.country_name
-      },
+      total_original_price: pricing.total_original_price,
+      total_promotions_discount_amount: pricing.total_promotions_discount_amount,
+      total_after_promotions_amount: pricing.total_after_promotions_amount,
+      total_coupon_discount: pricing.total_coupon_discount,
+      order_final_discount_amount: pricing.order_final_discount_amount,
+      shipping_fee: pricing.shipping_fee,
+      final_amount: pricing.final_amount,
+      total_usd: pricing.total_usd,
+      total_cny: pricing.total_cny,
+      total_aed: pricing.total_aed,
+      address: pricing.address,
+      coupon_details: pricing.coupon_details,
       coupon: coupon_ids && coupon_ids.length > 0 ? {
         ids: coupon_ids,
-        discount: couponDiscount,
-        details: couponDetails
+        discount: pricing.total_coupon_discount,
+        details: pricing.coupon_details
       } : undefined
     });
 

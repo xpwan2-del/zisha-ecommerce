@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -348,27 +349,25 @@ export async function PUT(
         WHERE product_id = ?
       `, [quantity, newStatusId, productId]);
 
-      const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['adjustment']);
-      const transactionTypeId = typeResult.rows[0]?.id || 13;
-
       const quantityChange = quantity - oldQuantity;
 
       if (quantityChange !== 0) {
-        await query(`
-          INSERT INTO inventory_transactions (
-            product_id, product_name, transaction_type_id, quantity_change,
-            quantity_before, quantity_after, reason, operator_name, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-        `, [
+        await createInventoryTransaction({
           productId,
-          name || oldProduct.name,
-          transactionTypeId,
+          productName: name || oldProduct.name,
+          transactionTypeCode:
+            quantityChange > 0
+              ? InventoryTransactionCode.ADMIN_ADJUST_INCREASE
+              : InventoryTransactionCode.ADMIN_ADJUST_REDUCE,
           quantityChange,
-          oldQuantity,
-          quantity,
-          '人工调整库存',
-          'admin'
-        ]);
+          quantityBefore: oldQuantity,
+          quantityAfter: quantity,
+          reason: '人工调整库存',
+          referenceType: 'admin_product_update',
+          referenceId: productId,
+          operatorId: null,
+          operatorName: 'admin',
+        });
       }
     }
 

@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { getMessage, getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 import { applyPromotions } from '@/lib/pricing/cartPricing';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 
 /**
  * ============================================================
@@ -590,31 +591,23 @@ export async function POST(request: NextRequest) {
     }
 
     const productName = product.name || `Product #${product_id}`;
-    const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['cat_creat']);
-    const transactionTypeId = typeResult.rows[0]?.id || 7;
 
-    await query(
-      `INSERT INTO inventory_transactions (
-        product_id, product_name, transaction_type_id, quantity_change,
-        quantity_before, quantity_after, reason, reference_type, reference_id,
-        operator_id, operator_name, created_at
-      ) VALUES (?, ?, ?, ?, ?,
-        (SELECT quantity FROM inventory WHERE product_id = ?),
-        ?, ?, ?, ?, ?, datetime('now'))`,
-      [
-        product_id,
-        productName,
-        transactionTypeId,
-        -additionalQuantity,
-        product.stock,
-        product_id,
-        `Added to cart`,
-        'cart',
-        result.rows[0].id,
-        user_id,
-        authResult.user?.name || 'User'
-      ]
-    );
+    await createInventoryTransaction({
+      productId: product_id,
+      productName,
+      transactionTypeCode:
+        existingItem.rows.length > 0
+          ? InventoryTransactionCode.CART_INCREASE
+          : InventoryTransactionCode.CART_CREATE,
+      quantityChange: -additionalQuantity,
+      quantityBefore: product.stock,
+      quantityAfter: product.stock - additionalQuantity,
+      reason: `Added to cart`,
+      referenceType: 'cart',
+      referenceId: result.rows[0].id,
+      operatorId: user_id,
+      operatorName: authResult.user?.name,
+    });
 
     logMonitor('CART', 'SUCCESS', {
       action: 'ADD_TO_CART',
@@ -732,31 +725,20 @@ export async function PUT(request: NextRequest) {
       }
 
       const productName = product.name || `Product #${product_id}`;
-      const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['cat_increase']);
-      const transactionTypeId = typeResult.rows[0]?.id || 8;
 
-      await query(
-        `INSERT INTO inventory_transactions (
-          product_id, product_name, transaction_type_id, quantity_change,
-          quantity_before, quantity_after, reason, reference_type, reference_id,
-          operator_id, operator_name, created_at
-        ) VALUES (?, ?, ?, ?, ?,
-          (SELECT quantity FROM inventory WHERE product_id = ?),
-          ?, ?, ?, ?, ?, datetime('now'))`,
-        [
-          product_id,
-          productName,
-          transactionTypeId,
-          -quantityDiff,
-          availableStock,
-          product_id,
-          `Increased cart quantity from ${oldQuantity} to ${quantity}`,
-          'cart',
-          id,
-          user_id,
-          authResult.user?.name || 'User'
-        ]
-      );
+      await createInventoryTransaction({
+        productId: product_id,
+        productName,
+        transactionTypeCode: InventoryTransactionCode.CART_INCREASE,
+        quantityChange: -quantityDiff,
+        quantityBefore: availableStock,
+        quantityAfter: availableStock - quantityDiff,
+        reason: `Increased cart quantity from ${oldQuantity} to ${quantity}`,
+        referenceType: 'cart',
+        referenceId: id,
+        operatorId: user_id,
+        operatorName: authResult.user?.name,
+      });
     } else {
       const returnQty = Math.abs(quantityDiff);
 
@@ -766,29 +748,20 @@ export async function PUT(request: NextRequest) {
       );
 
       const productName = product.name || `Product #${product_id}`;
-      const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['cat_reduce']);
-      const transactionTypeId = typeResult.rows[0]?.id || 9;
 
-      await query(
-        `INSERT INTO inventory_transactions (
-          product_id, product_name, transaction_type_id, quantity_change,
-          quantity_before, quantity_after, reason, reference_type, reference_id,
-          operator_id, operator_name, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [
-          product_id,
-          productName,
-          transactionTypeId,
-          returnQty,
-          availableStock,
-          availableStock + returnQty,
-          `Decreased cart quantity from ${oldQuantity} to ${quantity}`,
-          'cart',
-          id,
-          user_id,
-          authResult.user?.name || 'User'
-        ]
-      );
+      await createInventoryTransaction({
+        productId: product_id,
+        productName,
+        transactionTypeCode: InventoryTransactionCode.CART_DECREASE,
+        quantityChange: returnQty,
+        quantityBefore: availableStock,
+        quantityAfter: availableStock + returnQty,
+        reason: `Decreased cart quantity from ${oldQuantity} to ${quantity}`,
+        referenceType: 'cart',
+        referenceId: id,
+        operatorId: user_id,
+        operatorName: authResult.user?.name,
+      });
     }
 
     await query(
@@ -869,29 +842,19 @@ export async function DELETE(request: NextRequest) {
         const productInfo = await query('SELECT name FROM products WHERE id = ?', [item.product_id]);
         const productName = productInfo.rows[0]?.name || `Product #${item.product_id}`;
 
-        const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['cat_delete']);
-        const transactionTypeId = typeResult.rows[0]?.id || 10;
-
-        await query(
-          `INSERT INTO inventory_transactions (
-            product_id, product_name, transaction_type_id, quantity_change,
-            quantity_before, quantity_after, reason, reference_type, reference_id,
-            operator_id, operator_name, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-          [
-            item.product_id,
-            productName,
-            transactionTypeId,
-            item.quantity,
-            beforeQty,
-            beforeQty + item.quantity,
-            `Removed from cart (clear all)`,
-            'cart',
-            item.product_id,
-            user_id,
-            authResult.user?.name || 'User'
-          ]
-        );
+        await createInventoryTransaction({
+          productId: item.product_id,
+          productName,
+          transactionTypeCode: InventoryTransactionCode.CART_DELETE,
+          quantityChange: item.quantity,
+          quantityBefore: beforeQty,
+          quantityAfter: beforeQty + item.quantity,
+          reason: `Removed from cart (clear all)`,
+          referenceType: 'cart',
+          referenceId: item.product_id,
+          operatorId: user_id,
+          operatorName: authResult.user?.name,
+        });
       }
 
       await query('DELETE FROM cart_items WHERE user_id = ?', [user_id]);
@@ -945,29 +908,19 @@ export async function DELETE(request: NextRequest) {
     const productInfo = await query('SELECT name FROM products WHERE id = ?', [deletedItem.product_id]);
     const productName = productInfo.rows[0]?.name || `Product #${deletedItem.product_id}`;
 
-    const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['cat_delete']);
-    const transactionTypeId = typeResult.rows[0]?.id || 10;
-
-    await query(
-      `INSERT INTO inventory_transactions (
-        product_id, product_name, transaction_type_id, quantity_change,
-        quantity_before, quantity_after, reason, reference_type, reference_id,
-        operator_id, operator_name, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [
-        deletedItem.product_id,
-        productName,
-        transactionTypeId,
-        deletedItem.quantity,
-        beforeQty,
-        beforeQty + deletedItem.quantity,
-        `Removed from cart`,
-        'cart',
-        deletedItem.product_id,
-        user_id,
-        authResult.user?.name || 'User'
-      ]
-    );
+    await createInventoryTransaction({
+      productId: deletedItem.product_id,
+      productName,
+      transactionTypeCode: InventoryTransactionCode.CART_DELETE,
+      quantityChange: deletedItem.quantity,
+      quantityBefore: beforeQty,
+      quantityAfter: beforeQty + deletedItem.quantity,
+      reason: `Removed from cart`,
+      referenceType: 'cart',
+      referenceId: deletedItem.product_id,
+      operatorId: user_id,
+      operatorName: authResult.user?.name,
+    });
 
     await query(
       'DELETE FROM cart_items WHERE id = ? AND user_id = ?',

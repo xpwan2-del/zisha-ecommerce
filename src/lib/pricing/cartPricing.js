@@ -5,6 +5,10 @@ function toSafeNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function round2(value) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function normalizeCurrency(currency) {
   const c = String(currency || '').toLowerCase();
   if (c === 'usd' || c === 'cny' || c === 'aed') return c;
@@ -27,7 +31,7 @@ function getBasePrice(row, currency) {
 }
 
 function applyPromotions(basePrice, promos) {
-  const price = toSafeNumber(basePrice);
+  const price = round2(toSafeNumber(basePrice));
   const list = Array.isArray(promos) ? promos : [];
   if (price <= 0 || list.length === 0) {
     return { finalPrice: price, totalDiscountPercent: 0, isExclusive: false };
@@ -36,10 +40,10 @@ function applyPromotions(basePrice, promos) {
   const exclusive = list.find(p => Number(p.can_stack) === 1);
   if (exclusive) {
     const percent = toSafeNumber(exclusive.discount_percent);
-    const finalPrice = price * (100 - percent) / 100;
+    const finalPrice = round2(price * (100 - percent) / 100);
     return {
       finalPrice,
-      totalDiscountPercent: percent,
+      totalDiscountPercent: round2(percent),
       isExclusive: true
     };
   }
@@ -49,10 +53,10 @@ function applyPromotions(basePrice, promos) {
   for (const p of sorted) {
     multiplier *= (1 - toSafeNumber(p.discount_percent) / 100);
   }
-  const totalDiscountPercent = Math.round((1 - multiplier) * 10000) / 100;
-  const finalPrice = price * multiplier;
+  const totalDiscountPercent = round2(Math.round((1 - multiplier) * 10000) / 100);
+  const finalPrice = round2(price * multiplier);
   return { finalPrice, totalDiscountPercent, isExclusive: false };
 }
 
-module.exports = { getBasePrice, applyPromotions };
+module.exports = { getBasePrice, applyPromotions, round2 };
 

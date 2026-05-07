@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { round2 } from '@/lib/pricing/orderAmountMath';
 /**
  * @api {GET} /api/home 获取首页数据
  * @apiName GetHomeData
@@ -224,14 +225,12 @@ export async function GET(request: NextRequest) {
     
     // 处理产品数据，添加活动标签和图标（使用嵌套promotion结构，与/api/products一致）
     const calculateFinalPrice = (originalPrice: number, discount: number, priority: number, canStack: number) => {
-      // 独占活动(can_stack=1)直接用该折扣，可叠加活动(can_stack=0)也用该折扣（home页只显示最优促销）
-      // 逻辑：can_stack=1是独占（不可叠加），can_stack=0是可叠加
-      return originalPrice * (1 - discount / 100);
+      return round2(originalPrice * (1 - discount / 100));
     };
 
     const products = productsResult.rows.map((product: any) => {
-      const originalPrice = parseFloat(product.price);
-      const discount = product.promotion_discount || 0;
+      const originalPrice = round2(parseFloat(product.price) || 0);
+      const discount = round2(parseFloat(product.promotion_discount) || 0);
       const finalPrice = discount > 0 ? calculateFinalPrice(originalPrice, discount, product.priority || 2, product.can_stack || 1) : originalPrice;
       
       const activities = activitiesMap[product.id] || [];

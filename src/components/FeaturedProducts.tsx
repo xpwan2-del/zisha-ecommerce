@@ -252,7 +252,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
           multiplier *= (1 - p.discount_percent / 100);
           parts.push(`(1-${p.discount_percent}%)`);
         });
-        totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
+        totalDiscount = Number(((1 - multiplier) * 100).toFixed(2));
         formula = parts.join(' × ') + ` = ${totalDiscount}%`;
       }
 

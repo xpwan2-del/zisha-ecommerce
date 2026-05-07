@@ -370,7 +370,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                   } else {
                     const sortedPromos = [...promos].sort((a: any, b: any) => a.priority - b.priority);
                     const multiplier = sortedPromos.reduce((acc: number, p: any) => acc * (1 - p.discount_percent / 100), 1);
-                    totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
+                    totalDiscount = Number(((1 - multiplier) * 100).toFixed(2));
                   }
 
                   return (
@@ -467,7 +467,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
                           parts.push(`(1-${p.discount_percent}%)`);
                         });
                         const multiplier = sortedPromos.reduce((acc: number, p: any) => acc * (1 - p.discount_percent / 100), 1);
-                        totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
+                        totalDiscount = Number(((1 - multiplier) * 100).toFixed(2));
                         formula = parts.join(' × ') + ` = ${totalDiscount}%`;
                       }
 

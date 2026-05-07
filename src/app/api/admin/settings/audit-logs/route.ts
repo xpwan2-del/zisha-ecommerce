@@ -10,14 +10,14 @@ export async function GET(request: NextRequest) {
   try {
     const { page, limit } = getPaginationParams(request);
     const { searchParams } = new URL(request.url);
-    const module = searchParams.get('module') || '';
+    const logModule = searchParams.get('module') || '';
     const action = searchParams.get('action') || '';
     const status = searchParams.get('status') || '';
 
     let whereClauses: string[] = [];
     let params: any[] = [];
 
-    if (module) { whereClauses.push('module = ?'); params.push(module); }
+    if (logModule) { whereClauses.push('module = ?'); params.push(logModule); }
     if (action) { whereClauses.push('action = ?'); params.push(action); }
     if (status) { whereClauses.push('status = ?'); params.push(status); }
 

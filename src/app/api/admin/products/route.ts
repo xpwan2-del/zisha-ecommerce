@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -363,7 +364,7 @@ export async function POST(request: NextRequest) {
       specifications || '{}', shipping || '', after_sale || ''
     ]);
 
-    const productId = insertResult.lastInsertRowid;
+    const productId = Number(insertResult.lastInsertRowid);
 
     await query(`INSERT INTO product_prices (product_id, currency, price, created_at) VALUES (?, 'USD', ?, datetime('now'))`, [productId, price]);
     if (price_usd && price_usd != price) {
@@ -384,15 +385,19 @@ export async function POST(request: NextRequest) {
       VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
     `, [productId, name, quantity, statusId]);
 
-    const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['self_estock']);
-    const transactionTypeId = typeResult.rows[0]?.id || 14;
-
-    await query(`
-      INSERT INTO inventory_transactions (
-        product_id, product_name, transaction_type_id, quantity_change,
-        quantity_before, quantity_after, reason, operator_name, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `, [productId, name, transactionTypeId, quantity, 0, quantity, '商品初始化', 'admin']);
+    await createInventoryTransaction({
+      productId,
+      productName: name,
+      transactionTypeCode: InventoryTransactionCode.SELF_RESTOCK,
+      quantityChange: quantity,
+      quantityBefore: 0,
+      quantityAfter: quantity,
+      reason: '商品初始化',
+      referenceType: 'admin_product_create',
+      referenceId: productId,
+      operatorId: null,
+      operatorName: 'admin',
+    });
 
     if (promotions && Array.isArray(promotions) && promotions.length > 0) {
       for (const promo of promotions) {

@@ -12,15 +12,16 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [currency, setCurrency] = useState<string>('aed');
-
-  // Load currency from localStorage on mount
-  useEffect(() => {
-    const storedCurrency = localStorage.getItem('currency');
-    if (storedCurrency && supportedCurrencies.some(c => c.code === storedCurrency)) {
-      setCurrency(storedCurrency);
+  const [currency, setCurrency] = useState<string>(() => {
+    if (typeof window === 'undefined') {
+      return 'aed';
     }
-  }, []);
+
+    const storedCurrency = localStorage.getItem('currency');
+    return storedCurrency && supportedCurrencies.some(c => c.code === storedCurrency)
+      ? storedCurrency
+      : 'aed';
+  });
 
   // Save currency to localStorage whenever it changes
   useEffect(() => {

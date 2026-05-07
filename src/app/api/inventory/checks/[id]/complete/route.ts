@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { logMonitor } from '@/lib/utils/logger';
 
 /**
@@ -160,7 +161,7 @@ export async function POST(
       const differenceType = item.difference_type;
 
       const beforeResult = await query(
-        'SELECT quantity, low_stock_threshold FROM inventory WHERE product_id = ?',
+        'SELECT quantity FROM inventory WHERE product_id = ?',
         [productId]
       );
 
@@ -180,29 +181,23 @@ export async function POST(
         [afterQuantity, calculateStatusId(afterQuantity), productId]
       );
 
-      const transactionTypeCode = differenceType === 'profit' ? 'stock_gain' : 'stock_lose';
-      const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', [transactionTypeCode]);
-      const transactionTypeId = typeResult.rows[0]?.id || (differenceType === 'profit' ? 11 : 12);
+      const transactionTypeCode = differenceType === 'profit'
+        ? InventoryTransactionCode.STOCK_GAIN
+        : InventoryTransactionCode.STOCK_LOSE;
 
-      await query(
-        `INSERT INTO inventory_transactions (
-          product_id, product_name, transaction_type_id, quantity_change,
-          quantity_before, quantity_after, reason,
-          reference_type, reference_id, operator_name, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [
-          productId,
-          item.product_name,
-          transactionTypeId,
-          difference,
-          beforeQuantity,
-          afterQuantity,
-          `盘点差异: ${differenceType}`,
-          'check',
-          checkId,
-          check.operator_name || 'system'
-        ]
-      );
+      await createInventoryTransaction({
+        productId,
+        productName: item.product_name,
+        transactionTypeCode,
+        quantityChange: difference,
+        quantityBefore: beforeQuantity,
+        quantityAfter: afterQuantity,
+        reason: `盘点差异: ${differenceType}`,
+        referenceType: 'check',
+        referenceId: checkId,
+        operatorId: check.operator_id,
+        operatorName: check.operator_name || 'system',
+      });
 
       await query(
         `UPDATE inventory_check_items

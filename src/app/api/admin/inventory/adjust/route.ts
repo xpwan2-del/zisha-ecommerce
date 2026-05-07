@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
 
 export async function POST(request: NextRequest) {
@@ -45,12 +46,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await query(
-      `INSERT INTO inventory_transactions (product_id, product_name, quantity_change, quantity_before, quantity_after, reason, reference_type, operator_id, operator_name, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'admin_adjust', ?, ?, datetime('now'))`,
-      [product_id, product.rows[0].name, newStock - currentStock, currentStock, newStock,
-       reason || '管理员手动调整', operatorId, opName]
-    );
+    const quantityChange = newStock - currentStock;
+
+    await createInventoryTransaction({
+      productId: product_id,
+      productName: product.rows[0].name,
+      transactionTypeCode:
+        quantityChange >= 0
+          ? InventoryTransactionCode.ADMIN_ADJUST_INCREASE
+          : InventoryTransactionCode.ADMIN_ADJUST_REDUCE,
+      quantityChange,
+      quantityBefore: currentStock,
+      quantityAfter: newStock,
+      reason: reason || '管理员手动调整',
+      referenceType: 'admin_adjust',
+      referenceId: null,
+      operatorId,
+      operatorName: opName,
+    });
 
     if (currentStock <= 0 && newStock > 0) {
       await query(

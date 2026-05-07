@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
 import { PaymentService } from '@/lib/payment/PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
 import { getPaymentErrorMapping, resolvePaymentError } from '@/lib/payment/errorCodeMapper';
@@ -328,35 +327,6 @@ export async function POST(request: NextRequest) {
       errorIssue: responseData.details?.[0]?.issue
     });
 
-    const responseReferenceId = responseData?.purchase_units?.[0]?.reference_id;
-    if (responseReferenceId && responseReferenceId !== order_number) {
-      logMonitor('PAYMENTS', 'AUTH_FAILED', {
-        action: 'PAYPAL_REFERENCE_ID_MISMATCH',
-        paypalOrderId: platformOrderId,
-        order_number,
-        response_reference_id: responseReferenceId
-      });
-      await savePayPalLog(
-        order.id,
-        order_number,
-        platformOrderId,
-        responseStatus,
-        responseData.name || null,
-        'REFERENCE_ID_MISMATCH',
-        `reference_id ${responseReferenceId} does not match order_number ${order_number}`,
-        JSON.stringify(responseData),
-        false,
-        parseFloat(order.final_amount),
-        'USD'
-      );
-      return NextResponse.json({
-        success: false,
-        status: 'fail',
-        error_code: 'REFERENCE_ID_MISMATCH',
-        message: lang === 'zh' ? '订单号不匹配' : lang === 'ar' ? 'رقم الطلب غير متطابق' : 'Order number mismatch'
-      }, { status: 403 });
-    }
-
     const issues: Array<{ issue: string; description?: string }> = Array.isArray(responseData?.details)
       ? responseData.details.map((d: any) => ({ issue: d.issue, description: d.description }))
       : [];
@@ -397,22 +367,23 @@ export async function POST(request: NextRequest) {
       'USD'
     );
 
-    // 如果支付成功，更新订单状态
+    // 支付成功验证通过，只记录日志，不写数据库
+    // 订单状态更新由 result 路由统一负责（幂等性保障）
     if (isSuccess) {
       logMonitor('PAYMENTS', 'SUCCESS', {
-        action: 'PAYMENT_SUCCESS',
+        action: 'PAYMENT_VERIFIED',
         orderId: order.id,
         order_number,
-        errorCode
+        errorCode,
+        note: 'Verify-only mode, order status update handled by result route'
       });
 
-      // 验证支付金额
       const capturedAmount = parseFloat(responseData.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value || '0');
       const orderAmount = parseFloat(order.final_amount);
       
       if (Math.abs(capturedAmount - orderAmount) > 0.01) {
         logMonitor('PAYMENTS', 'WARNING', {
-          action: 'AMOUNT_MISMATCH',
+          action: 'AMOUNT_MISMATCH_DETECTED',
           orderId: order.id,
           order_number,
           capturedAmount,
@@ -421,72 +392,9 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // 保存 reference_id
-      await query(
-        'UPDATE orders SET reference_id = ? WHERE id = ?',
-        [orderId, order.id]
-      );
-
-      // 更新订单状态
-      const statusResult = await OrderStatusService.changeStatus(
-        order.id,
-        OrderEvent.PAY_SUCCESS,
-        {
-          type: OperatorType.SYSTEM,
-          id: 0,
-          name: 'PayPal'
-        },
-        { paypal_order_id: orderId, paypal_capture_id: responseData.id || orderId }
-      );
-
-      // 更新支付状态
-      await query(
-        'UPDATE orders SET payment_status = ? WHERE id = ?',
-        ['paid', order.id]
-      );
-
-      // 记录支付记录（添加幂等性检查）
-      try {
-        await query(
-          `INSERT INTO order_payments
-           (order_id, payment_method, transaction_id, amount, payment_status, paid_at)
-           VALUES (?, ?, ?, ?, 'paid', datetime('now'))`,
-          [order.id, 'paypal', responseData.id || orderId, order.final_amount]
-        );
-      } catch (err: any) {
-        // 如果 transaction_id 已存在，忽略错误
-        if (err.message && err.message.includes('UNIQUE constraint failed')) {
-          logMonitor('PAYMENTS', 'INFO', {
-            action: 'PAYMENT_RECORD_EXISTS',
-            orderId: order.id,
-            transactionId: responseData.id || orderId
-          });
-        } else {
-          throw err;
-        }
-      }
-
-      // 更新支付日志为成功
-      await query(
-        'UPDATE payment_logs SET is_success = 1, status = ? WHERE order_number = ? AND platform_order_id = ?',
-        ['success', order_number, orderId]
-      );
-
-      // 支付成功后删除购物车中对应的商品项
-      const orderItemsResult = await query(
-        'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
-        [order.id]
-      );
-      for (const item of orderItemsResult.rows) {
-        await query(
-          `DELETE FROM cart_items WHERE user_id = ? AND product_id = ?`,
-          [order.user_id, item.product_id]
-        );
-      }
-
       return NextResponse.json({
         success: true,
-        status: errorCode === 'ORDER_ALREADY_CAPTURED' ? 'already_paid' : 'captured',
+        status: 'verified',
         payment_id: responseData.id || orderId
       });
     }

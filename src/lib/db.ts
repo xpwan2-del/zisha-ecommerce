@@ -8,6 +8,7 @@ let SQL: SqlJsStatic | null = null;
 const dbPath = path.join(process.cwd(), 'src/lib/db/database.sqlite');
 
 let transactionSnapshot: Uint8Array | null = null;
+let dbFileMtimeMs = 0;
 
 async function initDB(): Promise<SqlJsDatabase> {
   logMonitor('DB', 'INIT', { message: '开始初始化数据库' });
@@ -18,10 +19,12 @@ async function initDB(): Promise<SqlJsDatabase> {
 
   try {
     const buffer = fs.readFileSync(dbPath);
+    dbFileMtimeMs = fs.statSync(dbPath).mtimeMs;
     logMonitor('DB', 'INIT', {
       message: '从磁盘读取数据库文件',
       size: buffer.length,
-      path: dbPath
+      path: dbPath,
+      mtimeMs: dbFileMtimeMs
     });
 
     const tempDb = new SQL.Database(new Uint8Array(buffer));
@@ -36,6 +39,7 @@ async function initDB(): Promise<SqlJsDatabase> {
     db.run("PRAGMA foreign_keys = ON");
     logMonitor('DB', 'INIT', { message: '数据库初始化完成，外键约束已启用' });
   } catch (error) {
+    dbFileMtimeMs = 0;
     logMonitor('DB', 'ERROR', { message: '创建新数据库（文件不存在或损坏）', error: String(error) });
     db = new SQL.Database();
     db.run("PRAGMA foreign_keys = ON");
@@ -51,8 +55,46 @@ export async function getDB(): Promise<SqlJsDatabase> {
   return db;
 }
 
+function getDiskMtime() {
+  try {
+    return fs.statSync(dbPath).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
 function saveToDisk(data: Uint8Array) {
   fs.writeFileSync(dbPath, Buffer.from(data));
+  dbFileMtimeMs = getDiskMtime();
+}
+
+function ensureFreshDatabase(database: SqlJsDatabase) {
+  if (transactionSnapshot) {
+    return database;
+  }
+
+  const diskMtimeMs = getDiskMtime();
+  if (!diskMtimeMs || diskMtimeMs <= dbFileMtimeMs) {
+    return database;
+  }
+
+  if (!SQL) {
+    throw new Error('SQL module not initialized, cannot reload database from disk');
+  }
+
+  const buffer = fs.readFileSync(dbPath);
+  database.close();
+  db = new SQL.Database(new Uint8Array(buffer));
+  db.run("PRAGMA foreign_keys = ON");
+  dbFileMtimeMs = diskMtimeMs;
+
+  logMonitor('DB', 'RELOAD', {
+    message: '检测到磁盘数据库更新，已重新加载到内存',
+    size: buffer.length,
+    mtimeMs: dbFileMtimeMs
+  });
+
+  return db;
 }
 
 function restoreFromSnapshot(database: SqlJsDatabase, snapshot: Uint8Array) {
@@ -82,8 +124,10 @@ function restoreFromSnapshot(database: SqlJsDatabase, snapshot: Uint8Array) {
 }
 
 export async function query(sql: string, params: any[] = []) {
-  const database = await getDB();
+  let database = await getDB();
   const sqlUpper = sql.trim().toUpperCase();
+
+  database = ensureFreshDatabase(database);
 
   if (sqlUpper === 'BEGIN' || sqlUpper.startsWith('BEGIN ')) {
     transactionSnapshot = database.export();

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface HomeModule {
@@ -27,31 +29,38 @@ interface HomeModule {
 }
 
 export function ActivityCarousel() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const [activities, setActivities] = useState<HomeModule[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible] = useState(true);
 
   useEffect(() => {
-    fetchActivities();
+    let cancelled = false;
+
+    fetch('/api/home-modules')
+      .then(async (response) => {
+        if (!response.ok) {
+          return [] as HomeModule[];
+        }
+
+        const modules = await response.json();
+        return modules.filter((module: HomeModule) => module.type === 'activity' && module.is_active);
+      })
+      .then((activityModules: HomeModule[]) => {
+        if (!cancelled) {
+          setActivities(activityModules);
+        }
+      })
+      .catch((error) => {
+        console.error('Error fetching activities:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const fetchActivities = async () => {
-    try {
-      const response = await fetch('/api/home-modules');
-      if (response.ok) {
-        const modules = await response.json();
-        const activityModules = modules.filter((module: HomeModule) => module.type === 'activity' && module.is_active);
-        setActivities(activityModules);
-      }
-    } catch (error) {
-      console.error('Error fetching activities:', error);
-    }
-  };
-
-  // 自动轮播
   useEffect(() => {
-    setIsVisible(true);
     if (activities.length > 0) {
       const interval = setInterval(() => {
         setCurrentIndex((prevIndex) => (prevIndex + 1) % activities.length);
@@ -78,11 +87,13 @@ export function ActivityCarousel() {
                 key={activity.id}
                 className={`absolute inset-0 transition-opacity duration-1000 ${index === currentIndex ? 'opacity-100' : 'opacity-0'}`}
               >
-                <a href={activity.link || '#'} className="block h-full w-full">
-                  <img
+                <Link href={activity.link || '#'} className="block h-full w-full">
+                  <Image
                     src={activity.image}
                     alt={activity.title}
-                    className="w-full h-full object-contain"
+                    fill
+                    sizes="100vw"
+                    className="object-contain"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-dark/95 via-dark/50 to-transparent flex flex-col justify-end">
                     <div className="p-3 sm:p-4 text-white w-full">
@@ -94,7 +105,7 @@ export function ActivityCarousel() {
                       </p>
                     </div>
                   </div>
-                </a>
+                </Link>
               </div>
             ))}
             
@@ -157,7 +168,6 @@ export function ActivityCarousel() {
   };
 
   if (activities.length === 0) {
-    // 使用默认数据作为 fallback
     const defaultActivities: HomeModule[] = [
       {
         id: 1,

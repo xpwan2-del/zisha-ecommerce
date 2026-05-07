@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { query } from '@/lib/db';
-import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
 import { logMonitor } from '@/lib/utils/logger';
 /**
  * @api {POST} /api/payments/stripe/notify Stripe 支付回调
  * @apiName StripeNotify
  * @apiGroup PAYMENTS
- * @apiDescription 接收 Stripe Webhook 支付结果通知，验证签名并更新订单状态。
+ * @apiDescription 接收 Stripe Webhook 支付结果通知。验签校验后返回结果，不写数据库，订单落单由 result 路由统一负责。
  */
 
 
@@ -28,6 +27,7 @@ async function getStripeErrorMessage(errorCode: string, lang: string): Promise<s
       HTTP_404: '订单不存在',
       HTTP_401: '支付配置错误',
       AMOUNT_MISMATCH: '支付金额与订单金额不一致',
+      ORDER_NUMBER_MISMATCH: '支付订单号不匹配',
       PAYMENT_ALREADY_PAID: '订单已支付',
       UNKNOWN_ERROR: '支付失败，请稍后重试'
     },
@@ -35,6 +35,7 @@ async function getStripeErrorMessage(errorCode: string, lang: string): Promise<s
       HTTP_404: 'Order not found',
       HTTP_401: 'Payment configuration error',
       AMOUNT_MISMATCH: 'Payment amount does not match order amount',
+      ORDER_NUMBER_MISMATCH: 'Payment order number mismatch',
       PAYMENT_ALREADY_PAID: 'Order already paid',
       UNKNOWN_ERROR: 'Payment failed, please retry'
     },
@@ -42,6 +43,7 @@ async function getStripeErrorMessage(errorCode: string, lang: string): Promise<s
       HTTP_404: 'الطلب غير موجود',
       HTTP_401: 'خطأ في تكوين الدفع',
       AMOUNT_MISMATCH: 'مبلغ الدفع لا يتطابق مع مبلغ الطلب',
+      ORDER_NUMBER_MISMATCH: 'رقم طلب الدفع غير متطابق',
       PAYMENT_ALREADY_PAID: 'تم الدفع بالفعل',
       UNKNOWN_ERROR: 'فشل الدفع، يرجى المحاولة لاحقًا'
     }
@@ -130,7 +132,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'ORDER_NUMBER_MISMATCH',
-        message: await getStripeErrorMessage('AMOUNT_MISMATCH', lang)
+        message: await getStripeErrorMessage('ORDER_NUMBER_MISMATCH', lang)
       }, { status: 403 });
     }
 
@@ -170,14 +172,56 @@ export async function POST(request: NextRequest) {
     const orderAmount = parseFloat(order.final_amount);
 
     if (Math.abs(paidAmount - orderAmount) > 0.01) {
-      logMonitor('PAYMENTS', 'WARNING', {
-        action: 'AMOUNT_MISMATCH',
+      logMonitor('PAYMENTS', 'ERROR', {
+        action: 'AMOUNT_MISMATCH_BLOCKED',
         orderId: order.id,
         order_number: stripeOrderNumber,
         paidAmount,
         orderAmount,
         difference: Math.abs(paidAmount - orderAmount)
       });
+
+      try {
+        await query(
+          `INSERT INTO payment_logs
+           (order_id, order_number, payment_method, status, error_code, error_message, is_success,
+            transaction_id, platform_order_id, payment_stage, amount, currency, extra_data, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+          [
+            order.id, stripeOrderNumber, 'stripe', 'failed',
+            'AMOUNT_MISMATCH', `Paid: ${paidAmount}, Expected: ${orderAmount}`, 0,
+            session.payment_intent || session_id, session_id, 'notify',
+            paidAmount, (session.currency || 'usd').toUpperCase(),
+            JSON.stringify({ difference: Math.abs(paidAmount - orderAmount) })
+          ]
+        );
+      } catch (_logErr) {}
+
+      if (session.payment_intent) {
+        try {
+          await stripe.refunds.create({ payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : (session.payment_intent as any).id });
+          logMonitor('PAYMENTS', 'SUCCESS', {
+            action: 'AMOUNT_MISMATCH_REFUNDED',
+            orderId: order.id,
+            order_number: stripeOrderNumber,
+            paymentIntent: session.payment_intent
+          });
+        } catch (_refundErr) {
+          logMonitor('PAYMENTS', 'ERROR', {
+            action: 'AMOUNT_MISMATCH_REFUND_FAILED',
+            orderId: order.id,
+            order_number: stripeOrderNumber,
+            paymentIntent: session.payment_intent,
+            error: String(_refundErr)
+          });
+        }
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: 'AMOUNT_MISMATCH',
+        message: await getStripeErrorMessage('AMOUNT_MISMATCH', lang)
+      }, { status: 400 });
     }
 
     logMonitor('PAYMENTS', 'SUCCESS', {
@@ -186,53 +230,6 @@ export async function POST(request: NextRequest) {
       order_number: stripeOrderNumber,
       paidAmount
     });
-
-    const statusResult = await OrderStatusService.changeStatus(
-      order.id,
-      OrderEvent.PAY_SUCCESS,
-      {
-        type: OperatorType.SYSTEM,
-        id: 0,
-        name: 'Stripe'
-      },
-      { stripe_session_id: session_id, stripe_payment_intent: session.payment_intent }
-    );
-
-    await query(
-      'UPDATE orders SET payment_status = ? WHERE id = ?',
-      ['paid', order.id]
-    );
-
-    try {
-      await query(
-        `INSERT INTO order_payments
-         (order_id, payment_method, transaction_id, amount, payment_status, paid_at)
-         VALUES (?, ?, ?, ?, 'paid', datetime('now'))`,
-        [order.id, 'stripe', session.payment_intent || session_id, order.final_amount]
-      );
-    } catch (err: any) {
-      if (err.message && err.message.includes('UNIQUE constraint failed')) {
-        logMonitor('PAYMENTS', 'INFO', {
-          action: 'PAYMENT_RECORD_EXISTS',
-          orderId: order.id,
-          transactionId: session.payment_intent || session_id
-        });
-      } else {
-        throw err;
-      }
-    }
-
-    // 支付成功后删除购物车中对应的商品项
-    const orderItemsResult = await query(
-      'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
-      [order.id]
-    );
-    for (const item of orderItemsResult.rows) {
-      await query(
-        `DELETE FROM cart_items WHERE user_id = ? AND product_id = ?`,
-        [order.user_id, item.product_id]
-      );
-    }
 
     return NextResponse.json({
       success: true,
