@@ -124,7 +124,7 @@ export async function registerRefundWebhookEvent(
   const eventId = fallbackEventId || `${platform}:unknown`;
 
   const existing = await query(
-    `SELECT id, status FROM ${WEBHOOK_EVENTS_TABLE}
+    `SELECT id, event_id, status FROM ${WEBHOOK_EVENTS_TABLE}
      WHERE platform = ?
        AND (
          event_id = ?
@@ -135,12 +135,39 @@ export async function registerRefundWebhookEvent(
   );
 
   if (existing.rows.length > 0) {
+    const existingRow = existing.rows[0];
+    const existingStatus = String(existingRow.status || 'processing');
+
+    if (existingStatus === 'completed') {
+      return {
+        success: true,
+        eventId: String(existingRow.event_id || eventId),
+        duplicate: true,
+        recordId: Number(existingRow.id),
+        status: existingStatus,
+      };
+    }
+
+    await query(
+      `UPDATE ${WEBHOOK_EVENTS_TABLE}
+       SET status = 'processing',
+           processing_state = CASE WHEN status = 'failed' THEN 'retrying' ELSE COALESCE(processing_state, 'processing') END,
+           retry_count = CASE WHEN status = 'failed' THEN COALESCE(retry_count, 0) + 1 ELSE COALESCE(retry_count, 0) END,
+           last_retry_at = CASE WHEN status = 'failed' THEN datetime('now') ELSE last_retry_at END,
+           raw_payload = ?,
+           error_message = NULL,
+           failure_stage = NULL,
+           updated_at = datetime('now')
+       WHERE id = ?`,
+      [serializePayload(payload), existingRow.id]
+    );
+
     return {
       success: true,
-      eventId,
-      duplicate: true,
-      recordId: Number(existing.rows[0].id),
-      status: String(existing.rows[0].status || 'processing'),
+      eventId: String(existingRow.event_id || eventId),
+      duplicate: false,
+      recordId: Number(existingRow.id),
+      status: 'processing',
     };
   }
 
@@ -161,18 +188,47 @@ export async function registerRefundWebhookEvent(
 
   if (insertResult.changes === 0) {
     const duplicate = await query(
-      `SELECT id, status FROM ${WEBHOOK_EVENTS_TABLE}
+      `SELECT id, event_id, status FROM ${WEBHOOK_EVENTS_TABLE}
        WHERE platform = ? AND transaction_id = ? AND event_type = ?
        LIMIT 1`,
       [platform, webhook.transactionId, eventType]
     );
 
+    const duplicateRow = duplicate.rows[0];
+    const duplicateStatus = String(duplicateRow?.status || 'processing');
+
+    if (duplicateStatus === 'completed') {
+      return {
+        success: true,
+        eventId: String(duplicateRow?.event_id || eventId),
+        duplicate: true,
+        recordId: Number(duplicateRow?.id || 0),
+        status: duplicateStatus,
+      };
+    }
+
+    if (duplicateRow?.id) {
+      await query(
+        `UPDATE ${WEBHOOK_EVENTS_TABLE}
+         SET status = 'processing',
+             processing_state = CASE WHEN status = 'failed' THEN 'retrying' ELSE COALESCE(processing_state, 'processing') END,
+             retry_count = CASE WHEN status = 'failed' THEN COALESCE(retry_count, 0) + 1 ELSE COALESCE(retry_count, 0) END,
+             last_retry_at = CASE WHEN status = 'failed' THEN datetime('now') ELSE last_retry_at END,
+             raw_payload = ?,
+             error_message = NULL,
+             failure_stage = NULL,
+             updated_at = datetime('now')
+         WHERE id = ?`,
+        [serializePayload(payload), duplicateRow.id]
+      );
+    }
+
     return {
       success: true,
-      eventId,
-      duplicate: true,
-      recordId: Number(duplicate.rows[0]?.id || 0),
-      status: String(duplicate.rows[0]?.status || 'processing'),
+      eventId: String(duplicateRow?.event_id || eventId),
+      duplicate: false,
+      recordId: Number(duplicateRow?.id || 0),
+      status: 'processing',
     };
   }
 
