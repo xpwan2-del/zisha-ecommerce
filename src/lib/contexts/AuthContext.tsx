@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 
 export interface User {
   id: string;
@@ -14,32 +15,30 @@ export interface User {
   referral_code: string;
 }
 
-/**
- * 从API响应中提取用户数据
- * @description 兼容新旧响应格式：{ success: true, data: { user } } 或 { user }
- */
 function extractUserFromResponse(data: any): User | null {
   if (!data) return null;
-  // 新格式：{ success: true, data: { user: {...} } }
   if (data.data?.user) return data.data.user;
-  // 旧格式：{ user: {...} }
   if (data.user) return data.user;
   return null;
 }
 
+export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  status: AuthStatus;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   checkAuth: () => Promise<boolean>;
+  isNavigating: boolean;
+  setIsNavigating: (val: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 辅助函数：从 Cookie 获取访客购物车
 const getGuestCartFromCookie = (): any[] | null => {
   if (typeof document === 'undefined') return null;
   const cookies = document.cookie.split(';');
@@ -56,106 +55,133 @@ const getGuestCartFromCookie = (): any[] | null => {
   return null;
 };
 
-// 辅助函数：清除访客购物车 Cookie
 const clearGuestCartCookie = () => {
   if (typeof document === 'undefined') return;
   document.cookie = 'cart_guest=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 };
 
+function normalizeUser(user: User | null): User | null {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    level: user.level || '普通',
+    points: user.points || 0,
+    total_spent: user.total_spent || 0,
+    referral_code: user.referral_code || ''
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [status, setStatus] = useState<AuthStatus>('loading');
+  const [isNavigating, setIsNavigating] = useState(false);
+  const pathname = usePathname();
+  const checkAuthPromiseRef = useRef<Promise<boolean> | null>(null);
+  const hasResolvedInitialAuthRef = useRef(false);
 
-  // Check auth status - 直接调用后端 API 验证（方案 B：不再用 JS 检查 Cookie）
+  const applyUserState = useCallback((nextUser: User | null) => {
+    const normalized = normalizeUser(nextUser);
+    setUser(normalized);
+    setStatus(normalized ? 'authenticated' : 'unauthenticated');
+    setIsLoading(false);
+  }, []);
+
   const checkAuthStatus = useCallback(async (): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/auth/me', {
-        credentials: 'include',
-      });
+    if (checkAuthPromiseRef.current) {
+      return checkAuthPromiseRef.current;
+    }
 
-      if (response.ok) {
-        const data = await response.json();
-        const user = extractUserFromResponse(data);
-        if (!user) {
-          setUser(null);
-          setIsLoading(false);
-          return false;
-        }
+    setIsLoading(true);
 
-        const userData = {
-          id: String(user.id),
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          level: user.level || '普通',
-          points: user.points || 0,
-          total_spent: user.total_spent || 0,
-          referral_code: user.referral_code || ''
-        };
-        setUser(userData);
-        setIsLoading(false);
-        return true;
-      } else if (response.status === 401) {
-        // Token 过期，尝试刷新
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST',
+    checkAuthPromiseRef.current = (async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
           credentials: 'include',
         });
 
-        if (refreshResponse.ok) {
-          // 刷新成功，重新获取用户信息
-          const meResponse = await fetch('/api/auth/me', {
-            credentials: 'include',
-          });
-          if (meResponse.ok) {
-            const meData = await meResponse.json();
-            const user = extractUserFromResponse(meData);
-            if (user) {
-              const userData = {
-                id: String(user.id),
-                name: user.name,
-                email: user.email,
-                phone: user.phone,
-                role: user.role,
-                level: user.level || '普通',
-                points: user.points || 0,
-                total_spent: user.total_spent || 0,
-                referral_code: user.referral_code || ''
-              };
-              setUser(userData);
-              setIsLoading(false);
-              return true;
+        if (response.ok) {
+          const data = await response.json();
+          if (data?.authenticated === false) {
+            applyUserState(null);
+            return false;
+          }
+          const nextUser = extractUserFromResponse(data);
+          applyUserState(nextUser);
+          return Boolean(nextUser);
+        }
+
+        if (response.status === 401) {
+          const errorData = await response.json().catch(() => null);
+
+          if (errorData?.error === 'AUTH_TOKEN_INVALID') {
+            const refreshResponse = await fetch('/api/auth/refresh', {
+              method: 'POST',
+              credentials: 'include',
+            });
+
+            if (refreshResponse.ok) {
+              const meResponse = await fetch('/api/auth/me', {
+                credentials: 'include',
+              });
+
+              if (meResponse.ok) {
+                const meData = await meResponse.json();
+                const nextUser = extractUserFromResponse(meData);
+                applyUserState(nextUser);
+                return Boolean(nextUser);
+              }
             }
           }
         }
-        // 刷新失败
-        setUser(null);
-        setIsLoading(false);
-        return false;
-      } else {
-        setIsLoading(false);
-        return false;
-      }
-    } catch (error) {
-      console.error('checkAuthStatus error:', error);
-      setIsLoading(false);
-      return false;
-    }
-  }, []);
 
-  // Mount Effect - 初始化时直接调用 API 验证
+        applyUserState(null);
+        return false;
+      } catch (error) {
+        console.error('checkAuthStatus error:', error);
+        applyUserState(null);
+        return false;
+      } finally {
+        setIsLoading(false);
+        hasResolvedInitialAuthRef.current = true;
+        checkAuthPromiseRef.current = null;
+      }
+    })();
+
+    return checkAuthPromiseRef.current;
+  }, [applyUserState]);
+
   useEffect(() => {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
-  // checkAuth - 供其他组件调用检查登录状态
+  // 路由变化时自动重置导航加载状态
+  useEffect(() => {
+    setIsNavigating(false);
+  }, [pathname]);
+
   const checkAuth = useCallback(async (): Promise<boolean> => {
-    if (!user) {
-      return await checkAuthStatus();
+    if (user) {
+      return true;
     }
-    return true;
-  }, [user, checkAuthStatus]);
+
+    if (checkAuthPromiseRef.current) {
+      return checkAuthPromiseRef.current;
+    }
+
+    if (!hasResolvedInitialAuthRef.current) {
+      return checkAuthStatus();
+    }
+
+    return false;
+  }, [checkAuthStatus, user]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -174,28 +200,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await response.json();
-      const user = extractUserFromResponse(data);
+      const nextUser = extractUserFromResponse(data);
 
-      if (!user) {
+      if (!nextUser) {
         throw new Error('Failed to parse user data');
       }
 
-      const userData = {
-        id: String(user.id),
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        level: user.level || '普通',
-        points: user.points || 0,
-        total_spent: user.total_spent || 0,
-        referral_code: user.referral_code || ''
-      };
-      setUser(userData);
+      applyUserState(nextUser);
+      hasResolvedInitialAuthRef.current = true;
 
-      // 合并访客购物车（通过 Cookie）
       const guestCart = getGuestCartFromCookie();
-      if (guestCart && user) {
+      if (guestCart && nextUser) {
         try {
           await fetch('/api/cart/merge', {
             method: 'POST',
@@ -217,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string, phone?: string) => {
     setIsLoading(true);
     try {
       const response = await fetch('/api/auth/register', {
@@ -225,7 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, phone }),
       });
 
       if (!response.ok) {
@@ -234,21 +249,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await response.json();
+      const nextUser = data.user ? normalizeUser(data.user) : null;
 
-      const userData = {
-        id: String(data.user.id),
-        name: data.user.name,
-        email: data.user.email,
-        phone: data.user.phone,
-        role: data.user.role,
-        level: data.user.level || '普通',
-        points: data.user.points || 0,
-        total_spent: data.user.total_spent || 0,
-        referral_code: data.user.referral_code || ''
-      };
-      setUser(userData);
+      if (!nextUser) {
+        throw new Error('Failed to parse user data');
+      }
 
-      // 合并访客购物车（通过 Cookie）
+      applyUserState(nextUser);
+      hasResolvedInitialAuthRef.current = true;
+
       const guestCart = getGuestCartFromCookie();
       if (guestCart && data.user) {
         try {
@@ -282,6 +291,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Logout error:', error);
     } finally {
       setUser(null);
+      setStatus('unauthenticated');
+      hasResolvedInitialAuthRef.current = true;
     }
   };
 
@@ -292,11 +303,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isLoading,
+        status,
         login,
         register,
         logout,
         isAuthenticated,
         checkAuth,
+        isNavigating,
+        setIsNavigating,
       }}
     >
       {children}

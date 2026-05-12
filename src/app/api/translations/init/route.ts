@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 /**
  * @api {GET} /api/translations/init 初始化翻译表
  * @apiName InitTranslationsTable
@@ -10,6 +11,9 @@ import { logMonitor } from '@/lib/utils/logger';
 
 
 export async function POST(request: NextRequest) {
+  const authResult = checkAdminAuth(request);
+  if (authResult.response) return authResult.response;
+
   try {
     logMonitor('TRANSLATIONS', 'REQUEST', { method: 'POST', action: 'INIT_TRANSLATIONS' });
     
@@ -63,6 +67,23 @@ export async function POST(request: NextRequest) {
       { key: 'products.buy_now', language: 'en', value: 'Buy Now' },
       { key: 'products.description', language: 'en', value: 'Description' },
       { key: 'products.reviews', language: 'en', value: 'Reviews' },
+      { key: 'reviews.feedback.submitted', language: 'en', value: 'Review submitted' },
+      { key: 'reviews.feedback.reply_submitted', language: 'en', value: 'Reply submitted' },
+      { key: 'reviews.feedback.followup_submitted', language: 'en', value: 'Follow-up review submitted' },
+      { key: 'reviews.feedback.success_hint', language: 'en', value: 'Saved to the current product reviews.' },
+      { key: 'reviews.feedback.reply_success_hint', language: 'en', value: 'Your reply has been posted under this review.' },
+      { key: 'reviews.feedback.followup_success_hint', language: 'en', value: 'Your follow-up review has been added below the original review.' },
+      { key: 'reviews.feedback.reviewed', language: 'en', value: 'Reviewed' },
+      { key: 'reviews.feedback.replied', language: 'en', value: 'Replied' },
+      { key: 'reviews.feedback.followed_up', language: 'en', value: 'Followed up' },
+      { key: 'reviews.feedback.image_alt', language: 'en', value: 'Submitted review image' },
+      { key: 'reviews.feedback.error_title', language: 'en', value: 'Please check and try again' },
+      { key: 'reviews.feedback.comment_required', language: 'en', value: 'Please enter your review content.' },
+      { key: 'reviews.feedback.reply_required', language: 'en', value: 'Please enter your reply content.' },
+      { key: 'reviews.feedback.followup_required', language: 'en', value: 'Please enter your follow-up review content.' },
+      { key: 'reviews.feedback.submitted_content', language: 'en', value: 'Submitted content' },
+      { key: 'reviews.feedback.max_images_exceeded', language: 'en', value: 'You can upload up to {maxCount} images.' },
+      { key: 'reviews.feedback.upload_failed', language: 'en', value: 'Image upload failed.' },
       
       // 中文翻译
       { key: 'products.filters', language: 'zh', value: '筛选' },
@@ -90,6 +111,23 @@ export async function POST(request: NextRequest) {
       { key: 'products.buy_now', language: 'zh', value: '立即购买' },
       { key: 'products.description', language: 'zh', value: '描述' },
       { key: 'products.reviews', language: 'zh', value: '评价' },
+      { key: 'reviews.feedback.submitted', language: 'zh', value: '评价已提交' },
+      { key: 'reviews.feedback.reply_submitted', language: 'zh', value: '回复已提交' },
+      { key: 'reviews.feedback.followup_submitted', language: 'zh', value: '追评已提交' },
+      { key: 'reviews.feedback.success_hint', language: 'zh', value: '已保存到当前商品评价中。' },
+      { key: 'reviews.feedback.reply_success_hint', language: 'zh', value: '您的回复已展示在这条评价下方。' },
+      { key: 'reviews.feedback.followup_success_hint', language: 'zh', value: '您的追评已追加到原评价下方。' },
+      { key: 'reviews.feedback.reviewed', language: 'zh', value: '已评价' },
+      { key: 'reviews.feedback.replied', language: 'zh', value: '已回复' },
+      { key: 'reviews.feedback.followed_up', language: 'zh', value: '已追评' },
+      { key: 'reviews.feedback.image_alt', language: 'zh', value: '已提交的评价图片' },
+      { key: 'reviews.feedback.error_title', language: 'zh', value: '请检查后再提交' },
+      { key: 'reviews.feedback.comment_required', language: 'zh', value: '请输入评价内容。' },
+      { key: 'reviews.feedback.reply_required', language: 'zh', value: '请输入回复内容。' },
+      { key: 'reviews.feedback.followup_required', language: 'zh', value: '请输入追评内容。' },
+      { key: 'reviews.feedback.submitted_content', language: 'zh', value: '已提交内容' },
+      { key: 'reviews.feedback.max_images_exceeded', language: 'zh', value: '最多只能上传 {maxCount} 张图片。' },
+      { key: 'reviews.feedback.upload_failed', language: 'zh', value: '上传图片失败。' },
       
       // 阿拉伯文翻译
       { key: 'products.filters', language: 'ar', value: 'مرشحات' },
@@ -117,6 +155,21 @@ export async function POST(request: NextRequest) {
       { key: 'products.buy_now', language: 'ar', value: 'اشتر الآن' },
       { key: 'products.description', language: 'ar', value: 'الوصف' },
       { key: 'products.reviews', language: 'ar', value: 'التقييمات' },
+      { key: 'reviews.feedback.submitted', language: 'ar', value: 'تم إرسال التقييم' },
+      { key: 'reviews.feedback.reply_submitted', language: 'ar', value: 'تم إرسال الرد' },
+      { key: 'reviews.feedback.followup_submitted', language: 'ar', value: 'تم إرسال التقييم الإضافي' },
+      { key: 'reviews.feedback.success_hint', language: 'ar', value: 'تم حفظه ضمن تقييمات المنتج الحالية.' },
+      { key: 'reviews.feedback.reply_success_hint', language: 'ar', value: 'تم نشر ردك أسفل هذا التقييم.' },
+      { key: 'reviews.feedback.followup_success_hint', language: 'ar', value: 'تمت إضافة تقييمك الإضافي أسفل التقييم الأصلي.' },
+      { key: 'reviews.feedback.reviewed', language: 'ar', value: 'تم التقييم' },
+      { key: 'reviews.feedback.replied', language: 'ar', value: 'تم الرد' },
+      { key: 'reviews.feedback.followed_up', language: 'ar', value: 'تمت الإضافة' },
+      { key: 'reviews.feedback.image_alt', language: 'ar', value: 'صورة التقييم المرسلة' },
+      { key: 'reviews.feedback.error_title', language: 'ar', value: 'يرجى المراجعة والمحاولة مرة أخرى' },
+      { key: 'reviews.feedback.comment_required', language: 'ar', value: 'يرجى إدخال محتوى التقييم.' },
+      { key: 'reviews.feedback.reply_required', language: 'ar', value: 'يرجى إدخال محتوى الرد.' },
+      { key: 'reviews.feedback.followup_required', language: 'ar', value: 'يرجى إدخال محتوى التقييم الإضافي.' },
+      { key: 'reviews.feedback.submitted_content', language: 'ar', value: 'المحتوى المرسل' },
     ];
 
     // 批量插入翻译数据

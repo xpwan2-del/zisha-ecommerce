@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AddressList, AddressForm } from '@/components/addresses';
@@ -30,7 +30,7 @@ interface UserCoupon {
 }
 
 type MyCouponTab = 'available' | 'expired' | 'used';
-type OrderTab = 'all' | 'pending' | 'paid' | 'shipped' | 'reviewing' | 'refund';
+type OrderTab = 'all' | 'pending' | 'paid' | 'shipped' | 'delivered' | 'refund';
 
 interface OrderItem {
   id: number;
@@ -192,6 +192,7 @@ function CouponCard({ userCoupon, isExpired, isUsed, isLoggedIn }: {
   );
 }
 
+
 function AvailableCouponCard({ coupon, onReceive, isLoggedIn }: {
   coupon: UserCoupon;
   onReceive: (couponId: number) => void;
@@ -268,6 +269,7 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showNewAddressForm, setShowNewAddressForm] = useState(false);
   const [countdown, setCountdown] = useState<ReturnType<typeof getCountdown> | null>(null);
+  const [confirmingOrderId, setConfirmingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     if (order.order_status === 'pending' && order.created_at) {
@@ -283,8 +285,10 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
   const statusMap: Record<string, { label: string; bg: string }> = {
     pending: { label: '待付款', bg: 'bg-yellow-500' },
     paid: { label: '待发货', bg: 'bg-blue-500' },
-    shipped: { label: '已发货', bg: 'bg-purple-500' },
-    reviewing: { label: '待评价', bg: 'bg-yellow-500' },
+    shipped: { label: '待收货', bg: 'bg-purple-500' },
+    delivered: { label: '待评价', bg: 'bg-emerald-500' },
+    completed: { label: '已完成', bg: 'bg-green-600' },
+    refunding_payment: { label: '退款待审核', bg: 'bg-orange-400' },
     refunding: { label: '退款中', bg: 'bg-orange-500' },
     refunded: { label: '已退款', bg: 'bg-gray-500' },
     cancelled: { label: '已取消', bg: 'bg-gray-400' }
@@ -298,11 +302,13 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
       case 'paid':
         return (<><button onClick={handleRequestRefund} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>申请退款</button><button onClick={handleEditAddress} className="px-3 py-1.5 bg-blue-100 text-blue-600 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors">修改地址</button></>);
       case 'shipped':
-        return (<><button onClick={handleRequestRefund} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>申请退款</button><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--primary)', color: '#fff' }}>查看物流</button></>);
-      case 'reviewing':
-        return (<><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--primary)', color: '#fff' }}>再来一单</button><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>评价商品</button></>);
+        return (<><button onClick={handleConfirmReceipt} disabled={confirmingOrderId === order.id} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--primary)', color: '#fff' }}>{confirmingOrderId === order.id ? '确认中...' : '确认收货'}</button><button onClick={handleRequestRefund} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--accent)', color: '#fff' }}>申请退款</button><button className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--primary)', color: '#fff' }}>查看物流</button></>);
+      case 'delivered':
+      case 'completed':
+        return (<button onClick={handleGoReview} className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors hover:opacity-90" style={{ background: 'var(--primary)', color: '#fff' }}>去评价</button>);
+      case 'refunding_payment':
       case 'refunding':
-        return (<button className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs cursor-pointer hover:bg-gray-200 transition-colors">撤销退款</button>);
+        return (<span className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs">退款处理中</span>);
       default:
         return null;
     }
@@ -310,11 +316,12 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
 
   const statusLabelMap: Record<string, string> = {
     pending: '待付款',
-    paid: '已支付',
-    shipped: '已发货',
-    reviewing: '待评价',
+    paid: '待发货',
+    shipped: '待收货',
+    delivered: '待评价',
     completed: '已完成',
     cancelled: '已取消',
+    refunding_payment: '退款待审核',
     refunding: '退款中',
     refunded: '已退款'
   };
@@ -376,6 +383,15 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
     router.push(`/orders/${order.id}`);
   };
 
+  const handleGoReview = () => {
+    const firstItem = order.items?.[0];
+    if (firstItem?.id) {
+      router.push(`/orders/${order.id}?review_item=${firstItem.id}`);
+      return;
+    }
+    router.push(`/orders/${order.id}`);
+  };
+
   const handleCancelOrder = async () => {
     if (!confirm('确定要取消这个订单吗？取消后库存将自动归还。')) return;
     try {
@@ -413,6 +429,29 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
       }
     } catch (err) {
       alert('退款请求失败');
+    }
+  };
+
+  const handleConfirmReceipt = async () => {
+    if (confirmingOrderId === order.id) return;
+    if (!confirm('确认已收到商品吗？确认后订单将进入待评价状态。')) return;
+
+    setConfirmingOrderId(order.id);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/confirm`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (data.success) {
+        onAddressUpdated?.();
+      } else {
+        alert(data.error || '确认收货失败');
+      }
+    } catch (err) {
+      alert('确认收货请求失败');
+    } finally {
+      setConfirmingOrderId(null);
     }
   };
 
@@ -491,7 +530,9 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
                   order.order_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                   order.order_status === 'paid' ? 'bg-blue-100 text-blue-800' :
                   order.order_status === 'shipped' ? 'bg-indigo-100 text-indigo-800' :
+                  order.order_status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
                   order.order_status === 'completed' ? 'bg-green-100 text-green-800' :
+                  ['refunding_payment', 'refunding'].includes(order.order_status) ? 'bg-orange-100 text-orange-800' :
                   'bg-gray-100 text-gray-600'
                 }`}>
                   {statusLabelMap[order.order_status] || order.order_status}
@@ -672,7 +713,7 @@ function OrderCard({ order, isSelected, onToggle, onAddressUpdated }: { order: O
   );
 }
 
-export default function AccountPage() {
+function AccountPageContent() {
   const { user, isLoading, logout, checkAuth } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -741,8 +782,8 @@ export default function AccountPage() {
       case 'pending': return orders.filter(o => o.order_status === 'pending').length;
       case 'paid': return orders.filter(o => o.order_status === 'paid').length;
       case 'shipped': return orders.filter(o => o.order_status === 'shipped').length;
-      case 'reviewing': return orders.filter(o => o.order_status === 'reviewing').length;
-      case 'refund': return orders.filter(o => ['refunding', 'refunded'].includes(o.order_status)).length;
+      case 'delivered': return orders.filter(o => ['delivered', 'completed'].includes(o.order_status)).length;
+      case 'refund': return orders.filter(o => ['refunding_payment', 'refunding', 'refunded'].includes(o.order_status)).length;
       default: return 0;
     }
   };
@@ -750,8 +791,10 @@ export default function AccountPage() {
   const filteredOrders = orderTab === 'all' 
     ? orders 
     : orders.filter(o => orderTab === 'refund' 
-        ? ['refunding', 'refunded'].includes(o.order_status) 
-        : o.order_status === orderTab);
+        ? ['refunding_payment', 'refunding', 'refunded'].includes(o.order_status) 
+        : orderTab === 'delivered'
+          ? ['delivered', 'completed'].includes(o.order_status)
+          : o.order_status === orderTab);
 
   const fetchCoupons = async () => {
     if (!user) return;
@@ -1032,14 +1075,14 @@ export default function AccountPage() {
                   <h2 className="text-2xl font-semibold text-dark mb-6" style={{ fontFamily: 'Cormorant, serif' }}>订单管理</h2>
                   
                   <div className="flex border-b mb-6" style={{ borderColor: 'var(--border)' }}>
-                    {(['all', 'pending', 'paid', 'shipped', 'reviewing', 'refund'] as OrderTab[]).map(tab => (
+                    {(['all', 'pending', 'paid', 'shipped', 'delivered', 'refund'] as OrderTab[]).map(tab => (
                       <button
                         key={tab}
                         onClick={() => setOrderTab(tab)}
                         className={`px-4 py-2 text-sm font-medium border-b-2 cursor-pointer ${orderTab === tab ? 'border-accent' : 'border-transparent'}`}
                         style={{ color: orderTab === tab ? 'var(--accent)' : 'var(--text-muted)' }}
                       >
-                        {tab === 'all' ? '全部' : tab === 'pending' ? '待付款' : tab === 'paid' ? '待发货' : tab === 'shipped' ? '待收货' : tab === 'reviewing' ? '评价' : '退款/售后'} ({getOrderTabCount(tab)})
+                        {tab === 'all' ? '全部' : tab === 'pending' ? '待付款' : tab === 'paid' ? '待发货' : tab === 'shipped' ? '待收货' : tab === 'delivered' ? '待评价' : '退款/售后'} ({getOrderTabCount(tab)})
                       </button>
                     ))}
                   </div>
@@ -1202,5 +1245,13 @@ export default function AccountPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense fallback={null}>
+      <AccountPageContent />
+    </Suspense>
   );
 }

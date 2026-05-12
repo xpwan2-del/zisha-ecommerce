@@ -1,7 +1,15 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { recordAdminAuditLog } from '@/lib/admin-audit';
 import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
+
+function calculateStatusId(quantity: number): number {
+  if (quantity <= 0) return 4;
+  if (quantity <= 5) return 3;
+  if (quantity <= 10) return 2;
+  return 1;
+}
 
 export async function POST(request: NextRequest) {
   logApiRequest('INVENTORY', 'POST', '/api/admin/inventory/adjust');
@@ -14,7 +22,7 @@ export async function POST(request: NextRequest) {
     const operatorId = auth.user.userId;
     const opName = operator_name || auth.user.name || 'Admin';
 
-    if (!product_id || !quantity) {
+    if (product_id === undefined || product_id === null || quantity === undefined || quantity === null) {
       return createErrorResponse('MISSING_PARAMS', 400);
     }
 
@@ -27,18 +35,23 @@ export async function POST(request: NextRequest) {
 
     switch (change_type) {
       case 'increase': newStock = currentStock + quantity; break;
-      case 'decrease': newStock = Math.max(0, currentStock - quantity); break;
+      case 'decrease': newStock = currentStock - quantity; break;
       case 'set': newStock = quantity; break;
       default: return createErrorResponse('INVALID_CHANGE_TYPE', 400);
     }
 
+    if (newStock < 0) {
+      return createErrorResponse('INSUFFICIENT_STOCK', 400);
+    }
+
+    const statusId = calculateStatusId(newStock);
+
     if (inv.rows.length > 0) {
       await query(
-        `UPDATE inventory SET quantity = ?, updated_at = datetime('now') WHERE product_id = ?`,
-        [newStock, product_id]
+        `UPDATE inventory SET quantity = ?, status_id = ?, updated_at = datetime('now') WHERE product_id = ?`,
+        [newStock, statusId, product_id]
       );
     } else {
-      const statusId = newStock <= 0 ? 4 : newStock <= 5 ? 3 : newStock <= 10 ? 2 : 1;
       await query(
         `INSERT INTO inventory (product_id, product_name, quantity, status_id, updated_at)
          VALUES (?, ?, ?, ?, datetime('now'))`,
@@ -71,6 +84,25 @@ export async function POST(request: NextRequest) {
         [product_id]
       );
     }
+
+    await recordAdminAuditLog({
+      request,
+      module: 'INVENTORY',
+      action: 'ADJUST_STOCK',
+      description: '管理员手动调整库存',
+      operator: opName,
+      status: 'success',
+      resourceId: product_id,
+      resourceType: 'product',
+      riskLevel: 'critical',
+      metadata: {
+        change_type,
+        quantity,
+        reason: reason || '管理员手动调整',
+        stockBefore: currentStock,
+        stockAfter: newStock,
+      },
+    });
 
     logApiSuccess('INVENTORY', 'ADJUST_STOCK', { product_id, stockBefore: currentStock, stockAfter: newStock });
     return createSuccessResponse({

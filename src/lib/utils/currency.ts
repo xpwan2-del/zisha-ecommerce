@@ -114,7 +114,7 @@ export const supportedCurrencies = [
 
 export const COUNTDOWN_MINUTES = 30;
 
-export function getCountdown(createdAt: string): { remaining: number; display: string; urgency: 'normal' | 'warning' | 'critical' | 'expired' } {
+export function getCountdown(createdAt: string, lang: string = 'zh'): { remaining: number; display: string; urgency: 'normal' | 'warning' | 'critical' | 'expired' } {
   const now = Date.now();
   const created = new Date(createdAt + 'Z').getTime();
   const deadline = created + COUNTDOWN_MINUTES * 60 * 1000;
@@ -124,7 +124,9 @@ export function getCountdown(createdAt: string): { remaining: number; display: s
 
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
-  const display = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  
+  const display = lang === 'ar' ? `تنتهي خلال ${timeStr}` : lang === 'en' ? `Expires in ${timeStr}` : `剩余时间 ${timeStr}`;
 
   let urgency: 'normal' | 'warning' | 'critical' = 'normal';
   if (remaining <= 300) urgency = 'critical';

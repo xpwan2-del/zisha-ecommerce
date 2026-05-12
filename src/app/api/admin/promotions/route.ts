@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { recordAdminAuditLog } from '@/lib/admin-audit';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, getPaginationParams, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
 
 export async function GET(request: NextRequest) {
@@ -62,6 +63,18 @@ export async function POST(request: NextRequest) {
       [name, name_en || '', name_ar || '', type, discount_percent, status || 'active', description || '',
        min_spend || 0, max_discount || null, usage_limit || null, icon || '', color || '']
     );
+
+    await recordAdminAuditLog({
+      request,
+      module: 'PROMOTIONS',
+      action: 'CREATE_PROMOTION',
+      description: `创建促销活动 ${name}`,
+      operator: auth.user.name || 'Admin',
+      resourceId: Number(result.lastInsertRowid),
+      resourceType: 'promotion',
+      riskLevel: 'medium',
+      metadata: { name, type, discount_percent, status: status || 'active' },
+    });
 
     logApiSuccess('PRODUCTS', 'CREATE_PROMOTION', { name, type, discount_percent });
     return createSuccessResponse({ id: result.lastInsertRowid, name }, 201);

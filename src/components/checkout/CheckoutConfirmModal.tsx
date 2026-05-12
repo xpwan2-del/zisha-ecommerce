@@ -23,6 +23,8 @@ interface Address {
 interface CouponInfo {
   code: string;
   name: string;
+  name_en?: string;
+  name_ar?: string;
   discount: number;
 }
 
@@ -61,7 +63,7 @@ export default function CheckoutConfirmModal({
   displayCurrency,
   isLoading = false
 }: CheckoutConfirmModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
 
   if (!isOpen) return null;
@@ -71,14 +73,21 @@ export default function CheckoutConfirmModal({
   const getPaymentMethodLabel = (method: string) => {
     switch (method) {
       case 'stripe':
-        return 'Credit/Debit Card';
+        return t('payment.method.card', 'Credit/Debit Card');
       case 'paypal':
-        return 'PayPal';
+        return t('payment.method.paypal', 'PayPal');
       case 'mock':
-        return '模拟支付';
+        return i18n.language === 'ar' ? 'دفع محاكي' : i18n.language === 'en' ? 'Mock Payment' : '模拟支付';
       default:
         return method;
     }
+  };
+
+  const getCouponName = (coupon: CouponInfo) => {
+    const lang = i18n.language;
+    if (lang === 'ar' && coupon.name_ar) return coupon.name_ar;
+    if (lang === 'en' && coupon.name_en) return coupon.name_en;
+    return coupon.name;
   };
 
   return (
@@ -171,7 +180,7 @@ export default function CheckoutConfirmModal({
                 {coupons.map((coupon, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                     <div>
-                      <p className="font-medium text-green-700">{coupon.name}</p>
+                      <p className="font-medium text-green-700">{getCouponName(coupon)}</p>
                       <p className="text-xs text-green-600">{coupon.code}</p>
                     </div>
                     <span className="font-medium text-green-700">-{formatPrice(coupon.discount)}</span>
@@ -246,9 +255,21 @@ export default function CheckoutConfirmModal({
               {showPaymentMethods && (
                 <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
                   {[
-                    { value: 'stripe', label: 'Credit/Debit Card', desc: 'Visa, Mastercard, American Express' },
-                    { value: 'paypal', label: 'PayPal', desc: 'Pay with your PayPal account' },
-                    { value: 'mock', label: '模拟支付', desc: '测试使用，模拟支付成功' }
+                    { 
+                      value: 'stripe', 
+                      label: 'Credit/Debit Card', 
+                      desc: i18n.language === 'ar' ? 'فيزا، ماستركارد، أمريكان إكسبريس' : i18n.language === 'en' ? 'Visa, Mastercard, American Express' : 'Visa, Mastercard, American Express' 
+                    },
+                    { 
+                      value: 'paypal', 
+                      label: 'PayPal', 
+                      desc: i18n.language === 'ar' ? 'الدفع باستخدام حساب PayPal الخاص بك' : i18n.language === 'en' ? 'Pay with your PayPal account' : 'Pay with your PayPal account' 
+                    },
+                    { 
+                      value: 'mock', 
+                      label: i18n.language === 'ar' ? 'دفع محاكي' : i18n.language === 'en' ? 'Mock Payment' : '模拟支付', 
+                      desc: i18n.language === 'ar' ? 'للاختبار فقط، محاكاة نجاح الدفع' : i18n.language === 'en' ? 'For testing only, simulate payment success' : '测试使用，模拟支付成功' 
+                    }
                   ].map((method) => (
                     <div
                       key={method.value}

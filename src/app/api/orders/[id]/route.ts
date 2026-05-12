@@ -63,19 +63,46 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const itemsResult = await query(
       `SELECT
         oi.*,
+        oi.id as order_item_id,
         p.name as product_name,
         p.name_en as product_name_en,
         p.name_ar as product_name_ar,
-        p.image as product_image
+        p.image as product_image,
+        r.id as review_id,
+        r.status as review_status
       FROM order_items oi
       LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN reviews r ON r.order_item_id = oi.id AND r.user_id = ?
       WHERE oi.order_id = ?`,
-      [orderId]
+      [order.user_id, orderId]
     );
 
     // Get order logistics
     const logisticsResult = await query(
       'SELECT * FROM order_logistics WHERE order_id = ?',
+      [orderId]
+    );
+
+    const orderCouponsResult = await query(
+      `SELECT
+         oc.id as order_coupon_id,
+         oc.coupon_id as user_coupon_id,
+         c.id as coupon_id,
+         c.code as coupon_code,
+         c.name as coupon_name,
+         c.name_en as coupon_name_en,
+         c.name_ar as coupon_name_ar,
+         c.type as coupon_type,
+         c.value as coupon_value,
+         c.description,
+         uc.expires_at,
+         c.is_stackable,
+         oc.discount_applied
+       FROM order_coupons oc
+       LEFT JOIN user_coupons uc ON oc.coupon_id = uc.id
+       LEFT JOIN coupons c ON uc.coupon_id = c.id
+       WHERE oc.order_id = ?
+       ORDER BY oc.id ASC`,
       [orderId]
     );
 
@@ -94,11 +121,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       itemCount: itemsResult.rows?.length || 0 
     });
 
+    const canReviewStatus = ['delivered', 'completed'].includes(String(order.order_status));
+    const items = (itemsResult.rows || []).map((item: any) => ({
+      ...item,
+      order_item_id: Number(item.order_item_id || item.id),
+      review_id: item.review_id ? Number(item.review_id) : null,
+      review_status: item.review_status || null,
+      has_reviewed: Boolean(item.review_id),
+      can_review: canReviewStatus && !item.review_id,
+    }));
+
     return NextResponse.json({
       success: true,
       data: {
         ...order,
-        items: itemsResult.rows || [],
+        selected_coupon_ids: order.coupon_ids ? JSON.parse(order.coupon_ids) : [],
+        items,
+        coupons: orderCouponsResult.rows || [],
         logistics: logisticsResult.rows || [],
         payment_logs: paymentLogsResult.rows || []
       }

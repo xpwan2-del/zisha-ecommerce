@@ -96,11 +96,15 @@ interface CouponItem {
   coupon_id: number;
   code: string;
   name: string;
-  type: string;
+    name_en?: string;
+    name_ar?: string;
+    type: string;
   value: number;
   is_stackable: number;
   permanent_days: number;
   description: string;
+  description_en?: string;
+  description_ar?: string;
   expires_at: string;
 }
 
@@ -118,6 +122,8 @@ async function getUserCoupons(userId: string, orderAmount: number) {
       c.start_date,
       c.end_date,
       c.description,
+      c.description_en,
+      c.description_ar,
       uc.status as user_coupon_status,
       uc.expires_at
     FROM user_coupons uc
@@ -143,6 +149,8 @@ async function getUserCoupons(userId: string, orderAmount: number) {
       is_stackable: row.is_stackable,
       permanent_days: row.permanent_days || 0,
       description: row.description,
+      description_en: row.description_en,
+      description_ar: row.description_ar,
       expires_at: row.expires_at
     };
     available.push(coupon);
@@ -165,6 +173,8 @@ async function getUsedCoupons(userId: string) {
       c.start_date,
       c.end_date,
       c.description,
+      c.description_en,
+      c.description_ar,
       uc.status as user_coupon_status,
       uc.expires_at,
       uc.used_order_id
@@ -185,6 +195,8 @@ async function getUsedCoupons(userId: string) {
     is_stackable: row.is_stackable,
     permanent_days: row.permanent_days || 0,
     description: row.description,
+    description_en: row.description_en,
+    description_ar: row.description_ar,
     expires_at: row.expires_at
   }));
 }
@@ -203,6 +215,8 @@ async function getExpiredCoupons(userId: string) {
       c.start_date,
       c.end_date,
       c.description,
+      c.description_en,
+      c.description_ar,
       uc.status as user_coupon_status,
       uc.expires_at
     FROM user_coupons uc
@@ -224,6 +238,8 @@ async function getExpiredCoupons(userId: string) {
     is_stackable: row.is_stackable,
     permanent_days: row.permanent_days || 0,
     description: row.description,
+    description_en: row.description_en,
+    description_ar: row.description_ar,
     expires_at: row.expires_at
   }));
 }
@@ -241,6 +257,8 @@ async function getClaimableCoupons(userId: string) {
       c.start_date,
       c.end_date,
       c.description,
+      c.description_en,
+      c.description_ar,
       c.is_active
     FROM coupons c
     WHERE c.is_active = 1
@@ -260,6 +278,8 @@ async function getClaimableCoupons(userId: string) {
     is_stackable: row.is_stackable,
     permanent_days: row.permanent_days || 0,
     description: row.description,
+    description_en: row.description_en,
+    description_ar: row.description_ar,
     expires_at: row.end_date
   }));
 }

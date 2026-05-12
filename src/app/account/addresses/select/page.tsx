@@ -90,7 +90,7 @@ function AddressSelectContent() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}></div>
+        <div className="loading-spinner"></div>
       </div>
     );
   }
@@ -213,7 +213,7 @@ export default function AddressSelectPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}></div>
+        <div className="loading-spinner"></div>
       </div>
     }>
       <AddressSelectContent />

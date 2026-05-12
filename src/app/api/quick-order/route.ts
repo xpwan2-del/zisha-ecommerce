@@ -375,6 +375,7 @@ export async function GET(request: NextRequest) {
           order_id: order.id,
           order_number: order.order_number,
           order_status: order.order_status,
+          selected_coupon_ids: order.coupon_ids ? JSON.parse(order.coupon_ids) : [],
           product: {
             id: order.product_id,
             name: order.name,

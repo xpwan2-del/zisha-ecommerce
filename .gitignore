@@ -5,6 +5,9 @@ node_modules/
 .next/
 out/
 
+# Runtime uploads
+public/uploads/
+
 # Environment variables
 .env
 .env.local
@@ -45,6 +48,26 @@ node_modules
 .trae/plans/
 
 # Local databases and backups
+*.db
+*.db-*
 *.sqlite
 *.sqlite.*
+*.sqlite-*
+!src/lib/db/database.sqlite
 zishang.db
+backups/
+tmp/
+.tmp-*
+tmp-*
+*.test.mjs
+*.guard.mjs
+*-guard.test.mjs
+tests/
+e2e-*.mjs
+page-level-e2e*.mjs
+*e2e-report.md
+*test-report.md
+src/lib/db/database-backup-*.sqlite
+src/lib/db/*.sqlite-*
+src/lib/db/*.db
+src/lib/db/*.db-*

@@ -13,6 +13,8 @@ export interface PaymentSuccessPersistence {
     paymentStatus: 'paid';
     paymentMethod: string;
     referenceId: string;
+    afterSaleStatus: 'none';
+    refundFromStatus: null;
   };
   orderPayment: {
     orderId: number;
@@ -36,6 +38,8 @@ export function buildPaymentSuccessPersistence({
       paymentStatus: 'paid',
       paymentMethod: detectedPlatform,
       referenceId: platformOrderId,
+      afterSaleStatus: 'none',
+      refundFromStatus: null,
     },
     orderPayment: {
       orderId,

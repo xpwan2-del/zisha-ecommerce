@@ -42,25 +42,11 @@ interface CalculateRequest {
 }
 
 async function calculateProductPromotions(productId: number): Promise<Array<{id: number; name: string; discount: number; percent: number}>> {
-  const productResult = await query(
-    `SELECT pp_usd.price as price_usd
-    FROM product_prices pp_usd
-    WHERE pp_usd.product_id = ? AND pp_usd.currency = 'USD'`,
-    [productId]
-  );
-
-  if (productResult.rows.length === 0) {
-    throw new Error(`Product ${productId} not found`);
-  }
-
-  const originalPriceUSD = round2(parseFloat(productResult.rows[0].price_usd) || 0);
-
   const promoResult = await query(`
     SELECT
       pr.id as promo_id,
       pr.name as promo_name,
-      pr.discount_percent,
-      pp.can_stack
+      pr.discount_percent
     FROM product_promotions pp
     JOIN promotions pr ON pp.promotion_id = pr.id
     WHERE pp.product_id = ?
@@ -69,11 +55,49 @@ async function calculateProductPromotions(productId: number): Promise<Array<{id:
   `, [productId]);
 
   return promoResult.rows.map((promotion: any) => ({
-    id: promotion.promo_id,
+    id: Number(promotion.promo_id),
     name: promotion.promo_name || '促销活动',
-    discount: round2(originalPriceUSD * promotion.discount_percent / 100),
+    discount: 0,
     percent: round2(parseFloat(promotion.discount_percent) || 0)
   }));
+}
+
+function buildAppliedPromotions(
+  productPricing: { original_price_usd: number; final_price_usd: number; promotion_ids: number[]; product_discount_amount: number } | undefined,
+  promotions: Array<{ id: number; name: string; discount: number; percent: number }>
+) {
+  if (!productPricing || !Array.isArray(productPricing.promotion_ids) || productPricing.promotion_ids.length === 0) {
+    return [];
+  }
+
+  const appliedIds = new Set(productPricing.promotion_ids.map((id) => Number(id)));
+  const appliedPromotions = promotions.filter((promotion) => appliedIds.has(Number(promotion.id)));
+  const discountTotal = round2(Number(productPricing.product_discount_amount) || 0);
+
+  if (appliedPromotions.length === 0 || discountTotal <= 0) {
+    return [];
+  }
+
+  const originalPrice = round2(Number(productPricing.original_price_usd) || 0);
+  const percentTotal = round2(appliedPromotions.reduce((sum, promotion) => sum + promotion.percent, 0));
+
+  return appliedPromotions.map((promotion, index) => {
+    if (index === appliedPromotions.length - 1) {
+      const usedDiscount = appliedPromotions
+        .slice(0, -1)
+        .reduce((sum, item) => sum + item.discount, 0);
+      return {
+        ...promotion,
+        discount: round2(discountTotal - usedDiscount)
+      };
+    }
+
+    const weight = percentTotal > 0 ? promotion.percent / percentTotal : 1 / appliedPromotions.length;
+    return {
+      ...promotion,
+      discount: round2(discountTotal * weight)
+    };
+  }).filter((promotion) => promotion.discount > 0 && originalPrice > 0);
 }
 
 export async function POST(request: NextRequest) {
@@ -174,7 +198,8 @@ export async function POST(request: NextRequest) {
     });
 
     const productPricing = pricing.items.find((item) => item.product_id === Number(product_id));
-    const promotions = await calculateProductPromotions(product_id);
+    const productPromotions = await calculateProductPromotions(product_id);
+    const appliedPromotions = buildAppliedPromotions(productPricing, productPromotions);
 
     logMonitor('ORDERS', 'SUCCESS', {
       action: 'CALCULATE_QUICK_ORDER',
@@ -216,7 +241,8 @@ export async function POST(request: NextRequest) {
           discount: pricing.total_coupon_discount,
           details: pricing.coupon_details
         } : undefined,
-        product_promotions: promotions,
+        promotions: appliedPromotions,
+        product_promotions: productPromotions,
         payment_method
       }
     });

@@ -2,10 +2,16 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCart } from '@/lib/contexts/CartContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
+
+const LANGUAGE_OPTIONS = [
+  { code: 'zh', label: '中文', flag: '🇨🇳' },
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+];
 
 export function Navbar() {
   const router = useRouter();
@@ -15,9 +21,12 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const currentLanguage = LANGUAGE_OPTIONS.find((option) => option.code === i18nInstance.language) || LANGUAGE_OPTIONS[1];
 
   const changeLanguage = (lang: string) => {
     i18nInstance.changeLanguage(lang);
+    setShowLanguageMenu(false);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -113,24 +122,34 @@ export function Navbar() {
             </div>
             
             <div className="flex items-center space-x-6">
-              <button 
-                onClick={() => changeLanguage('zh')}
-                className="text-sm text-dark hover:text-accent transition-colors duration-300 tracking-wide"
-              >
-                {t('common.zh')}
-              </button>
-              <button 
-                onClick={() => changeLanguage('en')}
-                className="text-sm text-dark hover:text-accent transition-colors duration-300 tracking-wide"
-              >
-                {t('common.en')}
-              </button>
-              <button 
-                onClick={() => changeLanguage('ar')}
-                className="text-sm text-dark hover:text-accent transition-colors duration-300 tracking-wide"
-              >
-                {t('common.ar')}
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                  className="flex items-center gap-2 rounded-sm border border-border bg-card px-3 py-2 text-sm text-dark hover:border-accent hover:text-accent transition-colors duration-300"
+                >
+                  <span className="text-base leading-none">{currentLanguage.flag}</span>
+                  <span>{currentLanguage.label}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showLanguageMenu && (
+                  <div className="absolute right-0 mt-2 w-40 overflow-hidden rounded-md border border-border bg-card shadow-lg z-50">
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <button
+                        key={option.code}
+                        type="button"
+                        onClick={() => changeLanguage(option.code)}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-sm transition-colors duration-300 ${currentLanguage.code === option.code ? 'bg-background text-accent' : 'text-dark hover:bg-background hover:text-accent'}`}
+                      >
+                        <span className="text-base leading-none">{option.flag}</span>
+                        <span>{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <Link href="/cart" className="relative group">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-dark group-hover:text-accent transition-colors duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />

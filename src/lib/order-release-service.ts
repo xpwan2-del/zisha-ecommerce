@@ -14,6 +14,24 @@ interface ReleaseOrderResourcesParams {
 interface ReleaseOrderResourcesResult {
   itemsReleased: number;
   couponsReleased: number;
+  alreadyReleased?: boolean;
+}
+
+async function ensureOrderResourceReleasesTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS order_resource_releases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      reference_type TEXT NOT NULL,
+      transaction_type_code TEXT NOT NULL,
+      items_released INTEGER NOT NULL DEFAULT 0,
+      coupons_released INTEGER NOT NULL DEFAULT 0,
+      operator_id INTEGER,
+      operator_name TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(order_id, reference_type, transaction_type_code)
+    )
+  `);
 }
 
 export async function releaseOrderResources({
@@ -25,6 +43,24 @@ export async function releaseOrderResources({
   operatorId,
   operatorName,
 }: ReleaseOrderResourcesParams): Promise<ReleaseOrderResourcesResult> {
+  await ensureOrderResourceReleasesTable();
+
+  const releaseInsertResult = await query(
+    `INSERT OR IGNORE INTO order_resource_releases (
+      order_id, reference_type, transaction_type_code,
+      operator_id, operator_name, created_at
+    ) VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+    [orderId, referenceType, transactionTypeCode, operatorId, operatorName]
+  );
+
+  if (releaseInsertResult.changes === 0) {
+    return {
+      itemsReleased: 0,
+      couponsReleased: 0,
+      alreadyReleased: true,
+    };
+  }
+
   const itemsResult = await query(
     `SELECT oi.product_id, oi.quantity, p.name
      FROM order_items oi
@@ -81,6 +117,13 @@ export async function releaseOrderResources({
       [row.order_coupon_id]
     );
   }
+
+  await query(
+    `UPDATE order_resource_releases
+     SET items_released = ?, coupons_released = ?
+     WHERE order_id = ? AND reference_type = ? AND transaction_type_code = ?`,
+    [itemsResult.rows.length, orderCouponsResult.rows.length, orderId, referenceType, transactionTypeCode]
+  );
 
   return {
     itemsReleased: itemsResult.rows.length,

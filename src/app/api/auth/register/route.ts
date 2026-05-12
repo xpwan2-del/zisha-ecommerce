@@ -13,10 +13,16 @@ import { getMessage } from '@/lib/messages';
  */
 
 
-function getLangFromRequest(request: NextRequest): string {
-  return request.headers.get('x-lang') ||
-         request.cookies.get('locale')?.value ||
-         'zh';
+const isProduction = process.env.NODE_ENV === 'production';
+
+function cookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge,
+    path: '/',
+  } as const;
 }
 
 if (!process.env.JWT_SECRET) {
@@ -104,21 +110,9 @@ export async function POST(request: NextRequest) {
       message: 'Registration successful'
     }, { status: 201 });
 
-    response.cookies.set('access_token', accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 60 * 60 * 2,
-      path: '/'
-    });
+    response.cookies.set('access_token', accessToken, cookieOptions(60 * 60 * 2));
 
-    response.cookies.set('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/'
-    });
+    response.cookies.set('refresh_token', refreshToken, cookieOptions(60 * 60 * 24 * 30));
 
     return response;
   } catch (error) {

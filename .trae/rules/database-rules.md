@@ -72,12 +72,14 @@ total\_promotions\_discount\_amount DECIMAL DEFAULT 0
 
 ### 状态定义
 
+> 说明：以下状态值与代码保持一致，`refunding_payment` 使用下划线，不使用连字符。
+
 | 状态 | 业务含义 | 类型 |
 |------|---------|------|
 | `pending` | 待付款 | 进行中 |
 | `paid` | 待发货（已支付） | 进行中 |
 | `shipped` | 待收货（已发货） | 进行中 |
-| `refunding-payment` | 待处理退款（管理员审核中） | 进行中 |
+| `refunding_payment` | 待处理退款（管理员审核中） | 进行中 |
 | `refunding` | 退款中（已发起支付平台退款，监听回调） | 进行中 |
 | `delivered` | 待评价（已收货） | 进行中 |
 | `cancelled` | 已取消 | 终态 |
@@ -92,15 +94,15 @@ total\_promotions\_discount\_amount DECIMAL DEFAULT 0
   POST /api/orders │  支付成功
   ─────────────────┼───────→ paid ──→ shipped ──→ delivered ──→ completed
                    │          │          │
-                   │          │          ├─ 申请退款 ──→ refunding-payment
+                   │          │          ├─ 申请退款 ──→ refunding_payment
                    │          │          │                  │
                    │          │          │         ┌─ 拒绝 ─┘
                    │          │          │         │   ↓
-                   │          │          │         │ shipped
+                   │          │          │         │ paid / shipped
                    │          │          │         │
                    │          │          │   同意 ─┘
                    │          │          │   ↓
-                   │          │          │ refunding (发起支付平台退款)
+                   │          │          │ refunding (已发起支付平台退款，等待回调)
                    │          │          │   ↓
                    │          │          │ 支付平台退款成功
                    │          │          │   ↓
@@ -108,10 +110,7 @@ total\_promotions\_discount\_amount DECIMAL DEFAULT 0
                    │          │          │
                    │          │          └─ 确认收货 ──→ delivered
                    │          │
-                   │          └─ 管理员同意退款 ──→ refunding ──→ refunded
-                   │                                          (归还库存+优惠券)
-                   │
-                   └── pending (初始)
+                   │          └── pending (初始)
 ```
 
 ### 链路明细表
@@ -119,14 +118,14 @@ total\_promotions\_discount\_amount DECIMAL DEFAULT 0
 | # | 角色 | 事件 | 状态变更 | 附加动作 | API 路由 | 触发条件 |
 |---|------|------|----------|---------|---------|---------|
 | ① | 系统 | 订单创建 | → pending | — | `POST /api/orders` | 购物车/快速下单提交 |
-| ② | 支付回调 | 支付成功 | pending → paid | 记录 paid\_at | `GET /api/payments/result` / `POST /api/payments/*/notify` | PayPal/Stripe/Alipay 返回成功 |
+| ② | 支付回调 | 支付成功 | pending → paid | 记录 paid_at | `GET /api/payments/result` / `POST /api/payments/*/notify` | PayPal/Stripe/Alipay 返回成功 |
 | ③ | 用户 | 手动取消 | pending → cancelled | 归还库存+优惠券 | `PATCH /api/orders/[id]?action=cancel` | 订单状态 = pending |
-| ④ | 系统 | 超时取消 | pending → cancelled | 归还库存+优惠券 | `POST /api/inventory/release-expired` | pending 且 created\_at + 30分钟 < now |
+| ④ | 系统 | 超时取消 | pending → cancelled | 归还库存+优惠券 | `POST /api/inventory/release-expired` | pending 且 created_at + 30 分钟 < now |
 | ⑤ | 管理员 | 商家发货 | paid → shipped | — | `POST /api/admin/orders/[id]/ship` | 管理员权限，状态 = paid |
-| ⑥ | 管理员 | 同意退款（待发货） | paid → refunding | 发起支付平台退款 | `POST /api/admin/orders/[id]/refund/approve` | 管理员权限，状态 = paid |
-| ⑦ | 用户 | 申请退款（待收货） | shipped → refunding-payment | — | `POST /api/orders/[id]/refund` | 订单状态 = shipped |
-| ⑧ | 管理员 | 同意退款（待收货） | refunding-payment → refunding | 发起支付平台退款 | `POST /api/admin/orders/[id]/refund/approve` | 状态 = refunding-payment |
-| ⑨ | 管理员 | 拒绝退款 | refunding-payment → shipped | — | `POST /api/admin/orders/[id]/refund/reject` | 状态 = refunding-payment |
+| ⑥ | 用户 | 申请退款（待发货） | paid → refunding_payment | 进入退款审核态 | `POST /api/orders/[id]/refund` | 订单状态 = paid |
+| ⑦ | 用户 | 申请退款（待收货） | shipped → refunding_payment | 进入退款审核态 | `POST /api/orders/[id]/refund` | 订单状态 = shipped |
+| ⑧ | 管理员 | 同意退款 | refunding_payment → refunding | 发起支付平台退款 | `POST /api/admin/orders/[id]/refund/approve` | 状态 = refunding_payment |
+| ⑨ | 管理员 | 拒绝退款 | refunding_payment → paid / shipped | — | `POST /api/admin/orders/[id]/refund/reject` | 状态 = refunding_payment |
 | ⑩ | 支付回调 | 退款成功 | refunding → refunded | 归还库存+优惠券 | 支付平台退款回调 | 支付平台确认退款成功 |
 | ⑪ | 用户 | 确认收货 | shipped → delivered | — | ⚠️ 未接入 | 用户点击确认收货 |
 | ⑫ | 系统 | 自动完成 | delivered → completed | — | ⚠️ 未接入 | 收货后自动 |
@@ -134,14 +133,17 @@ total\_promotions\_discount\_amount DECIMAL DEFAULT 0
 
 ### 关键规则
 
-1. **退款必须经过两步**：先管理员审批 → 再发起支付平台退款 → 监听回调 → refunded
+1. **退款必须经过两步**：先进入 `refunding_payment` 审核态，再由管理员同意后发起支付平台退款，最后监听回调进入 `refunded`
 2. **refunded 是唯一归还资源的退款终态**：库存和优惠券在此状态变更时归还
-3. **待发货直接退款**：paid → refunding（跳过 refunding-payment，因为货未发）
-4. **待收货退款需审核**：shipped → refunding-payment → refunding（货已发，需管理员判断）
+3. **待发货退款**：当前实现为 `paid → refunding_payment → refunding`，不是直接跳到 `refunding`
+4. **待收货退款需审核**：`shipped → refunding_payment → refunding`（货已发，需管理员判断）
+5. **退款审核态统一**：`refunding_payment` 表示待处理退款 / 管理员审核中，拒绝后回到原状态 `paid` 或 `shipped`
 
 ## 当前 transaction_type 字典表
 
-| id | code | name_zh | name_en | operation_type | description |
+> 说明：真实数据库表字段是 `id`、`code`、`name_zh`、`name_en`、`name_ar`、`information`、`description_zh`。`operation_type` 不是表字段，这里仅保留业务归类方便理解。
+
+| id | code | name_zh | name_en | 业务归类 | 说明 |
 |---|---|---|---|---|---|
 | 1 | `sales_creat` | 创建购买 | Create Purchase | 扣除 | 从商品详情直接购买扣除库存 |
 | 2 | `sales_increase` | 增加购买 | Increase Purchase | 扣除 | 快速购买页面点击加号扣除库存 |

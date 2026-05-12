@@ -7,19 +7,35 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    // Mock authentication for demo purposes
-    if (email === 'admin@zishapottery.com' && password === 'admin123') {
-      // Store admin token in localStorage
-      localStorage.setItem('adminToken', 'mock-admin-token');
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data?.message || data?.error || 'Invalid email or password');
+        return;
+      }
+
       router.push('/admin/dashboard');
-    } else {
+    } catch {
       setError('Invalid email or password');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,14 +73,15 @@ export default function LoginPage() {
           </div>
           <button
             type="submit"
-            className="w-full text-white py-3 rounded-lg font-['Noto_Sans_Arabic'] font-medium transition-all duration-300"
+            disabled={loading}
+            className="w-full text-white py-3 rounded-lg font-['Noto_Sans_Arabic'] font-medium transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{
               backgroundColor: 'var(--btn-primary-bg)',
               color: 'var(--btn-primary-text)',
               border: '1px solid var(--btn-primary-border)'
             }}
           >
-            Login
+            {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
       </div>

@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AdminCard } from "@/components/admin/AdminCard";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminTable } from "@/components/admin/ui/admin-table";
+import { StatusBadge } from "@/components/admin/ui/status-badge";
 
 interface InventoryItem {
   id: number;
@@ -8,6 +12,8 @@ interface InventoryItem {
   product_name: string;
   quantity: number;
   status_id: number;
+  status_name?: string;
+  status_color?: string;
   updated_at: string;
 }
 
@@ -15,7 +21,10 @@ interface Transaction {
   id: number;
   product_id: number;
   product_name: string;
-  transaction_type: string;
+  transaction_type?: string;
+  transaction_code?: string;
+  transaction_name_zh?: string;
+  transaction_name_en?: string;
   quantity_change: number;
   quantity_before: number;
   quantity_after: number;
@@ -28,349 +37,349 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'inventory' | 'transactions'>('inventory');
-  const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
+  const [transactionLoading, setTransactionLoading] = useState(false);
+  const [adjustingProduct, setAdjustingProduct] = useState<InventoryItem | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({
-    change_type: 'increase',
-    quantity: '',
-    reason: ''
+    change_type: "increase",
+    quantity: "",
+    reason: ""
   });
 
   useEffect(() => {
     fetchInventory();
+    fetchTransactions();
   }, []);
+
+  const sortedInventory = useMemo(() => {
+    return [...inventory].sort((a, b) => {
+      const aPriority = a.quantity <= 0 ? 0 : a.quantity <= 10 ? 1 : 2;
+      const bPriority = b.quantity <= 0 ? 0 : b.quantity <= 10 ? 1 : 2;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return a.quantity - b.quantity;
+    });
+  }, [inventory]);
+
+  const riskItems = useMemo(() => sortedInventory.filter((item) => item.quantity <= 10).slice(0, 8), [sortedInventory]);
+  const recentTransactions = useMemo(() => transactions.slice(0, 8), [transactions]);
+
+  const metrics = useMemo(() => {
+    const totalSku = inventory.length;
+    const totalQuantity = inventory.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const lowStock = inventory.filter((item) => Number(item.quantity || 0) <= 10 && Number(item.quantity || 0) > 0).length;
+    const outOfStock = inventory.filter((item) => Number(item.quantity || 0) <= 0).length;
+    const healthy = inventory.filter((item) => Number(item.quantity || 0) > 10).length;
+    return { totalSku, totalQuantity, lowStock, outOfStock, healthy };
+  }, [inventory]);
 
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/products?limit=100');
+      setError(null);
+      const res = await fetch("/api/admin/inventory");
       const data = await res.json();
-      if (data.success) {
-        const invData = data.data.products.map((p: any) => ({
-          id: p.id,
-          product_id: p.id,
-          product_name: p.name,
-          quantity: p.stock || 0,
-          status_id: p.stock_status_id || 1,
-          updated_at: p.updated_at
-        }));
-        setInventory(invData);
+      if (!data.success) {
+        setError(data.error || "获取库存失败");
+        return;
       }
+      const invData = (data.data || []).map((item: any) => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: item.product_full_name || item.product_name_en || item.product_name || `Product #${item.product_id}`,
+        quantity: Number(item.quantity || 0),
+        status_id: item.status_id || 1,
+        status_name: item.status_name,
+        status_color: item.status_color,
+        updated_at: item.updated_at
+      }));
+      setInventory(invData);
     } catch (err) {
-      console.error('Failed to fetch inventory:', err);
+      setError("网络错误，无法获取库存");
+      console.error("Failed to fetch inventory:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchTransactions = async (productId?: number) => {
+  const fetchTransactions = async () => {
     try {
-      setLoading(true);
-      let url = '/api/inventory?limit=50';
-      if (productId) {
-        url += `&product_id=${productId}`;
-      }
-      const res = await fetch(url);
+      setTransactionLoading(true);
+      const params = new URLSearchParams();
+      params.set("limit", "20");
+      const res = await fetch(`/api/inventory/transactions?${params.toString()}`);
       const data = await res.json();
-      if (data.success) {
-        setTransactions(data.data.logs || []);
+      if (!data.success) {
+        setError(data.error || "获取库存流水失败");
+        return;
       }
+      setTransactions(data.data.transactions || []);
     } catch (err) {
-      console.error('Failed to fetch transactions:', err);
+      setError("网络错误，无法获取库存流水");
+      console.error("Failed to fetch transactions:", err);
     } finally {
-      setLoading(false);
+      setTransactionLoading(false);
     }
   };
 
-  const handleTabChange = (tab: 'inventory' | 'transactions') => {
-    setActiveTab(tab);
-    if (tab === 'transactions') {
-      fetchTransactions(selectedProduct || undefined);
-    }
+  const refreshAll = async () => {
+    await Promise.all([fetchInventory(), fetchTransactions()]);
   };
 
-  const handleAdjustStock = async (productId: number) => {
-    if (!adjustForm.quantity || !confirm('Confirm stock adjustment?')) return;
+  const openAdjustPanel = (item: InventoryItem) => {
+    setAdjustingProduct(item);
+    setAdjustForm({ change_type: "increase", quantity: "", reason: "" });
+  };
+
+  const handleAdjustStock = async () => {
+    if (!adjustingProduct || !adjustForm.quantity) return;
+    if (!confirm("确认执行本次库存调整？该操作会写入库存流水和管理员审计日志。")) return;
 
     try {
-      const res = await fetch('/api/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      setError(null);
+      setMessage(null);
+      const res = await fetch("/api/admin/inventory/adjust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          product_id: productId,
+          product_id: adjustingProduct.product_id,
           change_type: adjustForm.change_type,
           quantity: parseInt(adjustForm.quantity),
-          reason: adjustForm.reason || 'Manual adjustment',
-          operator_name: 'admin'
+          reason: adjustForm.reason || "管理员手动调整"
         })
       });
 
       const data = await res.json();
-      if (data.success) {
-        alert('Stock adjusted successfully!');
-        setAdjustForm({ change_type: 'increase', quantity: '', reason: '' });
-        fetchInventory();
-      } else {
-        alert(data.error || 'Failed to adjust stock');
+      if (!data.success) {
+        setError(data.error || "库存调整失败");
+        return;
       }
+
+      setMessage("库存调整成功，已写入库存流水和审计日志");
+      setAdjustingProduct(null);
+      setAdjustForm({ change_type: "increase", quantity: "", reason: "" });
+      await refreshAll();
     } catch (err) {
-      alert('Failed to adjust stock');
+      setError("网络错误，库存调整失败");
+      console.error("Failed to adjust stock:", err);
     }
   };
 
-  const getStockStatus = (quantity: number, statusId: number) => {
-    if (statusId === 4) return { label: 'Out of Stock', color: 'bg-red-100 text-red-800' };
-    if (statusId === 3) return { label: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
-    if (statusId === 2) return { label: 'Limited', color: 'bg-orange-100 text-orange-800' };
-    return { label: 'In Stock', color: 'bg-green-100 text-green-800' };
+  const getStockTone = (quantity: number): "success" | "warning" | "danger" => {
+    if (quantity <= 0) return "danger";
+    if (quantity <= 10) return "warning";
+    return "success";
   };
 
-  const getTransactionTypeLabel = (type: string) => {
-    const types: Record<string, string> = {
-      'init': 'Initialize',
-      'increase': 'Stock In',
-      'decrease': 'Stock Out',
-      'sale': 'Sale',
-      'cancel': 'Cancel',
-      'return': 'Return',
-      'adjust': 'Adjustment',
-      'loss': 'Loss',
-      'profit': 'Profit'
-    };
-    return types[type] || type;
+  const getStockLabel = (quantity: number, statusName?: string) => {
+    if (statusName) return statusName;
+    if (quantity <= 0) return "缺货";
+    if (quantity <= 10) return "低库存";
+    return "库存正常";
   };
 
-  const getTransactionTypeColor = (type: string) => {
-    if (type === 'sale' || type === 'cancel' || type === 'loss') return 'text-red-600';
-    if (type === 'return' || type === 'profit' || type === 'init' || type === 'increase') return 'text-green-600';
-    return 'text-gray-600';
+  const getTransactionDisplayName = (tx: Transaction) => {
+    return tx.transaction_name_zh || tx.transaction_name_en || tx.transaction_code || tx.transaction_type || "-";
   };
+
+  const inventoryColumns = [
+    {
+      key: "product",
+      title: "商品",
+      render: (item: InventoryItem) => (
+        <div>
+          <div className="font-medium text-slate-950">{item.product_name}</div>
+          <div className="mt-1 text-xs text-slate-500">商品 ID：{item.product_id}</div>
+        </div>
+      )
+    },
+    {
+      key: "quantity",
+      title: "当前库存",
+      render: (item: InventoryItem) => <span className="font-semibold text-slate-950">{item.quantity}</span>
+    },
+    {
+      key: "status",
+      title: "库存状态",
+      render: (item: InventoryItem) => <StatusBadge tone={getStockTone(item.quantity)}>{getStockLabel(item.quantity, item.status_name)}</StatusBadge>
+    },
+    {
+      key: "updated_at",
+      title: "更新时间",
+      render: (item: InventoryItem) => <span className="text-slate-500">{item.updated_at ? new Date(item.updated_at).toLocaleString() : "-"}</span>
+    },
+    {
+      key: "actions",
+      title: "操作",
+      align: "right" as const,
+      render: (item: InventoryItem) => (
+        <div className="flex justify-end gap-3">
+          <a href={`/admin/inventory/transactions?product_id=${item.product_id}`} className="font-medium text-slate-700 hover:text-slate-950">看流水</a>
+          <button onClick={() => openAdjustPanel(item)} className="cursor-pointer font-medium text-blue-700 hover:text-blue-900">调库</button>
+        </div>
+      )
+    }
+  ];
 
   return (
-    <div className="p-6">
-      <div className="bg-gradient-to-r from-[var(--accent)] to-[var(--secondary)] text-white py-6 px-6 rounded-lg mb-6">
-        <h1 className="text-2xl font-bold">Inventory Management</h1>
-        <p className="text-white/80 mt-1">Manage product stock and view inventory transactions</p>
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="库存中心"
+        title="库存运营中心"
+        description="以缺货风险优先展示库存水位、待处理异常和最近流水，帮助运营快速完成预警、盘点、调库与追溯闭环。"
+        action={<button onClick={refreshAll} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">刷新数据</button>}
+        breadcrumbs={[{ label: "后台", href: "/admin/dashboard" }, { label: "库存中心" }]}
+      />
+
+      {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
+      {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <AdminCard>
+          <p className="text-sm text-slate-500">SKU 总数</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{metrics.totalSku}</p>
+        </AdminCard>
+        <AdminCard>
+          <p className="text-sm text-slate-500">总库存</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{metrics.totalQuantity}</p>
+        </AdminCard>
+        <AdminCard>
+          <p className="text-sm text-slate-500">库存正常</p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-600">{metrics.healthy}</p>
+        </AdminCard>
+        <AdminCard>
+          <p className="text-sm text-slate-500">低库存</p>
+          <p className="mt-2 text-2xl font-semibold text-amber-600">{metrics.lowStock}</p>
+        </AdminCard>
+        <AdminCard>
+          <p className="text-sm text-slate-500">缺货</p>
+          <p className="mt-2 text-2xl font-semibold text-rose-600">{metrics.outOfStock}</p>
+        </AdminCard>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => handleTabChange('inventory')}
-              className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                activeTab === 'inventory'
-                  ? 'border-[var(--accent)] text-[var(--accent)]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Inventory List
-            </button>
-            <button
-              onClick={() => handleTabChange('transactions')}
-              className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                activeTab === 'transactions'
-                  ? 'border-[var(--accent)] text-[var(--accent)]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Transactions
-            </button>
-          </nav>
-        </div>
-
-        <div className="p-6">
-          {activeTab === 'inventory' ? (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Product Inventory</h2>
-                <button
-                  onClick={fetchInventory}
-                  className="px-4 py-2 bg-[var(--accent)] text-white rounded-md hover:opacity-90 text-sm"
-                >
-                  Refresh
-                </button>
-              </div>
-
-              {loading ? (
-                <div className="text-center py-8">Loading...</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status ID</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {inventory.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                            No inventory data. Tables will be created during implementation.
-                          </td>
-                        </tr>
-                      ) : (
-                        inventory.map((item) => {
-                          const status = getStockStatus(item.quantity, item.status_id);
-                          return (
-                            <tr key={item.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-900">
-                                <div className="font-medium">{item.product_name}</div>
-                                <div className="text-xs text-gray-500">ID: {item.product_id}</div>
-                              </td>
-                              <td className="px-4 py-3 text-sm font-semibold">{item.quantity}</td>
-                              <td className="px-4 py-3 text-sm text-gray-500">{item.status_id}</td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-1 text-xs rounded-full ${status.color}`}>
-                                  {status.label}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                <button
-                                  onClick={() => {
-                                    setSelectedProduct(item.product_id);
-                                    setAdjustForm({ change_type: 'increase', quantity: '', reason: '' });
-                                  }}
-                                  className="text-[var(--accent)] hover:underline mr-3"
-                                >
-                                  Adjust
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {selectedProduct && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                    <h3 className="text-lg font-bold mb-4">Adjust Stock</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Operation</label>
-                        <select
-                          value={adjustForm.change_type}
-                          onChange={(e) => setAdjustForm({ ...adjustForm, change_type: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="increase">Increase (Stock In)</option>
-                          <option value="decrease">Decrease (Stock Out)</option>
-                          <option value="set">Set (Absolute Value)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Quantity</label>
-                        <input
-                          type="number"
-                          value={adjustForm.quantity}
-                          onChange={(e) => setAdjustForm({ ...adjustForm, quantity: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md"
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Reason</label>
-                        <input
-                          type="text"
-                          value={adjustForm.reason}
-                          onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md"
-                          placeholder="Optional reason"
-                        />
-                      </div>
-                      <div className="flex gap-3 justify-end">
-                        <button
-                          onClick={() => setSelectedProduct(null)}
-                          className="px-4 py-2 border rounded-md hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => handleAdjustStock(selectedProduct)}
-                          className="px-4 py-2 bg-[var(--color-green)] text-white rounded-md hover:opacity-90"
-                        >
-                          Confirm
-                        </button>
-                      </div>
-                    </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <AdminCard
+          title="缺货优先处理队列"
+          description="按缺货、低库存、库存数量排序，优先处理最影响履约的 SKU。"
+          action={<a href="/admin/inventory/alerts" className="text-sm font-medium text-blue-700 hover:text-blue-900">查看预警</a>}
+        >
+          <div className="space-y-3">
+            {loading ? (
+              <div className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">库存加载中...</div>
+            ) : riskItems.length === 0 ? (
+              <div className="rounded-xl bg-emerald-50 px-4 py-8 text-center text-sm text-emerald-700">当前没有缺货或低库存商品。</div>
+            ) : (
+              riskItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-slate-950">{item.product_name}</div>
+                    <div className="mt-1 text-xs text-slate-500">商品 ID：{item.product_id} · 当前库存 {item.quantity}</div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <StatusBadge tone={getStockTone(item.quantity)}>{getStockLabel(item.quantity, item.status_name)}</StatusBadge>
+                    <button onClick={() => openAdjustPanel(item)} className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-blue-700 ring-1 ring-slate-200 hover:bg-blue-50">调库</button>
                   </div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Inventory Transactions</h2>
-                <button
-                  onClick={() => fetchTransactions(selectedProduct || undefined)}
-                  className="px-4 py-2 bg-[var(--accent)] text-white rounded-md hover:opacity-90 text-sm"
-                >
-                  Refresh
-                </button>
-              </div>
+              ))
+            )}
+          </div>
+        </AdminCard>
 
-              {loading ? (
-                <div className="text-center py-8">Loading...</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Change</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Before</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">After</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Operator</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {transactions.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                            No transaction records found.
-                          </td>
-                        </tr>
-                      ) : (
-                        transactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm text-gray-500">
-                              {new Date(tx.created_at).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900">{tx.product_name}</td>
-                            <td className="px-4 py-3 text-sm">
-                              <span className={getTransactionTypeColor(tx.transaction_type)}>
-                                {getTransactionTypeLabel(tx.transaction_type)}
-                              </span>
-                            </td>
-                            <td className={`px-4 py-3 text-sm font-semibold ${getTransactionTypeColor(tx.transaction_type)}`}>
-                              {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
-                            </td>
-                            <td className="px-4 py-3 text-sm">{tx.quantity_before}</td>
-                            <td className="px-4 py-3 text-sm">{tx.quantity_after}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{tx.reason || '-'}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{tx.operator_name || '-'}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <AdminCard
+          title="操作闭环入口"
+          description="将盘点、预警和流水拆成专业子页，但在中心页保留快速入口。"
+        >
+          <div className="space-y-3">
+            <a href="/admin/inventory/transactions" className="block rounded-xl border border-slate-200 p-4 transition-colors hover:border-blue-200 hover:bg-blue-50/50">
+              <div className="text-sm font-semibold text-slate-950">库存流水</div>
+              <div className="mt-1 text-sm text-slate-500">追溯库存变更来源、前后数量和操作人。</div>
+            </a>
+            <a href="/admin/inventory/checks" className="block rounded-xl border border-slate-200 p-4 transition-colors hover:border-blue-200 hover:bg-blue-50/50">
+              <div className="text-sm font-semibold text-slate-950">盘点管理</div>
+              <div className="mt-1 text-sm text-slate-500">创建盘点单，录入实盘数量，并由后端完成库存修正。</div>
+            </a>
+            <a href="/admin/inventory/alerts" className="block rounded-xl border border-slate-200 p-4 transition-colors hover:border-blue-200 hover:bg-blue-50/50">
+              <div className="text-sm font-semibold text-slate-950">预警管理</div>
+              <div className="mt-1 text-sm text-slate-500">处理缺货、低库存和积压风险，形成处理记录。</div>
+            </a>
+          </div>
+        </AdminCard>
       </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <AdminCard title="库存总览" description="完整库存列表，默认按缺货风险排序。">
+          <AdminTable
+            columns={inventoryColumns}
+            data={sortedInventory}
+            rowKey={(item) => item.id}
+            loading={loading}
+            emptyTitle="暂无库存数据"
+            emptyDescription="当前系统没有返回任何库存记录。"
+          />
+        </AdminCard>
+
+        <AdminCard
+          title="最近库存流水"
+          description="展示最近的库存变动，完整追溯请进入库存流水页。"
+          action={<a href="/admin/inventory/transactions" className="text-sm font-medium text-blue-700 hover:text-blue-900">全部流水</a>}
+        >
+          <div className="space-y-3">
+            {transactionLoading ? (
+              <div className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">流水加载中...</div>
+            ) : recentTransactions.length === 0 ? (
+              <div className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">暂无库存流水</div>
+            ) : (
+              recentTransactions.map((tx) => (
+                <div key={tx.id} className="rounded-xl border border-slate-100 px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-slate-950">{tx.product_name}</div>
+                      <div className="mt-1 text-xs text-slate-500">{getTransactionDisplayName(tx)} · {tx.created_at ? new Date(tx.created_at).toLocaleString() : "-"}</div>
+                    </div>
+                    <div className={tx.quantity_change > 0 ? "text-sm font-semibold text-emerald-600" : tx.quantity_change < 0 ? "text-sm font-semibold text-rose-600" : "text-sm font-semibold text-slate-600"}>
+                      {tx.quantity_change > 0 ? "+" : ""}{tx.quantity_change}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-500">{tx.quantity_before} → {tx.quantity_after} · {tx.operator_name || "-"}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </AdminCard>
+      </div>
+
+      {adjustingProduct ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-6 py-5">
+              <h3 className="text-lg font-semibold text-slate-950">库存调整</h3>
+              <p className="mt-1 text-sm text-slate-500">{adjustingProduct.product_name} · 当前库存 {adjustingProduct.quantity}</p>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <label className="block text-sm font-medium text-slate-700">
+                调整方式
+                <select value={adjustForm.change_type} onChange={(event) => setAdjustForm({ ...adjustForm, change_type: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                  <option value="increase">增加库存</option>
+                  <option value="decrease">减少库存</option>
+                  <option value="set">设置为固定库存</option>
+                </select>
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                数量
+                <input type="number" value={adjustForm.quantity} onChange={(event) => setAdjustForm({ ...adjustForm, quantity: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" min="0" />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                原因
+                <input type="text" value={adjustForm.reason} onChange={(event) => setAdjustForm({ ...adjustForm, reason: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="例如：后台盘点修正 / 供应商补货 / 损耗修正" />
+              </label>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button onClick={() => setAdjustingProduct(null)} className="cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">取消</button>
+              <button onClick={handleAdjustStock} className="cursor-pointer rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">确认调整</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

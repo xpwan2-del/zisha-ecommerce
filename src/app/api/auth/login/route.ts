@@ -67,12 +67,23 @@ function getLangFromRequest(request: NextRequest): string {
  * @param lang 语言
  * @param status HTTP 状态码
  */
+const isProduction = process.env.NODE_ENV === 'production';
+
 function createErrorResponse(error: string, lang: string, status: number = 400) {
-  return NextResponse.json({ 
-    success: false, 
-    error, 
-    message: getMessage(error as any, lang) 
-  }, { status });
+  return NextResponse.json(
+    { success: false, error, message: getMessage(error as any, lang) },
+    { status }
+  );
+}
+
+function cookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge,
+    path: '/',
+  } as const;
 }
 
 // ============================================================
@@ -135,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     const refreshToken = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET!,
+      process.env.REFRESH_TOKEN_SECRET!,
       { expiresIn: '30d' }
     );
 
@@ -159,21 +170,9 @@ export async function POST(request: NextRequest) {
     });
 
     // 7. 设置 Cookie
-    response.cookies.set('access_token', accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 60 * 60 * 2,
-      path: '/'
-    });
+    response.cookies.set('access_token', accessToken, cookieOptions(60 * 60 * 2));
 
-    response.cookies.set('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/'
-    });
+    response.cookies.set('refresh_token', refreshToken, cookieOptions(60 * 60 * 24 * 30));
 
     // 8. 监听：登录成功
     logMonitor('AUTH', 'SUCCESS', {

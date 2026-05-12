@@ -178,6 +178,8 @@ export async function POST(request: NextRequest) {
       user_coupon_id: userCoupon.id,
       code: coupon.code,
       name: coupon.name,
+      name_en: coupon.name_en,
+      name_ar: coupon.name_ar,
       type: coupon.type,
       value: coupon.value,
       discount: discount,

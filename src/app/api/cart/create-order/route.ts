@@ -282,6 +282,22 @@ export async function POST(request: NextRequest) {
         paymentMethod,
       });
 
+      // ============================================================
+      // 核心修改：在事务中清空购物车
+      // ============================================================
+      const deletePlaceholders = cartItemIds.map(() => '?').join(',');
+      await query(
+        `DELETE FROM cart_items WHERE user_id = ? AND id IN (${deletePlaceholders})`,
+        [userId, ...cartItemIds]
+      );
+
+      logMonitor('CART', 'SUCCESS', {
+        action: 'CLEAR_CART_ON_ORDER',
+        userId,
+        orderId,
+        clearedItemIds: cartItemIds
+      });
+
       await query('COMMIT');
 
       return NextResponse.json({

@@ -1,7 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AdminCard } from '@/components/admin/AdminCard';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { 
+  CloudArrowUpIcon, 
+  ArrowDownTrayIcon, 
+  MagnifyingGlassIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  LanguageIcon
+} from '@heroicons/react/24/outline';
 
 interface TranslationData {
   key: string;
@@ -22,6 +32,8 @@ interface MissingStats {
   };
 }
 
+const inputClassName = 'w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100';
+
 export default function TranslationsPage() {
   const { t, i18n } = useTranslation();
   const [translations, setTranslations] = useState<TranslationData[]>([]);
@@ -36,7 +48,7 @@ export default function TranslationsPage() {
   const fetchTranslations = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/translations');
+      const response = await fetch('/api/admin/translations');
       if (response.ok) {
         const data = await response.json();
         const translationsArray: TranslationData[] = [];
@@ -83,7 +95,7 @@ export default function TranslationsPage() {
 
   const fetchMissingStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/translations/missing');
+      const response = await fetch('/api/admin/translations/missing');
       if (response.ok) {
         const data = await response.json();
         setMissingStats(data.data);
@@ -101,7 +113,7 @@ export default function TranslationsPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const response = await fetch('/api/translations/sync', {
+      const response = await fetch('/api/admin/translations/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'full' })
@@ -123,7 +135,7 @@ export default function TranslationsPage() {
 
   const handleExport = async (format: 'json' | 'csv') => {
     try {
-      const response = await fetch(`/api/translations/export?format=${format}`);
+      const response = await fetch(`/api/admin/translations/export?format=${format}`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -155,21 +167,21 @@ export default function TranslationsPage() {
     try {
       const promises = [];
       if (editValues.zh) {
-        promises.push(fetch('/api/translations', {
+        promises.push(fetch('/api/admin/translations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: editingKey, language: 'zh', value: editValues.zh })
         }));
       }
       if (editValues.en) {
-        promises.push(fetch('/api/translations', {
+        promises.push(fetch('/api/admin/translations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: editingKey, language: 'en', value: editValues.en })
         }));
       }
       if (editValues.ar) {
-        promises.push(fetch('/api/translations', {
+        promises.push(fetch('/api/admin/translations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: editingKey, language: 'ar', value: editValues.ar })
@@ -205,208 +217,192 @@ export default function TranslationsPage() {
   const namespaces = Array.from(new Set(translations.map(t => getNamespaceFromKey(t.key))));
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            {t('admin.translations.title', '翻译管理')}
-          </h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            {t('admin.translations.description', '管理系统UI文本翻译，支持中文、英文、阿拉伯文')}
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        {missingStats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500 dark:text-gray-400">总键值</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">{missingStats.total_keys}</div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500 dark:text-gray-400">完整翻译</div>
-              <div className="text-2xl font-bold text-green-600">{missingStats.complete}</div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500 dark:text-gray-400">缺失翻译</div>
-              <div className="text-2xl font-bold text-red-600">{missingStats.missing}</div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500 dark:text-gray-400">完成率</div>
-              <div className="text-2xl font-bold text-blue-600">
-                {missingStats.total_keys > 0 ? Math.round((missingStats.complete / missingStats.total_keys) * 100) : 0}%
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Toolbar */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder={t('admin.translations.search_placeholder', '搜索键值或翻译内容...')}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            <select
-              value={namespaceFilter}
-              onChange={(e) => setNamespaceFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-            >
-              <option value="all">{t('admin.translations.all_namespaces', '所有分类')}</option>
-              {namespaces.map(ns => (
-                <option key={ns} value={ns}>{ns}</option>
-              ))}
-            </select>
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="GLOBALIZATION"
+        title="语言与翻译管理"
+        description="统一管理多语言词条。您可以同步源码键值，也可以在此直接编辑各语言版本。建议在发布前完成所有缺失项的翻译。"
+        breadcrumbs={[{ label: 'Admin', href: '/admin/dashboard' }, { label: 'Translations' }]}
+        action={
+          <div className="flex gap-2">
             <button
               onClick={handleSync}
               disabled={syncing}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {syncing ? t('common.processing', '处理中...') : t('admin.translations.sync', '同步JSON')}
+              <CloudArrowUpIcon className="h-5 w-5" />
+              {syncing ? '同步中...' : '同步 JSON'}
             </button>
-            <button
-              onClick={() => handleExport('json')}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              {t('admin.translations.export_json', '导出JSON')}
-            </button>
-            <button
-              onClick={() => handleExport('csv')}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              {t('admin.translations.export_csv', '导出CSV')}
-            </button>
+            <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1">
+               <button onClick={() => handleExport('json')} className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition hover:bg-slate-50 rounded-lg">JSON</button>
+               <div className="h-4 w-px bg-slate-200 mx-1" />
+               <button onClick={() => handleExport('csv')} className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition hover:bg-slate-50 rounded-lg">CSV</button>
+            </div>
           </div>
+        }
+      />
+
+      {/* 统计指标 */}
+      {missingStats && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <AdminCard className="relative overflow-hidden">
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-slate-50 p-3 text-slate-600">
+                <LanguageIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">总键值</p>
+                <p className="text-2xl font-bold text-slate-950">{missingStats.total_keys}</p>
+              </div>
+            </div>
+          </AdminCard>
+          <AdminCard>
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
+                <CheckCircleIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">已完整</p>
+                <p className="text-2xl font-bold text-emerald-600">{missingStats.complete}</p>
+              </div>
+            </div>
+          </AdminCard>
+          <AdminCard>
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-red-50 p-3 text-red-600">
+                <ExclamationCircleIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">待补充</p>
+                <p className="text-2xl font-bold text-red-600">{missingStats.missing}</p>
+              </div>
+            </div>
+          </AdminCard>
+          <AdminCard>
+             <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
+                <div className="text-lg font-bold">%</div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">覆盖率</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {missingStats.total_keys > 0 ? Math.round((missingStats.complete / missingStats.total_keys) * 100) : 0}%
+                </p>
+              </div>
+            </div>
+          </AdminCard>
+        </div>
+      )}
+
+      {/* 筛选条 */}
+      <AdminCard>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="relative flex-1">
+            <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="搜索键值或翻译内容..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={`${inputClassName} pl-11`}
+            />
+          </div>
+          <select
+            value={namespaceFilter}
+            onChange={(e) => setNamespaceFilter(e.target.value)}
+            className={`${inputClassName} md:w-48`}
+          >
+            <option value="all">所有分类</option>
+            {namespaces.map(ns => (
+              <option key={ns} value={ns}>{ns}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Translations Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        {/* 翻译表格 */}
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
           <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-1/4">
-                    {t('admin.translations.key', '键值')}
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-1/4">
-                    中文 (ZH)
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-1/4">
-                    English (EN)
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-1/4">
-                    العربية (AR)
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-24">
-                    {t('admin.translations.actions', '操作')}
-                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-1/4">Key</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-1/4">中文 (ZH)</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-1/4">English (EN)</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-1/4">Arabic (AR)</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">操作</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {loading ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                      {t('common.loading', '加载中...')}
-                    </td>
-                  </tr>
+                  <tr><td colSpan={5} className="p-12 text-center text-slate-400">正在努力加载翻译项...</td></tr>
                 ) : filteredTranslations.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                      {t('common.no_data', '暂无数据')}
+                  <tr><td colSpan={5} className="p-12 text-center text-slate-400">没有找到匹配的词条</td></tr>
+                ) : filteredTranslations.map((item) => (
+                  <tr key={item.key} className={`transition group hover:bg-slate-50/80 ${editingKey === item.key ? 'bg-blue-50/30' : ''}`}>
+                    <td className="px-5 py-4 font-mono text-xs text-slate-500">{item.key}</td>
+                    <td className="px-5 py-4">
+                      {editingKey === item.key ? (
+                        <textarea
+                          value={editValues.zh}
+                          onChange={(e) => setEditValues({ ...editValues, zh: e.target.value })}
+                          className="w-full rounded-lg border-slate-200 text-sm focus:ring-blue-500"
+                          rows={2}
+                        />
+                      ) : (
+                        <div className={`text-sm leading-relaxed ${item.zh ? 'text-slate-900' : 'text-red-400 italic'}`}>
+                          {item.zh || '未翻译'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      {editingKey === item.key ? (
+                        <textarea
+                          value={editValues.en}
+                          onChange={(e) => setEditValues({ ...editValues, en: e.target.value })}
+                          className="w-full rounded-lg border-slate-200 text-sm focus:ring-blue-500"
+                          rows={2}
+                        />
+                      ) : (
+                        <div className={`text-sm leading-relaxed ${item.en ? 'text-slate-900' : 'text-red-400 italic'}`}>
+                          {item.en || '未翻译'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-4" dir="rtl">
+                      {editingKey === item.key ? (
+                        <textarea
+                          value={editValues.ar}
+                          onChange={(e) => setEditValues({ ...editValues, ar: e.target.value })}
+                          className="w-full rounded-lg border-slate-200 text-sm focus:ring-blue-500"
+                          rows={2}
+                        />
+                      ) : (
+                        <div className={`text-sm leading-relaxed ${item.ar ? 'text-slate-900' : 'text-red-400 italic'}`}>
+                          {item.ar || 'لا يوجد ترجمة'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      {editingKey === item.key ? (
+                        <div className="flex flex-col gap-2">
+                          <button onClick={handleSaveEdit} className="text-xs font-bold text-green-600 hover:text-green-800">保存</button>
+                          <button onClick={() => setEditingKey(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600">取消</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => handleEdit(item)} className="text-sm font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition hover:text-blue-800">编辑</button>
+                      )}
                     </td>
                   </tr>
-                ) : (
-                  filteredTranslations.map((item) => (
-                    <tr key={item.key} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-4 py-3 text-sm font-mono text-gray-900 dark:text-white">
-                        {item.key}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {editingKey === item.key ? (
-                          <textarea
-                            value={editValues.zh}
-                            onChange={(e) => setEditValues({ ...editValues, zh: e.target.value })}
-                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700"
-                            rows={2}
-                          />
-                        ) : (
-                          <span className={item.zh ? 'text-gray-900 dark:text-white' : 'text-red-500'}>
-                            {item.zh || '❌'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {editingKey === item.key ? (
-                          <textarea
-                            value={editValues.en}
-                            onChange={(e) => setEditValues({ ...editValues, en: e.target.value })}
-                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700"
-                            rows={2}
-                          />
-                        ) : (
-                          <span className={item.en ? 'text-gray-900 dark:text-white' : 'text-red-500'}>
-                            {item.en || '❌'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm" dir="rtl">
-                        {editingKey === item.key ? (
-                          <textarea
-                            value={editValues.ar}
-                            onChange={(e) => setEditValues({ ...editValues, ar: e.target.value })}
-                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700"
-                            rows={2}
-                          />
-                        ) : (
-                          <span className={item.ar ? 'text-gray-900 dark:text-white' : 'text-red-500'}>
-                            {item.ar || '❌'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {editingKey === item.key ? (
-                          <>
-                            <button
-                              onClick={handleSaveEdit}
-                              className="text-green-600 hover:text-green-800 mr-2"
-                            >
-                              {t('common.save', '保存')}
-                            </button>
-                            <button
-                              onClick={() => setEditingKey(null)}
-                              className="text-gray-600 hover:text-gray-800"
-                            >
-                              {t('common.cancel', '取消')}
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => handleEdit(item)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            {t('common.edit', '编辑')}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
         </div>
-
-        {/* Pagination info */}
-        <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-          {t('admin.translations.showing', '显示')} {filteredTranslations.length} / {translations.length} {t('admin.translations.items', '条记录')}
+        <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-400">
+          <p>共搜索到 {filteredTranslations.length} 个词条</p>
+          <p>分类: {namespaceFilter === 'all' ? '全部' : namespaceFilter}</p>
         </div>
-      </div>
+      </AdminCard>
     </div>
   );
 }

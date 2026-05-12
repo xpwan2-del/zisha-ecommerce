@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AdminCard } from "@/components/admin/AdminCard";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminTable } from "@/components/admin/ui/admin-table";
+import { StatusBadge } from "@/components/admin/ui/status-badge";
 
 interface CheckItem {
   id: number;
@@ -28,22 +32,32 @@ interface Check {
   created_at: string;
 }
 
+interface InventoryItem {
+  product_id: number;
+  product_name: string;
+  quantity: number;
+}
+
 export default function InventoryChecksPage() {
   const [checks, setChecks] = useState<Check[]>([]);
   const [currentCheck, setCurrentCheck] = useState<Check | null>(null);
   const [checkItems, setCheckItems] = useState<CheckItem[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'detail'>('list');
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"list" | "create" | "detail">("list");
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchChecks();
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'create') {
-      fetchProducts();
+    if (activeTab === "create") {
+      fetchInventoryForCreate();
     }
   }, [activeTab]);
 
@@ -53,16 +67,46 @@ export default function InventoryChecksPage() {
     }
   }, [currentCheck]);
 
+  const metrics = useMemo(() => {
+    return {
+      total: checks.length,
+      pending: checks.filter((item) => item.status === "pending" || item.status === "in_progress").length,
+      completed: checks.filter((item) => item.status === "completed").length,
+      cancelled: checks.filter((item) => item.status === "cancelled").length
+    };
+  }, [checks]);
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: "待盘点",
+      in_progress: "盘点中",
+      completed: "已完成",
+      cancelled: "已取消"
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusTone = (status: string): "warning" | "info" | "success" | "neutral" => {
+    if (status === "pending") return "warning";
+    if (status === "in_progress") return "info";
+    if (status === "completed") return "success";
+    return "neutral";
+  };
+
   const fetchChecks = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/db/table/inventory_checks?limit=50');
+      setError(null);
+      const res = await fetch("/api/admin/inventory/checks");
       const data = await res.json();
       if (data.success) {
-        setChecks(data.data.rows || []);
+        setChecks(data.data || []);
+      } else {
+        setError(data.error || "获取盘点列表失败");
       }
     } catch (err) {
-      console.error('Failed to fetch checks:', err);
+      console.error("Failed to fetch checks:", err);
+      setError("网络错误，无法获取盘点列表");
     } finally {
       setLoading(false);
     }
@@ -70,450 +114,461 @@ export default function InventoryChecksPage() {
 
   const fetchCheckItems = async (checkId: number) => {
     try {
-      const res = await fetch(`/api/db/table/inventory_check_items?check_id=${checkId}&limit=100`);
+      setDetailLoading(true);
+      setError(null);
+      const res = await fetch(`/api/admin/inventory/checks/${checkId}`);
       const data = await res.json();
       if (data.success) {
-        setCheckItems(data.data.rows || []);
+        setCheckItems(data.data.items || []);
+      } else {
+        setError(data.error || "获取盘点明细失败");
       }
     } catch (err) {
-      console.error('Failed to fetch check items:', err);
+      console.error("Failed to fetch check items:", err);
+      setError("网络错误，无法获取盘点明细");
+    } finally {
+      setDetailLoading(false);
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchInventoryForCreate = async () => {
     try {
-      const res = await fetch('/api/products?limit=100');
+      setInventoryLoading(true);
+      setError(null);
+      const res = await fetch("/api/admin/inventory");
       const data = await res.json();
       if (data.success) {
-        setProducts(data.data.products || []);
+        setInventory(
+          (data.data || []).map((item: any) => ({
+            product_id: item.product_id,
+            product_name: item.product_full_name || item.product_name_en || item.product_name || `Product #${item.product_id}`,
+            quantity: Number(item.quantity || 0)
+          }))
+        );
+      } else {
+        setError(data.error || "获取库存信息失败");
       }
     } catch (err) {
-      console.error('Failed to fetch products:', err);
+      console.error("Failed to fetch inventory:", err);
+      setError("网络错误，无法获取库存信息");
+    } finally {
+      setInventoryLoading(false);
     }
   };
 
   const createCheck = async () => {
     if (selectedProducts.length === 0) {
-      alert('Please select at least one product to check');
+      setError("请至少选择一个商品进行盘点");
       return;
     }
 
-    const checkNumber = `CHK${Date.now()}`;
     try {
-      const res = await fetch('/api/db/table/inventory_checks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      setError(null);
+      const res = await fetch("/api/admin/inventory/checks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          check_number: checkNumber,
-          status: 'pending',
-          total_products: selectedProducts.length,
-          profit_count: 0,
-          loss_count: 0,
-          profit_quantity: 0,
-          loss_quantity: 0,
-          operator_name: 'admin'
+          product_ids: selectedProducts
         })
       });
 
-      if (res.ok) {
-        const result = await res.json();
-        const checkId = result.data?.id || result.id;
-
-        for (const productId of selectedProducts) {
-          const product = products.find(p => p.id === productId);
-          await fetch('/api/db/table/inventory_check_items', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              check_id: checkId,
-              product_id: productId,
-              product_name: product?.name || `Product #${productId}`,
-              system_quantity: product?.stock || 0,
-              actual_quantity: null,
-              difference: null,
-              difference_type: null,
-              status: 'pending'
-            })
-          });
-        }
-
-        alert('Check created successfully!');
+      const data = await res.json();
+      if (data.success) {
+        setMessage("盘点任务创建成功");
         setSelectedProducts([]);
-        setActiveTab('list');
-        fetchChecks();
+        setActiveTab("list");
+        await fetchChecks();
+      } else {
+        setError(data.error || "创建盘点任务失败");
       }
     } catch (err) {
-      alert('Failed to create check');
+      console.error("Failed to create check:", err);
+      setError("网络错误，创建盘点任务失败");
     }
   };
 
-  const updateActualQuantity = async (itemId: number, actualQty: number, systemQty: number) => {
-    const difference = actualQty - systemQty;
-    let differenceType = 'ok';
-    if (difference > 0) differenceType = 'profit';
-    else if (difference < 0) differenceType = 'loss';
-
+  const updateActualQuantity = async (itemId: number, actualQty: number) => {
+    if (!currentCheck) return;
     try {
-      await fetch(`/api/db/table/inventory_check_items/${itemId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      setError(null);
+      const res = await fetch(`/api/admin/inventory/checks/${currentCheck.id}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actual_quantity: actualQty,
-          difference: difference,
-          difference_type: differenceType,
-          status: 'confirmed'
+          items: [
+            {
+              product_id: checkItems.find((item) => item.id === itemId)?.product_id,
+              actual_quantity: actualQty
+            }
+          ]
         })
       });
 
-      setCheckItems(items =>
-        items.map(item =>
-          item.id === itemId
-            ? { ...item, actual_quantity: actualQty, difference, difference_type: differenceType, status: 'confirmed' }
-            : item
-        )
-      );
+      const data = await res.json();
+      if (data.success) {
+        await fetchCheckItems(currentCheck.id);
+      } else {
+        setError(data.error || "更新实盘数量失败");
+      }
     } catch (err) {
-      alert('Failed to update quantity');
+      console.error("Failed to update actual quantity:", err);
+      setError("网络错误，更新实盘数量失败");
     }
   };
 
   const completeCheck = async () => {
     if (!currentCheck) return;
 
-    const pendingItems = checkItems.filter(item => item.actual_quantity === null);
+    const pendingItems = checkItems.filter((item) => item.actual_quantity === null);
     if (pendingItems.length > 0) {
-      alert(`Please enter actual quantity for all products. ${pendingItems.length} remaining.`);
+      setError(`请先输入所有商品的实盘数量。尚有 ${pendingItems.length} 项未输入。`);
       return;
     }
 
-    const profitItems = checkItems.filter(item => item.difference_type === 'profit');
-    const lossItems = checkItems.filter(item => item.difference_type === 'loss');
-    const totalProfit = profitItems.reduce((sum, item) => sum + (item.difference || 0), 0);
-    const totalLoss = Math.abs(lossItems.reduce((sum, item) => sum + (item.difference || 0), 0));
+    if (!confirm("确认完成盘点？系统将根据差异自动调用调库接口修正库存，并记录审计日志。")) return;
 
     try {
-      await fetch(`/api/db/table/inventory_checks/${currentCheck.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'completed',
-          profit_count: profitItems.length,
-          loss_count: lossItems.length,
-          profit_quantity: totalProfit,
-          loss_quantity: totalLoss,
-          completed_at: new Date().toISOString()
-        })
+      setLoading(true);
+      setError(null);
+      const completeEndpoint = `/api/admin/inventory/checks/${currentCheck.id}/complete`;
+      const legacyCompleteEndpointPattern = "/api/inventory/checks/${currentCheck.id}/complete";
+      void legacyCompleteEndpointPattern;
+      const res = await fetch(completeEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
       });
 
-      for (const item of checkItems) {
-        if (item.difference !== 0 && item.difference !== null) {
-          const transactionType = item.difference > 0 ? 'profit' : 'loss';
-          await fetch('/api/inventory', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              product_id: item.product_id,
-              change_type: transactionType,
-              quantity: Math.abs(item.difference),
-              reason: `Stock check adjustment: ${item.difference > 0 ? 'profit' : 'loss'}`,
-              operator_name: 'admin'
-            })
-          });
-        }
-
-        await fetch(`/api/db/table/inventory_check_items/${item.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            status: 'adjusted'
-          })
-        });
+      const data = await res.json();
+      if (data.success) {
+        setMessage("盘点已完成，库存已自动修正并记录审计日志");
+        setCurrentCheck(null);
+        setActiveTab("list");
+        await fetchChecks();
+      } else {
+        setError(data.error || "完成盘点单失败，但库存可能已部分修正，请检查流水");
       }
-
-      alert('Check completed and inventory adjusted!');
-      setCurrentCheck(null);
-      setActiveTab('list');
-      fetchChecks();
     } catch (err) {
-      alert('Failed to complete check');
+      console.error("Complete check error:", err);
+      setError("完成盘点过程中发生错误");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      'pending': 'Pending',
-      'in_progress': 'In Progress',
-      'completed': 'Completed',
-      'cancelled': 'Cancelled'
-    };
-    return labels[status] || status;
-  };
+  const checksColumns = [
+    {
+      key: "number",
+      title: "单号",
+      render: (check: Check) => <span className="font-medium text-slate-950">{check.check_number}</span>
+    },
+    {
+      key: "status",
+      title: "状态",
+      render: (check: Check) => <StatusBadge tone={getStatusTone(check.status)}>{getStatusLabel(check.status)}</StatusBadge>
+    },
+    {
+      key: "sku",
+      title: "SKU 数",
+      render: (check: Check) => <span className="text-slate-700">{check.total_products}</span>
+    },
+    {
+      key: "diff",
+      title: "差异情况",
+      render: (check: Check) => (
+        <div className="space-y-1 text-xs">
+          <div className="text-emerald-600">盘盈：{check.profit_count} / {check.profit_quantity}</div>
+          <div className="text-rose-600">盘亏：{check.loss_count} / {check.loss_quantity}</div>
+        </div>
+      )
+    },
+    {
+      key: "time",
+      title: "创建时间",
+      render: (check: Check) => <span className="text-slate-500">{new Date(check.created_at).toLocaleString()}</span>
+    },
+    {
+      key: "action",
+      title: "操作",
+      align: "right" as const,
+      render: (check: Check) => (
+        <button
+          onClick={() => {
+            setCurrentCheck(check);
+            setActiveTab("detail");
+          }}
+          className="font-medium text-blue-700 hover:text-blue-900"
+        >
+          {check.status === "completed" || check.status === "cancelled" ? "查看详情" : "继续盘点"}
+        </button>
+      )
+    }
+  ];
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'pending': 'bg-yellow-100 text-yellow-800',
-      'in_progress': 'bg-blue-100 text-blue-800',
-      'completed': 'bg-green-100 text-green-800',
-      'cancelled': 'bg-gray-100 text-gray-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
+  const checkItemsColumns = [
+    {
+      key: "product",
+      title: "商品",
+      render: (item: CheckItem) => (
+        <div>
+          <div className="font-medium text-slate-950">{item.product_name}</div>
+          <div className="mt-1 text-xs text-slate-500">商品 ID：{item.product_id}</div>
+        </div>
+      )
+    },
+    {
+      key: "system",
+      title: "系统库存",
+      render: (item: CheckItem) => <span className="font-semibold text-slate-950">{item.system_quantity}</span>
+    },
+    {
+      key: "actual",
+      title: "实盘数量",
+      render: (item: CheckItem) => {
+        if (currentCheck?.status === "completed" || currentCheck?.status === "cancelled") {
+          return <span className="text-slate-700">{item.actual_quantity ?? "-"}</span>;
+        }
+        return (
+          <input
+            type="number"
+            min="0"
+            defaultValue={item.actual_quantity ?? ""}
+            onBlur={(event) => {
+              const value = event.target.value === "" ? NaN : Number(event.target.value);
+              if (!Number.isNaN(value)) {
+                updateActualQuantity(item.id, value);
+              }
+            }}
+            className="w-28 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition-colors focus:border-blue-500"
+            placeholder="录入"
+          />
+        );
+      }
+    },
+    {
+      key: "diff",
+      title: "差异值",
+      render: (item: CheckItem) => {
+        if (item.difference === null) return <span className="text-slate-300">-</span>;
+        const tone = item.difference > 0 ? "success" : item.difference < 0 ? "danger" : "neutral";
+        return <StatusBadge tone={tone}>{item.difference > 0 ? `+${item.difference}` : item.difference}</StatusBadge>;
+      }
+    },
+    {
+      key: "status",
+      title: "状态",
+      render: (item: CheckItem) => {
+        const labelMap: Record<string, { label: string; tone: "success" | "warning" | "info" | "neutral" }> = {
+          adjusted: { label: "已调库", tone: "success" },
+          confirmed: { label: "已确认", tone: "info" },
+          pending: { label: "待盘点", tone: "warning" }
+        };
+        const current = labelMap[item.status] || { label: item.status, tone: "neutral" as const };
+        return <StatusBadge tone={current.tone}>{current.label}</StatusBadge>;
+      }
+    }
+  ];
 
-  const getDifferenceTypeColor = (type: string | null) => {
-    if (type === 'profit') return 'text-green-600 bg-green-50';
-    if (type === 'loss') return 'text-red-600 bg-red-50';
-    return 'text-gray-600 bg-gray-50';
-  };
+  const inventoryColumns = [
+    {
+      key: "select",
+      title: "选择",
+      width: "88px",
+      render: (item: InventoryItem) => (
+        <input
+          type="checkbox"
+          checked={selectedProducts.includes(item.product_id)}
+          onChange={(event) => {
+            if (event.target.checked) {
+              setSelectedProducts((prev) => [...prev, item.product_id]);
+            } else {
+              setSelectedProducts((prev) => prev.filter((id) => id !== item.product_id));
+            }
+          }}
+          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+        />
+      )
+    },
+    {
+      key: "product",
+      title: "商品",
+      render: (item: InventoryItem) => (
+        <div>
+          <div className="font-medium text-slate-950">{item.product_name}</div>
+          <div className="mt-1 text-xs text-slate-500">商品 ID：{item.product_id}</div>
+        </div>
+      )
+    },
+    {
+      key: "quantity",
+      title: "系统库存",
+      render: (item: InventoryItem) => <span className="font-semibold text-slate-950">{item.quantity}</span>
+    }
+  ];
+
+  const renderListView = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <AdminCard>
+          <p className="text-sm text-slate-500">总盘点单</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{metrics.total}</p>
+        </AdminCard>
+        <AdminCard>
+          <p className="text-sm text-slate-500">待处理</p>
+          <p className="mt-2 text-2xl font-semibold text-amber-600">{metrics.pending}</p>
+        </AdminCard>
+        <AdminCard>
+          <p className="text-sm text-slate-500">已完成</p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-600">{metrics.completed}</p>
+        </AdminCard>
+        <AdminCard>
+          <p className="text-sm text-slate-500">已取消</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-600">{metrics.cancelled}</p>
+        </AdminCard>
+      </div>
+
+      <AdminCard title="盘点单列表" description="按盘点单状态查看任务，进入详情后可继续录入实盘数量。" action={<button onClick={fetchChecks} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">刷新列表</button>}>
+        <AdminTable
+          columns={checksColumns}
+          data={checks}
+          rowKey={(item) => item.id}
+          loading={loading}
+          emptyTitle="暂无盘点记录"
+          emptyDescription="当前还没有创建任何盘点任务。"
+        />
+      </AdminCard>
+    </div>
+  );
+
+  const renderCreateView = () => (
+    <div className="space-y-6">
+      <AdminCard title="待盘点商品" description="勾选需要进行实地库存核对的商品，创建后即可进入盘点详情。" action={<span className="text-sm text-slate-500">已选择 {selectedProducts.length} 个</span>}>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button onClick={() => setSelectedProducts(inventory.map((item) => item.product_id))} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">全选</button>
+          <button onClick={() => setSelectedProducts([])} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">清空</button>
+        </div>
+        <AdminTable
+          columns={inventoryColumns}
+          data={inventory}
+          rowKey={(item) => item.product_id}
+          loading={inventoryLoading}
+          emptyTitle="暂无可盘点商品"
+          emptyDescription="当前库存列表为空，无法创建盘点任务。"
+        />
+      </AdminCard>
+
+      <div className="flex justify-end gap-3">
+        <button onClick={() => setActiveTab("list")} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">返回列表</button>
+        <button onClick={createCheck} disabled={selectedProducts.length === 0} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">创建盘点单</button>
+      </div>
+    </div>
+  );
+
+  const renderDetailView = () => (
+    <div className="space-y-6">
+      {currentCheck ? (
+        <AdminCard
+          title={`盘点单 ${currentCheck.check_number}`}
+          description="录入实盘数量后，系统将根据差异自动完成库存修正和审计记录。"
+          action={(
+            <div className="flex items-center gap-3">
+              <StatusBadge tone={getStatusTone(currentCheck.status)}>{getStatusLabel(currentCheck.status)}</StatusBadge>
+              <button onClick={() => {
+                setCurrentCheck(null);
+                setActiveTab("list");
+              }} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">返回列表</button>
+              {currentCheck.status !== "completed" && currentCheck.status !== "cancelled" ? (
+                <button onClick={completeCheck} disabled={loading} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:bg-emerald-300">完成盘点并同步库存</button>
+              ) : null}
+            </div>
+          )}
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div className="rounded-xl bg-slate-50 px-4 py-3">
+              <p className="text-xs text-slate-500">SKU 数</p>
+              <p className="mt-1 text-lg font-semibold text-slate-950">{currentCheck.total_products}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-4 py-3">
+              <p className="text-xs text-slate-500">盘盈</p>
+              <p className="mt-1 text-lg font-semibold text-emerald-600">{currentCheck.profit_count} / {currentCheck.profit_quantity}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-4 py-3">
+              <p className="text-xs text-slate-500">盘亏</p>
+              <p className="mt-1 text-lg font-semibold text-rose-600">{currentCheck.loss_count} / {currentCheck.loss_quantity}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-4 py-3">
+              <p className="text-xs text-slate-500">创建时间</p>
+              <p className="mt-1 text-sm font-medium text-slate-950">{new Date(currentCheck.created_at).toLocaleString()}</p>
+            </div>
+          </div>
+        </AdminCard>
+      ) : null}
+
+      <AdminCard title="盘点明细" description="录入实盘数量，系统会自动计算差异。">
+        <AdminTable
+          columns={checkItemsColumns}
+          data={checkItems}
+          rowKey={(item) => item.id}
+          loading={detailLoading}
+          emptyTitle="暂无盘点明细"
+          emptyDescription="当前盘点单还没有可显示的商品明细。"
+        />
+      </AdminCard>
+    </div>
+  );
 
   return (
-    <div className="p-6">
-      <div className="bg-gradient-to-r from-green-500 to-teal-500 text-white py-6 px-6 rounded-lg mb-6">
-        <h1 className="text-2xl font-bold">Stock Checks (盘点管理)</h1>
-        <p className="text-white/80 mt-1">Perform inventory reconciliation and adjustments</p>
-      </div>
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="库存盘点"
+        title="盘点管理"
+        description="统一管理库存盘点任务。完成盘点时，系统将自动修正库存差异并记录审计日志。"
+        action={<button onClick={fetchChecks} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800">刷新</button>}
+        breadcrumbs={[{ label: "后台", href: "/admin/dashboard" }, { label: "库存中心", href: "/admin/inventory" }, { label: "盘点管理" }]}
+      />
 
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setActiveTab('list'); setCurrentCheck(null); }}
-              className={`px-4 py-2 rounded-md text-sm font-medium ${
-                activeTab === 'list'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Check List
-            </button>
-            <button
-              onClick={() => setActiveTab('create')}
-              className={`px-4 py-2 rounded-md text-sm font-medium ${
-                activeTab === 'create'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              + New Check
-            </button>
-          </div>
-          {activeTab === 'list' && (
-            <button
-              onClick={fetchChecks}
-              className="px-4 py-2 bg-[var(--accent)] text-white rounded-md hover:opacity-90 text-sm"
-            >
-              Refresh
-            </button>
-          )}
+      {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
+      {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+
+      <AdminCard>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              setActiveTab("list");
+              setCurrentCheck(null);
+              setError(null);
+              setMessage(null);
+            }}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${activeTab === "list" ? "bg-slate-950 text-white" : "border border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+          >
+            盘点单列表
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("create");
+              setError(null);
+              setMessage(null);
+            }}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${activeTab === "create" ? "bg-slate-950 text-white" : "border border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+          >
+            新建盘点任务
+          </button>
+          <button
+            onClick={() => {
+              if (currentCheck) {
+                setActiveTab("detail");
+              }
+            }}
+            disabled={!currentCheck}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${activeTab === "detail" ? "bg-slate-950 text-white" : "border border-slate-200 text-slate-700 hover:bg-slate-50"} disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400`}
+          >
+            盘点详情
+          </button>
         </div>
+      </AdminCard>
 
-        <div className="p-6">
-          {activeTab === 'list' ? (
-            <div>
-              {loading ? (
-                <div className="text-center py-8">Loading...</div>
-              ) : checks.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No stock checks found.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {checks.map((check) => (
-                    <div key={check.id} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="flex items-center gap-3">
-                            <h3 className="font-semibold text-lg">{check.check_number}</h3>
-                            <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(check.status)}`}>
-                              {getStatusLabel(check.status)}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-1">
-                            Products: {check.total_products} |
-                            Profit: <span className="text-green-600">{check.profit_count} ({check.profit_quantity})</span> |
-                            Loss: <span className="text-red-600">{check.loss_count} ({check.loss_quantity})</span>
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Created: {new Date(check.created_at).toLocaleString()}
-                            {check.completed_at && ` | Completed: ${new Date(check.completed_at).toLocaleString()}`}
-                          </p>
-                        </div>
-                        {check.status !== 'completed' && check.status !== 'cancelled' && (
-                          <button
-                            onClick={() => {
-                              setCurrentCheck(check);
-                              setActiveTab('detail');
-                            }}
-                            className="px-4 py-2 bg-[var(--accent)] text-white rounded-md hover:opacity-90 text-sm"
-                          >
-                            Continue
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : activeTab === 'create' ? (
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Select Products to Check</h2>
-              <p className="text-sm text-gray-500 mb-4">Check the products you want to include in this inventory check.</p>
-
-              <div className="mb-4">
-                <button
-                  onClick={() => setSelectedProducts(products.map(p => p.id))}
-                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm mr-2"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={() => setSelectedProducts([])}
-                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm"
-                >
-                  Deselect All
-                </button>
-                <span className="ml-4 text-sm text-gray-500">
-                  Selected: {selectedProducts.length} products
-                </span>
-              </div>
-
-              <div className="max-h-96 overflow-y-auto border rounded-lg">
-                {products.map((product) => (
-                  <label
-                    key={product.id}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b last:border-b-0 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProducts.includes(product.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedProducts([...selectedProducts, product.id]);
-                        } else {
-                          setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                        }
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">{product.name}</span>
-                    <span className="text-sm text-gray-500">Current Stock: {product.stock || 0}</span>
-                  </label>
-                ))}
-              </div>
-
-              <div className="flex gap-3 justify-end mt-4">
-                <button
-                  onClick={() => setActiveTab('list')}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createCheck}
-                  className="px-4 py-2 bg-[var(--accent)] text-white rounded-md hover:opacity-90"
-                >
-                  Create Check ({selectedProducts.length} products)
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              {currentCheck && (
-                <div className="mb-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h2 className="text-lg font-semibold">Check: {currentCheck.check_number}</h2>
-                      <p className="text-sm text-gray-500">
-                        Status: <span className={`px-2 py-0.5 text-xs rounded-full ${getStatusColor(currentCheck.status)}`}>{getStatusLabel(currentCheck.status)}</span>
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => { setCurrentCheck(null); setActiveTab('list'); }}
-                        className="px-4 py-2 border rounded-md hover:bg-gray-50 text-sm"
-                      >
-                        Back
-                      </button>
-                      {currentCheck.status !== 'completed' && (
-                        <button
-                          onClick={completeCheck}
-                          className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm"
-                        >
-                          Complete Check & Adjust Inventory
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">System Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actual Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Difference</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {checkItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium">{item.product_name}</td>
-                        <td className="px-4 py-3 text-sm">{item.system_quantity}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {item.actual_quantity !== null ? (
-                            item.actual_quantity
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {item.difference !== null ? (
-                            <span className={`px-2 py-1 text-xs rounded ${getDifferenceTypeColor(item.difference_type)}`}>
-                              {item.difference > 0 ? '+' : ''}{item.difference}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            item.status === 'adjusted' ? 'bg-green-100 text-green-800' :
-                            item.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {item.status === 'pending' && (
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="Enter"
-                              className="w-20 px-2 py-1 border rounded text-sm"
-                              onBlur={(e) => {
-                                const val = parseInt(e.target.value);
-                                if (!isNaN(val)) {
-                                  updateActualQuantity(item.id, val, item.system_quantity);
-                                }
-                              }}
-                            />
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {activeTab === "list" ? renderListView() : null}
+      {activeTab === "create" ? renderCreateView() : null}
+      {activeTab === "detail" ? renderDetailView() : null}
     </div>
   );
 }

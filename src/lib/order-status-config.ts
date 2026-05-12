@@ -1,25 +1,42 @@
 export const OrderStatus = {
   PENDING: 'pending',
-  PENDING_PAYMENT: 'pending_payment',
   PAID: 'paid',
-  PROCESSING: 'processing',
   SHIPPED: 'shipped',
-  REVIEWING: 'reviewing',
+  REFUNDING_PAYMENT: 'refunding_payment',
+  REFUNDING: 'refunding',
   DELIVERED: 'delivered',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
-  REFUNDING: 'refunding',
   REFUNDED: 'refunded',
 } as const;
 
 export type OrderStatusType = typeof OrderStatus[keyof typeof OrderStatus];
 
+export const PaymentStatus = {
+  UNPAID: 'unpaid',
+  PAID: 'paid',
+  REFUNDING: 'refunding',
+  REFUNDED: 'refunded',
+  FAILED: 'failed',
+} as const;
+
+export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
+
+export const AfterSaleStatus = {
+  NONE: 'none',
+  REQUESTED: 'requested',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  RETURNING: 'returning',
+  COMPLETED: 'completed',
+} as const;
+
+export type AfterSaleStatusType = typeof AfterSaleStatus[keyof typeof AfterSaleStatus];
+
 export const OrderEvent = {
   ORDER_CREATED: 'order_created',
-  USER_CONFIRM_PAYMENT: 'user_confirm_payment',
   PAY_SUCCESS: 'pay_success',
   PAY_FAILED: 'pay_failed',
-  MERCHANT_CONFIRM: 'merchant_confirm',
   MERCHANT_SHIP: 'merchant_ship',
   USER_CONFIRM: 'user_confirm',
   USER_CANCEL: 'user_cancel',
@@ -27,9 +44,9 @@ export const OrderEvent = {
   MERCHANT_CANCEL: 'merchant_cancel',
   TIMEOUT_CANCEL: 'timeout_cancel',
   REFUND_REQUEST: 'refund_request',
+  REFUND_APPROVE: 'refund_approve',
   REFUND_SUCCESS: 'refund_success',
   REFUND_REJECT: 'refund_reject',
-  REVIEW_COMPLETE: 'review_complete',
   AUTO_COMPLETE: 'auto_complete',
 } as const;
 

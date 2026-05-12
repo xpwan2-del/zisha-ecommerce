@@ -209,14 +209,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // 查询评价统计
     const reviewResult = await query(
-      `SELECT COUNT(*) as count, AVG(rating) as avg_rating
-       FROM reviews
-       WHERE product_id = ?`,
+      `SELECT
+         COALESCE(prs.review_count, 0) as count,
+         COALESCE(prs.average_rating, 0) as avg_rating
+       FROM products p
+       LEFT JOIN product_review_stats prs ON p.id = prs.product_id
+       WHERE p.id = ?`,
       [productId]
     );
     const reviewCount = parseInt(String(reviewResult.rows?.[0]?.count || 0));
     const avgRating = reviewResult.rows?.[0]?.avg_rating;
-    const rating = avgRating ? parseFloat(String(avgRating)).toFixed(1) : '5.0';
+    const rating = reviewCount > 0 ? parseFloat(String(avgRating || 0)).toFixed(1) : '5.0';
 
     // 查询产品规格
     const featuresResult = await query(

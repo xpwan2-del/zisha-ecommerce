@@ -3,6 +3,15 @@ import { query } from '@/lib/db';
 import { PaymentService } from '@/lib/payment/PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
 import { getPaymentErrorMapping, resolvePaymentError } from '@/lib/payment/errorCodeMapper';
+import { completeRefundSuccess } from '@/lib/refund-completion-service';
+import {
+  markRefundWebhookEventCompleted,
+  markRefundWebhookEventFailed,
+  normalizePayPalRefundWebhook,
+  registerRefundWebhookEvent,
+  validatePayPalWebhookSource,
+  validateRefundWebhookAmount,
+} from '@/lib/payment/refund-webhook-service';
 
 /**
  * ============================================================
@@ -63,23 +72,12 @@ import { getPaymentErrorMapping, resolvePaymentError } from '@/lib/payment/error
 const PAYPAL_API_BASE_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_BASE_LIVE = 'https://api-m.paypal.com';
 
-// ============================================================
-// 辅助函数
-// ============================================================
-
-/**
- * getLangFromRequest - 从请求获取语言设置
- * @description 优先从请求头 x-lang 获取，其次从 cookie 获取，默认 zh
- */
 function getLangFromRequest(request: NextRequest): string {
   return request.headers.get('x-lang') ||
          request.cookies.get('locale')?.value ||
          'zh';
 }
 
-/**
- * getAccessToken - 获取 PayPal Access Token
- */
 async function getAccessToken(clientId: string, clientSecret: string, isSandbox: boolean): Promise<string> {
   const baseUrl = isSandbox ? PAYPAL_API_BASE_SANDBOX : PAYPAL_API_BASE_LIVE;
   const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
@@ -101,9 +99,6 @@ async function getAccessToken(clientId: string, clientSecret: string, isSandbox:
   return data.access_token;
 }
 
-/**
- * capturePayPalOrder - 捕获 PayPal 订单
- */
 async function capturePayPalOrder(accessToken: string, orderId: string, isSandbox: boolean) {
   const baseUrl = isSandbox ? PAYPAL_API_BASE_SANDBOX : PAYPAL_API_BASE_LIVE;
 
@@ -118,9 +113,6 @@ async function capturePayPalOrder(accessToken: string, orderId: string, isSandbo
   return response;
 }
 
-/**
- * getPayPalErrorMessage - 从数据库获取错误提示
- */
 async function getPayPalErrorMessage(errorCode: string, lang: string): Promise<{ code: string; type: string; message: string }> {
   const mapping = await getPaymentErrorMapping('paypal', errorCode);
   if (!mapping) {
@@ -142,9 +134,6 @@ async function getPayPalErrorMessage(errorCode: string, lang: string): Promise<{
   return { code: mapping.unifiedCode, type: mapping.errorType, message: msg };
 }
 
-/**
- * savePayPalLog - 保存支付日志（使用统一的 payment_logs 表）
- */
 async function savePayPalLog(
   orderId: number,
   orderNumber: string,
@@ -163,14 +152,14 @@ async function savePayPalLog(
      (order_id, order_number, payment_method, platform_order_id, status, error_code, error_message, raw_response, is_success, amount, currency, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [
-      orderId, 
-      orderNumber, 
-      'paypal', 
-      paypalOrderId, 
+      orderId,
+      orderNumber,
+      'paypal',
+      paypalOrderId,
       isSuccess ? 'success' : 'failed',
-      errorIssue || 'UNKNOWN_ERROR', 
-      errorDescription || null, 
-      rawResponse, 
+      errorIssue || 'UNKNOWN_ERROR',
+      errorDescription || null,
+      rawResponse,
       isSuccess ? 1 : 0,
       amount,
       currency
@@ -178,14 +167,9 @@ async function savePayPalLog(
   );
 }
 
-// ============================================================
-// POST - 处理 PayPal 回调
-// ============================================================
-
 export async function POST(request: NextRequest) {
   const lang = getLangFromRequest(request);
 
-  // 监听：请求进入
   logMonitor('PAYMENTS', 'REQUEST', {
     method: 'POST',
     path: '/api/payments/paypal/notify',
@@ -194,11 +178,102 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const refundWebhook = normalizePayPalRefundWebhook(body);
     const { orderId, order_number, token, PayerID } = body;
+
+    if (refundWebhook.isRefundSuccess) {
+      const sourceValidation = validatePayPalWebhookSource(request.headers, body);
+      if (!sourceValidation.success) {
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'PAYPAL_REFUND_WEBHOOK_SOURCE_INVALID',
+          eventId: refundWebhook.eventId,
+          error: sourceValidation.error,
+        });
+        return NextResponse.json({
+          success: false,
+          error: sourceValidation.error,
+        }, { status: 400 });
+      }
+
+      const webhookEvent = await registerRefundWebhookEvent('paypal', refundWebhook, body, 'refund_success');
+      if (webhookEvent.duplicate) {
+        logMonitor('PAYMENTS', 'SUCCESS', {
+          action: 'PAYPAL_REFUND_WEBHOOK_ALREADY_PROCESSED',
+          eventId: webhookEvent.eventId,
+          status: webhookEvent.status,
+        });
+        return NextResponse.json({
+          success: true,
+          status: 'already_processed',
+          eventId: webhookEvent.eventId,
+        });
+      }
+
+      const amountValidation = await validateRefundWebhookAmount(refundWebhook, 'paypal');
+      if (!amountValidation.success) {
+        await markRefundWebhookEventFailed('paypal', webhookEvent.eventId, amountValidation.error || 'REFUND_WEBHOOK_INVALID', 'amount_validation');
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'PAYPAL_REFUND_WEBHOOK_INVALID',
+          eventId: refundWebhook.eventId,
+          order_number: refundWebhook.orderNumber,
+          referenceId: refundWebhook.referenceId,
+          refund_id: refundWebhook.transactionId,
+          error: amountValidation.error,
+          refundAmount: refundWebhook.refundAmount,
+          orderAmount: amountValidation.orderAmount,
+        });
+        return NextResponse.json({
+          success: false,
+          error: amountValidation.error || 'REFUND_WEBHOOK_INVALID',
+        }, { status: amountValidation.error === 'ORDER_NOT_FOUND' ? 404 : 400 });
+      }
+
+      const refundResult = await completeRefundSuccess({
+        orderNumber: refundWebhook.orderNumber || amountValidation.orderNumber || null,
+        referenceId: refundWebhook.referenceId,
+        platform: 'paypal',
+        transactionId: refundWebhook.transactionId,
+        reason: 'PayPal 退款成功回调',
+      });
+
+      if (!refundResult.success) {
+        await markRefundWebhookEventFailed('paypal', webhookEvent.eventId, refundResult.error || 'REFUND_SUCCESS_FAILED', 'refund_completion');
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'PAYPAL_REFUND_SUCCESS_FAILED',
+          order_number: refundWebhook.orderNumber,
+          orderId,
+          token,
+          refund_id: refundWebhook.transactionId,
+          eventId: refundWebhook.eventId,
+          error: refundResult.error,
+          orderStatus: refundResult.orderStatus,
+        });
+        return NextResponse.json({
+          success: false,
+          error: refundResult.error || 'REFUND_SUCCESS_FAILED',
+        }, { status: refundResult.error === 'ORDER_NOT_FOUND' ? 404 : 400 });
+      }
+
+      await markRefundWebhookEventCompleted('paypal', webhookEvent.eventId);
+
+      logMonitor('PAYMENTS', 'SUCCESS', {
+        action: 'PAYPAL_REFUND_SUCCESS',
+        orderId: refundResult.orderId,
+        order_number: refundResult.orderNumber,
+        refund_id: refundWebhook.transactionId,
+        eventId: refundWebhook.eventId,
+        alreadyCompleted: refundResult.alreadyCompleted,
+      });
+
+      return NextResponse.json({
+        success: true,
+        status: refundResult.alreadyCompleted ? 'already_refunded' : 'refund_completed',
+        order_number: refundResult.orderNumber,
+      });
+    }
 
     const platformOrderId = orderId || token;
 
-    // 参数校验
     if (!platformOrderId || !order_number) {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
         reason: 'Missing orderId or order_number',
@@ -215,13 +290,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 查询本地订单
     let orderResult = await query(
       'SELECT id, user_id, order_number, final_amount, payment_status, order_status FROM orders WHERE order_number = ?',
       [order_number]
     );
 
-    // 如果找不到，通过 reference_id 查询
     if (orderResult.rows.length === 0) {
       logMonitor('PAYMENTS', 'NOT_FOUND', {
         reason: 'Order not found by order_number, trying by reference_id',
@@ -251,7 +324,6 @@ export async function POST(request: NextRequest) {
 
     const order = orderResult.rows[0];
 
-    // 检查订单是否已支付
     if (order.payment_status === 'paid') {
       logMonitor('PAYMENTS', 'SUCCESS', {
         action: 'PAYMENT_ALREADY_PAID',
@@ -265,12 +337,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 检查是否已经有成功的支付记录
     const existingPayment = await query(
       'SELECT id FROM order_payments WHERE order_id = ? AND payment_status = ?',
       [order.id, 'paid']
     );
-    
+
     if (existingPayment.rows.length > 0) {
       logMonitor('PAYMENTS', 'SUCCESS', {
         action: 'PAYMENT_ALREADY_EXISTS',
@@ -285,7 +356,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 获取 PayPal 配置
     await PaymentService.initialize();
     const paypalConfig = PaymentService.getConfig('paypal');
     if (!paypalConfig || !paypalConfig.config_json) {
@@ -305,13 +375,11 @@ export async function POST(request: NextRequest) {
     const configData = JSON.parse(paypalConfig.config_json);
     const isSandbox = paypalConfig.is_sandbox;
 
-    // 获取 Access Token
     logMonitor('PAYMENTS', 'INFO', {
       action: 'GET_ACCESS_TOKEN'
     });
     const accessToken = await getAccessToken(configData.client_id, configData.client_secret, isSandbox);
 
-    // 捕获订单
     logMonitor('PAYMENTS', 'INFO', {
       action: 'CAPTURE_PAYPAL_ORDER',
       paypalOrderId: platformOrderId
@@ -367,8 +435,6 @@ export async function POST(request: NextRequest) {
       'USD'
     );
 
-    // 支付成功验证通过，只记录日志，不写数据库
-    // 订单状态更新由 result 路由统一负责（幂等性保障）
     if (isSuccess) {
       logMonitor('PAYMENTS', 'SUCCESS', {
         action: 'PAYMENT_VERIFIED',
@@ -380,7 +446,7 @@ export async function POST(request: NextRequest) {
 
       const capturedAmount = parseFloat(responseData.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value || '0');
       const orderAmount = parseFloat(order.final_amount);
-      
+
       if (Math.abs(capturedAmount - orderAmount) > 0.01) {
         logMonitor('PAYMENTS', 'WARNING', {
           action: 'AMOUNT_MISMATCH_DETECTED',
@@ -399,7 +465,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 支付失败，获取错误提示
     if (!resolved) {
       const errorInfo = await getPayPalErrorMessage('UNKNOWN_ERROR', lang);
       return NextResponse.json({

@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { recordAdminAuditLog } from '@/lib/admin-audit';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
+import { OrderEvent, OrderStatusService } from '@/lib/order-status-service';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = checkAdminAuth(request);
   if (auth.response) return auth.response;
+
+  let transactionStarted = false;
 
   try {
     const { id } = await params;
@@ -22,7 +26,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (order.rows.length === 0) return createErrorResponse('NOT_FOUND', 404);
     const cur = order.rows[0];
 
-    if (cur.order_status !== 'paid' && cur.payment_status !== 'paid') {
+    if (cur.order_status !== 'paid' || cur.payment_status !== 'paid') {
+      return createErrorResponse('INVALID_ORDER_STATUS', 400);
+    }
+
+    await query('BEGIN TRANSACTION');
+    transactionStarted = true;
+
+    const statusChange = await OrderStatusService.changeStatus(
+      orderId,
+      OrderEvent.MERCHANT_SHIP,
+      {
+        type: 'admin',
+        id: operatorId,
+        name: operatorName,
+      },
+      {
+        reason: `发货: ${carrier} ${tracking_number}`,
+        useExistingTransaction: true,
+      }
+    );
+
+    if (!statusChange.success) {
+      await query('ROLLBACK');
+      transactionStarted = false;
       return createErrorResponse('INVALID_ORDER_STATUS', 400);
     }
 
@@ -32,17 +59,46 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [orderId, tracking_number, carrier, estimated_delivery || null]
     );
 
-    await query("UPDATE orders SET order_status = 'shipped', updated_at = datetime('now') WHERE id = ?", [orderId]);
+    await query('COMMIT');
+    transactionStarted = false;
 
-    await query(
-      `INSERT INTO order_status_logs (order_id, old_status, new_status, change_reason, changed_by, created_at, order_number, operator_type, operator_name)
-       VALUES (?, ?, 'shipped', ?, ?, datetime('now'), ?, 'admin', ?)`,
-      [orderId, cur.order_status, `发货: ${carrier} ${tracking_number}`, operatorId, cur.order_number, operatorName]
-    );
+    await recordAdminAuditLog({
+      request,
+      module: 'ORDERS',
+      action: 'SHIP_ORDER',
+      description: '管理员订单发货',
+      operator: operatorName,
+      status: 'success',
+      resourceId: orderId,
+      resourceType: 'order',
+      riskLevel: 'high',
+      metadata: {
+        orderNumber: cur.order_number,
+        tracking_number,
+        carrier,
+        estimated_delivery: estimated_delivery || null,
+        fromStatus: statusChange.fromStatus,
+        toStatus: statusChange.toStatus,
+      },
+    });
 
-    logApiSuccess('ORDERS', 'SHIP_ORDER', { orderId, tracking_number, carrier });
-    return createSuccessResponse({ message: '发货成功', tracking_number, carrier });
+    logApiSuccess('ORDERS', 'SHIP_ORDER', {
+      orderId,
+      tracking_number,
+      carrier,
+      fromStatus: statusChange.fromStatus,
+      toStatus: statusChange.toStatus,
+    });
+    return createSuccessResponse({
+      message: '发货成功',
+      tracking_number,
+      carrier,
+      order_status: statusChange.toStatus,
+    });
   } catch (error) {
+    if (transactionStarted) {
+      await query('ROLLBACK');
+    }
     logApiError('ORDERS', 'SHIP_ORDER', error);
     return createErrorResponse('INTERNAL_ERROR', 500);
   }

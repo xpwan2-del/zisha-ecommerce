@@ -2,23 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
-/**
- * @api {POST} /api/payments/stripe/notify Stripe 支付回调
- * @apiName StripeNotify
- * @apiGroup PAYMENTS
- * @apiDescription 接收 Stripe Webhook 支付结果通知。验签校验后返回结果，不写数据库，订单落单由 result 路由统一负责。
- */
-
+import { completeRefundSuccess } from '@/lib/refund-completion-service';
+import {
+  markRefundWebhookEventCompleted,
+  markRefundWebhookEventFailed,
+  normalizeStripeRefundWebhook,
+  registerRefundWebhookEvent,
+  validateRefundWebhookAmount,
+} from '@/lib/payment/refund-webhook-service';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
-  apiVersion: '2024-06-20' as any,
-}) : null;
+const stripe = stripeSecretKey
+  ? new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' as any })
+  : null;
 
 function getLangFromRequest(request: NextRequest): string {
-  return request.headers.get('x-lang') ||
-         request.cookies.get('locale')?.value ||
-         'zh';
+  return request.headers.get('x-lang') || request.cookies.get('locale')?.value || 'zh';
 }
 
 async function getStripeErrorMessage(errorCode: string, lang: string): Promise<string> {
@@ -29,7 +28,9 @@ async function getStripeErrorMessage(errorCode: string, lang: string): Promise<s
       AMOUNT_MISMATCH: '支付金额与订单金额不一致',
       ORDER_NUMBER_MISMATCH: '支付订单号不匹配',
       PAYMENT_ALREADY_PAID: '订单已支付',
-      UNKNOWN_ERROR: '支付失败，请稍后重试'
+      MISSING_PARAMS: '缺少必要参数',
+      UNKNOWN_ERROR: '支付失败，请稍后重试',
+      PAYMENT_NOT_COMPLETED: '支付尚未完成'
     },
     en: {
       HTTP_404: 'Order not found',
@@ -37,7 +38,9 @@ async function getStripeErrorMessage(errorCode: string, lang: string): Promise<s
       AMOUNT_MISMATCH: 'Payment amount does not match order amount',
       ORDER_NUMBER_MISMATCH: 'Payment order number mismatch',
       PAYMENT_ALREADY_PAID: 'Order already paid',
-      UNKNOWN_ERROR: 'Payment failed, please retry'
+      MISSING_PARAMS: 'Missing required parameters',
+      UNKNOWN_ERROR: 'Payment failed, please retry',
+      PAYMENT_NOT_COMPLETED: 'Payment is not completed'
     },
     ar: {
       HTTP_404: 'الطلب غير موجود',
@@ -45,11 +48,13 @@ async function getStripeErrorMessage(errorCode: string, lang: string): Promise<s
       AMOUNT_MISMATCH: 'مبلغ الدفع لا يتطابق مع مبلغ الطلب',
       ORDER_NUMBER_MISMATCH: 'رقم طلب الدفع غير متطابق',
       PAYMENT_ALREADY_PAID: 'تم الدفع بالفعل',
-      UNKNOWN_ERROR: 'فشل الدفع، يرجى المحاولة لاحقًا'
+      MISSING_PARAMS: 'معاملات مفقودة',
+      UNKNOWN_ERROR: 'فشل الدفع، يرجى المحاولة لاحقًا',
+      PAYMENT_NOT_COMPLETED: 'الدفع غير مكتمل'
     }
   };
 
-  return messages[lang]?.[errorCode] || messages['zh'][errorCode] || 'Unknown error';
+  return messages[lang]?.[errorCode] || messages.zh[errorCode] || messages.zh.UNKNOWN_ERROR;
 }
 
 export async function POST(request: NextRequest) {
@@ -75,11 +80,90 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const refundWebhook = normalizeStripeRefundWebhook(body);
     const { session_id, order_number } = body;
 
-    if (!session_id) {
+    if (refundWebhook.isRefundSuccess) {
+      const webhookEvent = await registerRefundWebhookEvent('stripe', refundWebhook, body, 'refund_success');
+      if (webhookEvent.duplicate) {
+        logMonitor('PAYMENTS', 'SUCCESS', {
+          action: 'STRIPE_REFUND_WEBHOOK_ALREADY_PROCESSED',
+          eventId: webhookEvent.eventId,
+          status: webhookEvent.status,
+        });
+        return NextResponse.json({
+          success: true,
+          status: 'already_processed',
+          eventId: webhookEvent.eventId,
+        });
+      }
+
+      const amountValidation = await validateRefundWebhookAmount(refundWebhook, 'stripe');
+      if (!amountValidation.success) {
+        await markRefundWebhookEventFailed('stripe', webhookEvent.eventId, amountValidation.error || 'REFUND_WEBHOOK_INVALID');
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'STRIPE_REFUND_WEBHOOK_INVALID',
+          eventId: refundWebhook.eventId,
+          order_number: refundWebhook.orderNumber,
+          payment_intent: refundWebhook.referenceId,
+          refund_id: refundWebhook.transactionId,
+          error: amountValidation.error,
+          refundAmount: refundWebhook.refundAmount,
+          orderAmount: amountValidation.orderAmount,
+        });
+        return NextResponse.json({
+          success: false,
+          error: amountValidation.error || 'REFUND_WEBHOOK_INVALID',
+        }, { status: amountValidation.error === 'ORDER_NOT_FOUND' ? 404 : 400 });
+      }
+
+      const refundResult = await completeRefundSuccess({
+        orderNumber: refundWebhook.orderNumber || amountValidation.orderNumber || null,
+        referenceId: refundWebhook.referenceId,
+        platform: 'stripe',
+        transactionId: refundWebhook.transactionId,
+        reason: 'Stripe 退款成功回调',
+      });
+
+      if (!refundResult.success) {
+        await markRefundWebhookEventFailed('stripe', webhookEvent.eventId, refundResult.error || 'REFUND_SUCCESS_FAILED', 'refund_completion');
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'STRIPE_REFUND_SUCCESS_FAILED',
+          order_number: refundWebhook.orderNumber,
+          payment_intent: refundWebhook.referenceId,
+          refund_id: refundWebhook.transactionId,
+          error: refundResult.error,
+          orderStatus: refundResult.orderStatus,
+        });
+        return NextResponse.json({
+          success: false,
+          error: refundResult.error || 'REFUND_SUCCESS_FAILED',
+        }, { status: refundResult.error === 'ORDER_NOT_FOUND' ? 404 : 400 });
+      }
+
+      await markRefundWebhookEventCompleted('stripe', webhookEvent.eventId);
+
+      logMonitor('PAYMENTS', 'SUCCESS', {
+        action: 'STRIPE_REFUND_SUCCESS',
+        orderId: refundResult.orderId,
+        order_number: refundResult.orderNumber,
+        refund_id: refundWebhook.transactionId,
+        eventId: refundWebhook.eventId,
+        alreadyCompleted: refundResult.alreadyCompleted,
+      });
+
+      return NextResponse.json({
+        success: true,
+        status: refundResult.alreadyCompleted ? 'already_refunded' : 'refund_completed',
+        order_number: refundResult.orderNumber,
+      });
+    }
+
+    if (!session_id || !order_number) {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
-        reason: 'Missing session_id'
+        reason: 'Missing session_id or order_number',
+        session_id,
+        order_number,
       });
       return NextResponse.json({
         success: false,
@@ -88,63 +172,41 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    logMonitor('PAYMENTS', 'INFO', {
-      action: 'VERIFY_STRIPE_SESSION',
-      session_id,
-      order_number
-    });
+    const session = await stripe.checkout.sessions.retrieve(String(session_id));
+    const sessionOrderNumber = session.metadata?.order_number || '';
 
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-
-    if (!session || session.payment_status !== 'paid') {
-      logMonitor('PAYMENTS', 'PAYMENT_FAILED', {
-        action: 'STRIPE_NOT_PAID',
-        session_id,
-        payment_status: session?.payment_status
-      });
-      return NextResponse.json({
-        success: false,
-        error: 'PAYMENT_NOT_COMPLETED',
-        message: await getStripeErrorMessage('UNKNOWN_ERROR', lang)
-      }, { status: 400 });
-    }
-
-    const stripeOrderNumber = order_number || session.metadata?.order_number;
-
-    if (!stripeOrderNumber) {
+    if (sessionOrderNumber && sessionOrderNumber !== order_number) {
       logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
-        reason: 'Missing order_number in session metadata'
-      });
-      return NextResponse.json({
-        success: false,
-        error: 'MISSING_PARAMS',
-        message: 'Missing order_number'
-      }, { status: 400 });
-    }
-
-    if (order_number && session.metadata?.order_number && session.metadata.order_number !== order_number) {
-      logMonitor('PAYMENTS', 'AUTH_FAILED', {
         action: 'STRIPE_ORDER_NUMBER_MISMATCH',
+        order_number,
+        sessionOrderNumber,
         session_id,
-        provided_order_number: order_number,
-        session_order_number: session.metadata.order_number
       });
       return NextResponse.json({
         success: false,
         error: 'ORDER_NUMBER_MISMATCH',
         message: await getStripeErrorMessage('ORDER_NUMBER_MISMATCH', lang)
-      }, { status: 403 });
+      }, { status: 400 });
     }
 
-    const orderResult = await query(
-      'SELECT id, user_id, order_number, final_amount, payment_status, order_status FROM orders WHERE order_number = ?',
-      [stripeOrderNumber]
+    let orderResult = await query(
+      'SELECT id, user_id, order_number, final_amount, payment_status, order_status, reference_id FROM orders WHERE order_number = ?',
+      [order_number]
     );
+
+    if (orderResult.rows.length === 0 && session.payment_intent) {
+      orderResult = await query(
+        'SELECT id, user_id, order_number, final_amount, payment_status, order_status, reference_id FROM orders WHERE reference_id = ?',
+        [String(session.payment_intent)]
+      );
+    }
 
     if (orderResult.rows.length === 0) {
       logMonitor('PAYMENTS', 'NOT_FOUND', {
-        reason: 'Order not found',
-        order_number: stripeOrderNumber
+        action: 'STRIPE_ORDER_NOT_FOUND',
+        order_number,
+        session_id,
+        payment_intent: session.payment_intent,
       });
       return NextResponse.json({
         success: false,
@@ -157,62 +219,73 @@ export async function POST(request: NextRequest) {
 
     if (order.payment_status === 'paid') {
       logMonitor('PAYMENTS', 'SUCCESS', {
-        action: 'PAYMENT_ALREADY_PAID',
+        action: 'STRIPE_PAYMENT_ALREADY_PAID',
         orderId: order.id,
-        order_number: stripeOrderNumber
+        order_number,
+        session_id,
       });
       return NextResponse.json({
         success: true,
         status: 'already_paid',
-        message: '订单已支付'
+        message: await getStripeErrorMessage('PAYMENT_ALREADY_PAID', lang)
       });
     }
 
-    const paidAmount = (session.amount_total || 0) / 100;
-    const orderAmount = parseFloat(order.final_amount);
+    if (session.payment_status !== 'paid') {
+      logMonitor('PAYMENTS', 'ERROR', {
+        action: 'STRIPE_PAYMENT_NOT_COMPLETED',
+        orderId: order.id,
+        order_number,
+        session_id,
+        payment_status: session.payment_status,
+      });
+      return NextResponse.json({
+        success: false,
+        error: 'PAYMENT_NOT_COMPLETED',
+        message: await getStripeErrorMessage('PAYMENT_NOT_COMPLETED', lang)
+      }, { status: 400 });
+    }
+
+    const paidAmount = typeof session.amount_total === 'number' ? session.amount_total / 100 : 0;
+    const orderAmount = parseFloat(order.final_amount || '0');
+    const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null;
 
     if (Math.abs(paidAmount - orderAmount) > 0.01) {
       logMonitor('PAYMENTS', 'ERROR', {
-        action: 'AMOUNT_MISMATCH_BLOCKED',
+        action: 'STRIPE_AMOUNT_MISMATCH',
         orderId: order.id,
-        order_number: stripeOrderNumber,
+        order_number,
+        session_id,
+        paymentIntentId,
         paidAmount,
         orderAmount,
-        difference: Math.abs(paidAmount - orderAmount)
       });
 
-      try {
-        await query(
-          `INSERT INTO payment_logs
-           (order_id, order_number, payment_method, status, error_code, error_message, is_success,
-            transaction_id, platform_order_id, payment_stage, amount, currency, extra_data, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-          [
-            order.id, stripeOrderNumber, 'stripe', 'failed',
-            'AMOUNT_MISMATCH', `Paid: ${paidAmount}, Expected: ${orderAmount}`, 0,
-            session.payment_intent || session_id, session_id, 'notify',
-            paidAmount, (session.currency || 'usd').toUpperCase(),
-            JSON.stringify({ difference: Math.abs(paidAmount - orderAmount) })
-          ]
-        );
-      } catch (_logErr) {}
-
-      if (session.payment_intent) {
+      if (paymentIntentId) {
         try {
-          await stripe.refunds.create({ payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : (session.payment_intent as any).id });
-          logMonitor('PAYMENTS', 'SUCCESS', {
-            action: 'AMOUNT_MISMATCH_REFUNDED',
-            orderId: order.id,
-            order_number: stripeOrderNumber,
-            paymentIntent: session.payment_intent
+          const refund = await stripe.refunds.create({
+            payment_intent: paymentIntentId,
+            reason: 'requested_by_customer',
+            metadata: {
+              order_number: String(order.order_number),
+              reason: 'amount_mismatch_auto_refund'
+            }
           });
-        } catch (_refundErr) {
-          logMonitor('PAYMENTS', 'ERROR', {
-            action: 'AMOUNT_MISMATCH_REFUND_FAILED',
+
+          logMonitor('PAYMENTS', 'SUCCESS', {
+            action: 'STRIPE_AMOUNT_MISMATCH_REFUND_CREATED',
             orderId: order.id,
-            order_number: stripeOrderNumber,
-            paymentIntent: session.payment_intent,
-            error: String(_refundErr)
+            order_number,
+            refundId: refund.id,
+            paymentIntentId,
+          });
+        } catch (refundError) {
+          logMonitor('PAYMENTS', 'ERROR', {
+            action: 'STRIPE_AMOUNT_MISMATCH_REFUND_FAILED',
+            orderId: order.id,
+            order_number,
+            paymentIntentId,
+            error: String(refundError),
           });
         }
       }
@@ -225,24 +298,26 @@ export async function POST(request: NextRequest) {
     }
 
     logMonitor('PAYMENTS', 'SUCCESS', {
-      action: 'PAYMENT_SUCCESS',
+      action: 'STRIPE_PAYMENT_VERIFIED',
       orderId: order.id,
-      order_number: stripeOrderNumber,
-      paidAmount
+      order_number,
+      session_id,
+      paymentIntentId,
+      paidAmount,
     });
 
     return NextResponse.json({
       success: true,
-      status: 'captured',
-      payment_id: session.payment_intent || session_id
+      status: 'verified',
+      payment_id: paymentIntentId || session.id,
+      session_id: session.id,
+      order_number: order.order_number,
     });
-
-  } catch (error: any) {
+  } catch (error) {
     logMonitor('PAYMENTS', 'ERROR', {
       action: 'STRIPE_NOTIFY_ERROR',
       error: String(error)
     });
-
     return NextResponse.json({
       success: false,
       error: 'UNKNOWN_ERROR',

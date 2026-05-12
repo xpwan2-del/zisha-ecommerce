@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { logMonitor } from "@/lib/utils/logger";
+import { checkAdminAuth } from '@/lib/admin-helpers';
 /**
  * @api {GET} /api/theme-colors/init-data 初始化主题颜色数据
  * @apiName InitThemeColorsData
@@ -43,6 +44,17 @@ const allConfigs: ConfigItem[] = [
   { theme: "chinese", key: "inventoryStatus_limited", value: "#F97316", description: "库存有限状态颜色" },
   { theme: "chinese", key: "inventoryStatus_lowStock", value: "#DC2626", description: "库存紧张状态颜色" },
   { theme: "chinese", key: "inventoryStatus_outOfStock", value: "#DC2626", description: "缺货状态颜色" },
+  { theme: "chinese", key: "reviewFeedbackSuccessBg", value: "#ECFDF5", description: "评价成功背景色" },
+  { theme: "chinese", key: "reviewFeedbackSuccessBorder", value: "#86EFAC", description: "评价成功边框色" },
+  { theme: "chinese", key: "reviewFeedbackSuccessText", value: "#14532D", description: "评价成功文字色" },
+  { theme: "chinese", key: "reviewFeedbackIconBg", value: "#16A34A", description: "评价成功图标背景色" },
+  { theme: "chinese", key: "reviewFeedbackIconText", value: "#FFFFFF", description: "评价成功图标文字色" },
+  { theme: "chinese", key: "reviewFeedbackBadgeBg", value: "#16A34A", description: "评价成功标签背景色" },
+  { theme: "chinese", key: "reviewFeedbackBadgeText", value: "#FFFFFF", description: "评价成功标签文字色" },
+  { theme: "chinese", key: "reviewFeedbackErrorBg", value: "#FEF2F2", description: "评价错误背景色" },
+  { theme: "chinese", key: "reviewFeedbackErrorBorder", value: "#FCA5A5", description: "评价错误边框色" },
+  { theme: "chinese", key: "reviewFeedbackErrorText", value: "#991B1B", description: "评价错误文字色" },
+  { theme: "chinese", key: "reviewStarActive", value: "#F59E0B", description: "评价星标激活色" },
   // chinese 主题 - 字体
   { theme: "chinese", key: "heading-font", value: "Cormorant, serif", description: "标题字体" },
   { theme: "chinese", key: "body-font", value: "Inter, sans-serif", description: "正文字体" },
@@ -90,6 +102,17 @@ const allConfigs: ConfigItem[] = [
   { theme: "middleEastern", key: "inventoryStatus_limited", value: "#F97316", description: "库存有限状态颜色" },
   { theme: "middleEastern", key: "inventoryStatus_lowStock", value: "#DC2626", description: "库存紧张状态颜色" },
   { theme: "middleEastern", key: "inventoryStatus_outOfStock", value: "#DC2626", description: "缺货状态颜色" },
+  { theme: "middleEastern", key: "reviewFeedbackSuccessBg", value: "#F5F0FF", description: "评价成功背景色" },
+  { theme: "middleEastern", key: "reviewFeedbackSuccessBorder", value: "#D8B4FE", description: "评价成功边框色" },
+  { theme: "middleEastern", key: "reviewFeedbackSuccessText", value: "#3B0764", description: "评价成功文字色" },
+  { theme: "middleEastern", key: "reviewFeedbackIconBg", value: "#5D3B6D", description: "评价成功图标背景色" },
+  { theme: "middleEastern", key: "reviewFeedbackIconText", value: "#FFFFFF", description: "评价成功图标文字色" },
+  { theme: "middleEastern", key: "reviewFeedbackBadgeBg", value: "#D4AF37", description: "评价成功标签背景色" },
+  { theme: "middleEastern", key: "reviewFeedbackBadgeText", value: "#1F2937", description: "评价成功标签文字色" },
+  { theme: "middleEastern", key: "reviewFeedbackErrorBg", value: "#FEF2F2", description: "评价错误背景色" },
+  { theme: "middleEastern", key: "reviewFeedbackErrorBorder", value: "#FCA5A5", description: "评价错误边框色" },
+  { theme: "middleEastern", key: "reviewFeedbackErrorText", value: "#991B1B", description: "评价错误文字色" },
+  { theme: "middleEastern", key: "reviewStarActive", value: "#D4AF37", description: "评价星标激活色" },
   // middleEastern 主题 - 字体
   { theme: "middleEastern", key: "heading-font", value: "Cormorant, serif", description: "标题字体" },
   { theme: "middleEastern", key: "body-font", value: "Inter, sans-serif", description: "正文字体" },
@@ -137,6 +160,17 @@ const allConfigs: ConfigItem[] = [
   { theme: "amazon", key: "inventoryStatus_limited", value: "#F97316", description: "库存有限状态颜色" },
   { theme: "amazon", key: "inventoryStatus_lowStock", value: "#DC2626", description: "库存紧张状态颜色" },
   { theme: "amazon", key: "inventoryStatus_outOfStock", value: "#DC2626", description: "缺货状态颜色" },
+  { theme: "amazon", key: "reviewFeedbackSuccessBg", value: "#F0FDF4", description: "评价成功背景色" },
+  { theme: "amazon", key: "reviewFeedbackSuccessBorder", value: "#86EFAC", description: "评价成功边框色" },
+  { theme: "amazon", key: "reviewFeedbackSuccessText", value: "#14532D", description: "评价成功文字色" },
+  { theme: "amazon", key: "reviewFeedbackIconBg", value: "#007185", description: "评价成功图标背景色" },
+  { theme: "amazon", key: "reviewFeedbackIconText", value: "#FFFFFF", description: "评价成功图标文字色" },
+  { theme: "amazon", key: "reviewFeedbackBadgeBg", value: "#FF9900", description: "评价成功标签背景色" },
+  { theme: "amazon", key: "reviewFeedbackBadgeText", value: "#111111", description: "评价成功标签文字色" },
+  { theme: "amazon", key: "reviewFeedbackErrorBg", value: "#FEF2F2", description: "评价错误背景色" },
+  { theme: "amazon", key: "reviewFeedbackErrorBorder", value: "#FCA5A5", description: "评价错误边框色" },
+  { theme: "amazon", key: "reviewFeedbackErrorText", value: "#991B1B", description: "评价错误文字色" },
+  { theme: "amazon", key: "reviewStarActive", value: "#FF9900", description: "评价星标激活色" },
   // amazon 主题 - 字体
   { theme: "amazon", key: "heading-font", value: "Inter, sans-serif", description: "标题字体" },
   { theme: "amazon", key: "body-font", value: "Inter, sans-serif", description: "正文字体" },
@@ -184,6 +218,17 @@ const allConfigs: ConfigItem[] = [
   { theme: "middleEasternLuxury", key: "inventoryStatus_limited", value: "#F97316", description: "库存有限状态颜色" },
   { theme: "middleEasternLuxury", key: "inventoryStatus_lowStock", value: "#DC2626", description: "库存紧张状态颜色" },
   { theme: "middleEasternLuxury", key: "inventoryStatus_outOfStock", value: "#DC2626", description: "缺货状态颜色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackSuccessBg", value: "#FFF7ED", description: "评价成功背景色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackSuccessBorder", value: "#D4AF37", description: "评价成功边框色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackSuccessText", value: "#422006", description: "评价成功文字色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackIconBg", value: "#8B4513", description: "评价成功图标背景色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackIconText", value: "#FFFFFF", description: "评价成功图标文字色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackBadgeBg", value: "#D4AF37", description: "评价成功标签背景色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackBadgeText", value: "#1F2937", description: "评价成功标签文字色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackErrorBg", value: "#FEF2F2", description: "评价错误背景色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackErrorBorder", value: "#FCA5A5", description: "评价错误边框色" },
+  { theme: "middleEasternLuxury", key: "reviewFeedbackErrorText", value: "#991B1B", description: "评价错误文字色" },
+  { theme: "middleEasternLuxury", key: "reviewStarActive", value: "#D4AF37", description: "评价星标激活色" },
   // middleEasternLuxury 主题 - 字体
   { theme: "middleEasternLuxury", key: "heading-font", value: "Cormorant, serif", description: "标题字体" },
   { theme: "middleEasternLuxury", key: "body-font", value: "Inter, sans-serif", description: "正文字体" },
@@ -207,6 +252,9 @@ const allConfigs: ConfigItem[] = [
 ];
 
 export async function POST(request: NextRequest) {
+  const authResult = checkAdminAuth(request);
+  if (authResult.response) return authResult.response;
+
   try {
     logMonitor('THEME_COLORS', 'REQUEST', { method: 'POST', action: 'INIT_THEME_COLORS_DATA' });
     

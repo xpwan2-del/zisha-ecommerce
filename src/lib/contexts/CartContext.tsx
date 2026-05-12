@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -33,7 +33,6 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// 辅助函数：从 Cookie 获取访客购物车
 const getGuestCartFromCookie = (): any[] | null => {
   if (typeof document === 'undefined') return null;
   const cookies = document.cookie.split(';');
@@ -50,14 +49,12 @@ const getGuestCartFromCookie = (): any[] | null => {
   return null;
 };
 
-// 辅助函数：保存访客购物车到 Cookie
 const setGuestCartToCookie = (cart: any[]) => {
   if (typeof document === 'undefined') return;
   const cookieValue = encodeURIComponent(JSON.stringify(cart));
   document.cookie = `cart_guest=${cookieValue}; path=/; max-age=${30 * 24 * 60 * 60}`;
 };
 
-// 辅助函数：清除访客购物车 Cookie
 const clearGuestCartCookie = () => {
   if (typeof document === 'undefined') return;
   document.cookie = 'cart_guest=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
@@ -66,100 +63,82 @@ const clearGuestCartCookie = () => {
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, checkAuth } = useAuth();
   const router = useRouter();
+  const previousAuthStateRef = useRef<boolean | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
-    if (!isAuthenticated) {
-      const guestCart = getGuestCartFromCookie();
-      if (guestCart && Array.isArray(guestCart)) {
-        return guestCart;
-      }
+    const guestCart = getGuestCartFromCookie();
+    if (guestCart && Array.isArray(guestCart)) {
+      return guestCart;
     }
     return [];
   });
   const [totalAmount, setTotalAmount] = useState<number>(0);
 
-  // 访客购物车：Cart 变化时同步到 Cookie
+  const fetchServerCart = useCallback(async () => {
+    const response = await fetch('/api/cart', {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      items: data.data?.items || [],
+      totalAmount: data.data?.total_usd || 0,
+    };
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) {
       setGuestCartToCookie(cart);
     }
   }, [cart, isAuthenticated]);
 
-  // 已登录用户从 API 获取最新数据
   useEffect(() => {
-    if (isAuthenticated && user) {
-      fetch('/api/cart', {
-        credentials: 'include',
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.data?.items) {
-          setCart(data.data.items);
-          setTotalAmount(data.data.total_usd || 0);
-        }
-      })
-      .catch(err => console.error('Failed to fetch cart:', err));
-    }
-  }, [isAuthenticated, user]);
-
-  // 处理登录状态变化时的购物车同步
-  const isInitialMount = useRef(true);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const handleAuthChange = async () => {
-      if (isAuthenticated && user) {
-        // 用户刚登录，合并访客购物车
-        const guestCart = getGuestCartFromCookie();
-        if (guestCart && guestCart.length > 0) {
-          try {
-            await fetch('/api/cart/merge', {
-              method: 'POST',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ guest_cart: guestCart }),
-            });
-            clearGuestCartCookie();
-
-            // 合并后刷新购物车
-            const response = await fetch('/api/cart', {
-              credentials: 'include',
-            });
-            if (response.ok) {
-              const data = await response.json();
-              setCart(data.data?.items || []);
-            }
-          } catch (error) {
-            console.error('Failed to merge guest cart:', error);
-          }
-        } else {
-          // 无访客购物车，直接获取用户购物车
-          try {
-            const response = await fetch('/api/cart', {
-              credentials: 'include',
-            });
-            if (response.ok) {
-              const data = await response.json();
-              setCart(data.data?.items || []);
-            }
-          } catch (error) {
-            console.error('Failed to refresh cart:', error);
-          }
-        }
-      } else {
-        // 用户登出，清空购物车
+    const syncCart = async () => {
+      if (!isAuthenticated || !user) {
+        previousAuthStateRef.current = false;
         setCart([]);
+        setTotalAmount(0);
+        return;
+      }
+
+      const justLoggedIn = previousAuthStateRef.current === false || previousAuthStateRef.current === null;
+      previousAuthStateRef.current = true;
+      const guestCart = getGuestCartFromCookie();
+
+      if (justLoggedIn && guestCart && guestCart.length > 0) {
+        try {
+          await fetch('/api/cart/merge', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ guest_cart: guestCart }),
+          });
+          clearGuestCartCookie();
+        } catch (error) {
+          console.error('Failed to merge guest cart:', error);
+        }
+      }
+
+      try {
+        const serverCart = await fetchServerCart();
+        if (!serverCart) {
+          return;
+        }
+        setCart(serverCart.items);
+        setTotalAmount(serverCart.totalAmount);
+      } catch (error) {
+        console.error('Failed to fetch cart:', error);
       }
     };
 
-    handleAuthChange();
-  }, [isAuthenticated, user]);
+    syncCart();
+  }, [fetchServerCart, isAuthenticated, user]);
 
   const addToCart = async (product: Omit<CartItem, 'quantity'>): Promise<AddToCartResult> => {
     const isAuth = await checkAuth();
@@ -193,13 +172,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const cartResponse = await fetch('/api/cart', {
-          credentials: 'include',
-        });
-        if (cartResponse.ok) {
-          const cartData = await cartResponse.json();
-          setCart(cartData.data?.items || []);
-          setTotalAmount(cartData.data?.total_usd || 0);
+        const serverCart = await fetchServerCart();
+        if (serverCart) {
+          setCart(serverCart.items);
+          setTotalAmount(serverCart.totalAmount);
         }
 
         return { success: true };
@@ -256,6 +232,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = async () => {
     setCart([]);
+    setTotalAmount(0);
 
     if (isAuthenticated && user) {
       try {
@@ -272,13 +249,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const refreshCart = async () => {
     if (isAuthenticated && user) {
       try {
-        const response = await fetch('/api/cart', {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setCart(data.data?.items || []);
-          setTotalAmount(data.data?.total_usd || 0);
+        const serverCart = await fetchServerCart();
+        if (serverCart) {
+          setCart(serverCart.items);
+          setTotalAmount(serverCart.totalAmount);
         }
       } catch (error) {
         console.error('Failed to refresh cart:', error);
@@ -287,7 +261,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
-  // const totalAmount = cart.reduce((total, item) => total + (item.price * item.quantity), 0); // 已改为从 API 获取 total_usd
 
   const debug = () => {
     const guestCart = getGuestCartFromCookie();

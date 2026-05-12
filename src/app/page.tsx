@@ -40,7 +40,7 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center h-screen bg-[var(--background)]">
         <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-2 border-[var(--accent)] border-t-transparent" role="status"></div>
+          <div className="loading-spinner-lg" role="status" aria-label="loading"></div>
           <p className="mt-4 text-[var(--text-muted)] text-sm tracking-wide">加载中...</p>
         </div>
       </div>

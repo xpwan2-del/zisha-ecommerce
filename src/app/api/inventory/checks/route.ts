@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 
 /**
  * ============================================================
@@ -145,9 +146,14 @@ export async function POST(request: NextRequest) {
     path: '/api/inventory/checks'
   });
 
+  const auth = checkAdminAuth(request);
+  if (auth.response) return auth.response;
+
   try {
     const body = await request.json();
-    const { product_ids, operator_name = 'system', operator_id = null } = body;
+    const { product_ids } = body;
+    const operator_name = auth.user.name || 'Admin';
+    const operator_id = auth.user.userId;
 
     logMonitor('INVENTORY', 'INFO', {
       action: 'CREATE_INVENTORY_CHECK',

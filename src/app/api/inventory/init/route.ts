@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 
 /**
  * ============================================================
@@ -36,6 +37,9 @@ function calculateStatusId(quantity: number): number {
 }
 
 export async function POST(request: NextRequest) {
+  const authResult = checkAdminAuth(request);
+  if (authResult.response) return authResult.response;
+
   logMonitor('INVENTORY', 'REQUEST', {
     method: 'POST',
     path: '/api/inventory/init'

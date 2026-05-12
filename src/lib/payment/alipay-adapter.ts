@@ -1,7 +1,20 @@
 // src/lib/payment/alipay-adapter.ts
 import crypto from 'crypto';
 import { OrderPaymentData, PaymentRequest, RedirectPaymentResult, PaymentAdapter } from './types';
+import { PaymentService } from './PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
+
+function parseAlipayConfig() {
+  const config = PaymentService.getConfig('alipay');
+  const json = config?.config_json ? JSON.parse(config.config_json) : {};
+  const partnerId = json.partner_id || json.partnerId || process.env.ALIPAY_PARTNER_ID;
+  const sellerId = json.seller_id || json.sellerId || process.env.ALIPAY_SELLER_ID;
+  const privateKey = json.private_key || json.privateKey || process.env.ALIPAY_PRIVATE_KEY;
+  const gatewayUrl = json.gateway_url || json.gatewayUrl || process.env.ALIPAY_GATEWAY_URL || 'https://openapi.alipaydev.com/gateway.do';
+  const appId = json.app_id || json.appId || process.env.ALIPAY_APP_ID || '';
+
+  return { partnerId, sellerId, privateKey, gatewayUrl, appId };
+}
 
 export class AlipayAdapter implements PaymentAdapter {
   async createPayment(
@@ -17,11 +30,7 @@ export class AlipayAdapter implements PaymentAdapter {
       finalAmount,
     });
 
-    const alipayPartner = process.env.ALIPAY_PARTNER_ID;
-    const alipaySellerId = process.env.ALIPAY_SELLER_ID;
-    const alipayPrivateKey = process.env.ALIPAY_PRIVATE_KEY;
-    const alipayGateway = process.env.ALIPAY_GATEWAY_URL || 'https://openapi.alipaydev.com/gateway.do';
-    const alipayAppId = process.env.ALIPAY_APP_ID || '';
+    const { partnerId: alipayPartner, sellerId: alipaySellerId, privateKey: alipayPrivateKey, gatewayUrl: alipayGateway, appId: alipayAppId } = parseAlipayConfig();
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
@@ -85,9 +94,7 @@ export class AlipayAdapter implements PaymentAdapter {
     out_trade_no: string;
     trade_no: string;
   }> {
-    const alipayGateway = process.env.ALIPAY_GATEWAY_URL || 'https://openapi.alipaydev.com/gateway.do';
-    const alipayAppId = process.env.ALIPAY_APP_ID || '';
-    const alipayPrivateKey = process.env.ALIPAY_PRIVATE_KEY;
+    const { privateKey: alipayPrivateKey, gatewayUrl: alipayGateway, appId: alipayAppId } = parseAlipayConfig();
 
     if (!alipayPrivateKey) {
       throw new Error('Alipay private key not configured, cannot query payment');

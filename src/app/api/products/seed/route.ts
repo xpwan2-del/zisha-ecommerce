@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 /**
  * @api {GET} /api/products/seed 种子产品数据
  * @apiName SeedProducts
@@ -10,12 +11,15 @@ import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inve
 
 
 export async function POST(request: NextRequest) {
+  const authResult = checkAdminAuth(request);
+  if (authResult.response) return authResult.response;
+
   try {
     // Start transaction
     await query('BEGIN');
 
-    // Clear existing products
-    await query('DELETE FROM products');
+    // Preserve existing products while adding missing seed data
+      await query('CREATE UNIQUE INDEX IF NOT EXISTS idx_products_seed_id ON products(id)');
 
     // Seed data
     const products = [
@@ -186,7 +190,7 @@ export async function POST(request: NextRequest) {
     // Insert products
     for (const product of products) {
       await query(
-        `INSERT INTO products (id, name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount)
+        `INSERT OR IGNORE INTO products (id, name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           product.id,

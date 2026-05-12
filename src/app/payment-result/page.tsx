@@ -114,7 +114,7 @@ function PaymentResultContent() {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="loading-spinner-lg mb-4"></div>
           <p className="text-[var(--text-muted)]">正在加载订单信息...</p>
         </div>
       </div>
@@ -145,7 +145,7 @@ export default function PaymentResultPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <div className="loading-spinner-lg"></div>
       </div>
     }>
       <PaymentResultContent />

@@ -21,6 +21,16 @@ export interface PricingItemDetail {
   product_discount_amount: number;
 }
 
+export interface PricingPromotionDetail {
+  id: number;
+  name: string;
+  name_en?: string;
+  name_ar?: string;
+  discount: number;
+  percent: number;
+  baseAmount: number;
+}
+
 export interface AddressDetail {
   id: number;
   contact_name: string;
@@ -47,6 +57,7 @@ export interface OrderPricingResult {
   product_discount: number;
   coupon_discount: number;
   coupon_details: PricingCouponDetail[];
+  promotions: PricingPromotionDetail[];
   items: PricingItemDetail[];
   address: AddressDetail | null;
 }
@@ -235,6 +246,9 @@ export async function estimateOrderPricing(input: CalculateOrderPricingInput): P
        pp.promotion_id,
        pp.can_stack,
        pp.priority,
+       pr.name,
+       pr.name_en,
+       pr.name_ar,
        pr.discount_percent
      FROM product_promotions pp
      JOIN promotions pr ON pp.promotion_id = pr.id
@@ -259,13 +273,17 @@ export async function estimateOrderPricing(input: CalculateOrderPricingInput): P
     const promotionResult = applyPromotions(originalPriceUsd, promotions);
     const finalPriceUsd = round2(promotionResult.finalPrice);
     const quantity = Number(row.quantity) || 0;
+    const exclusive = promotions.find((promotion: any) => Number(promotion.can_stack) === 1);
+    const appliedPromotions = exclusive
+      ? [exclusive]
+      : [...promotions].sort((a: any, b: any) => Number(a.priority || 0) - Number(b.priority || 0));
 
     return {
       product_id: Number(row.product_id),
       quantity,
       original_price_usd: originalPriceUsd,
       final_price_usd: finalPriceUsd,
-      promotion_ids: promotions.map((promotion: any) => Number(promotion.promotion_id)),
+      promotion_ids: appliedPromotions.map((promotion: any) => Number(promotion.promotion_id)),
       product_discount_amount: round2((originalPriceUsd - finalPriceUsd) * quantity),
     };
   });
@@ -273,6 +291,45 @@ export async function estimateOrderPricing(input: CalculateOrderPricingInput): P
   const totalOriginalPrice = round2(items.reduce((sum, item) => sum + item.original_price_usd * item.quantity, 0));
   const totalAfterPromotionsAmount = round2(items.reduce((sum, item) => sum + item.final_price_usd * item.quantity, 0));
   const totalPromotionsDiscountAmount = round2(Math.max(0, totalOriginalPrice - totalAfterPromotionsAmount));
+  const promotionDiscounts = new Map<number, { discount: number; baseAmount: number }>();
+
+  for (const item of items) {
+    if (item.product_discount_amount <= 0 || item.promotion_ids.length === 0) continue;
+    const promotions = promotionsMap.get(item.product_id) || [];
+    const percentTotal = promotions
+      .filter((promotion: any) => item.promotion_ids.includes(Number(promotion.promotion_id)))
+      .reduce((sum: number, promotion: any) => sum + (parseFloat(promotion.discount_percent) || 0), 0);
+
+    item.promotion_ids.forEach((promotionId, index) => {
+      const promotion = promotions.find((row: any) => Number(row.promotion_id) === promotionId);
+      const percent = parseFloat(promotion?.discount_percent) || 0;
+      const previous = promotionDiscounts.get(promotionId) || { discount: 0, baseAmount: 0 };
+      const discount = index === item.promotion_ids.length - 1
+        ? item.product_discount_amount - item.promotion_ids.slice(0, -1).reduce((sum, id) => {
+          const row = promotions.find((promotionRow: any) => Number(promotionRow.promotion_id) === id);
+          const weight = percentTotal > 0 ? (parseFloat(row?.discount_percent) || 0) / percentTotal : 1 / item.promotion_ids.length;
+          return sum + round2(item.product_discount_amount * weight);
+        }, 0)
+        : round2(item.product_discount_amount * (percentTotal > 0 ? percent / percentTotal : 1 / item.promotion_ids.length));
+      promotionDiscounts.set(promotionId, {
+        discount: round2(previous.discount + discount),
+        baseAmount: round2(previous.baseAmount + item.original_price_usd * item.quantity),
+      });
+    });
+  }
+
+  const promotions = Array.from(promotionDiscounts.entries()).map(([promotionId, amount]) => {
+    const source = Array.from(promotionsMap.values()).flat().find((promotion: any) => Number(promotion.promotion_id) === promotionId);
+    return {
+      id: promotionId,
+      name: source?.name || '促销活动',
+      name_en: source?.name_en || source?.name || 'Promotion',
+      name_ar: source?.name_ar || source?.name || 'عرض',
+      discount: round2(amount.discount),
+      percent: round2(parseFloat(source?.discount_percent) || 0),
+      baseAmount: round2(amount.baseAmount),
+    };
+  }).filter((promotion) => promotion.discount > 0);
 
   let address: AddressDetail | null = null;
   let shippingFee = 0;
@@ -307,6 +364,7 @@ export async function estimateOrderPricing(input: CalculateOrderPricingInput): P
     product_discount: totalPromotionsDiscountAmount,
     coupon_discount: totalCouponDiscount,
     coupon_details: couponDetails,
+    promotions,
     items,
     address,
   };

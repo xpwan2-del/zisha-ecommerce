@@ -280,17 +280,17 @@ export async function POST(request: NextRequest) {
     let couponIdsJson = '[]';
 
     if (requestedCouponIds.length > 0) {
+      // 串行执行以确保折扣正确累加
       for (const couponId of requestedCouponIds) {
-        const { discount } = await applyCouponDiscount(couponId, userId, subtotal);
+        const { discount } = await applyCouponDiscount(couponId, userId, subtotal - couponDiscount);
         couponDiscount += discount;
       }
       couponDiscount = Math.min(couponDiscount, subtotal);
       couponIdsJson = JSON.stringify(requestedCouponIds);
     }
 
-    const totalDiscount = productDiscount + couponDiscount;
-
-    const finalAmount = Math.max(0, subtotal - couponDiscount + shippingFee);
+    const totalDiscount = Number((productDiscount + couponDiscount).toFixed(2));
+    const finalAmount = Number(Math.max(0, subtotal - couponDiscount + shippingFee).toFixed(2));
 
     const existingCouponRows = await query(
       `SELECT oc.id, oc.coupon_id
@@ -319,17 +319,16 @@ export async function POST(request: NextRequest) {
     }
 
     await query(
-      `UPDATE orders SET 
-        payment_method = ?,
-        shipping_address_id = ?,
-        shipping_fee = ?,
-        coupon_ids = ?,
-        total_coupon_discount = ?,
-        order_final_discount_amount = ?,
-        final_amount = ?,
-        created_at = datetime('now'),
-        updated_at = datetime('now')
-       WHERE id = ? AND user_id = ?`,
+    `UPDATE orders SET 
+      payment_method = ?,
+      shipping_address_id = ?,
+      shipping_fee = ?,
+      coupon_ids = ?,
+      total_coupon_discount = ?,
+      order_final_discount_amount = ?,
+      final_amount = ?,
+      updated_at = datetime('now')
+     WHERE id = ? AND user_id = ?`,
       [
         payment_method,
         address_id,

@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useBFCacheDefense } from '@/lib/hooks/useBFCacheDefense';
 import { useCart } from '@/lib/contexts/CartContext';
 import { formatMultiPriceSync, convertFromUSD } from '@/lib/utils/currency';
+import OrderPriceBreakdown, { type OrderPriceBreakdownItem } from '@/components/order/OrderPriceBreakdown';
 import { getDisplayPromotions } from '@/lib/pricing/promotionDisplay';
 import Image from 'next/image';
 
@@ -75,10 +77,14 @@ interface Coupon {
   coupon_id: number;
   code: string;
   name: string;
+  name_en?: string;
+  name_ar?: string;
   type: string;
   discount_type: string;
   value: number;
   description: string;
+  description_en?: string;
+  description_ar?: string;
   expires_at: string;
   is_stackable: number;
 }
@@ -103,8 +109,11 @@ interface PaymentMethod {
 export default function CartPage() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { status, user, isAuthenticated, setIsNavigating } = useAuth();
   const { refreshCart } = useCart();
+
+  // 接入大厂级 BFCache 防护：当用户从支付平台点击“后退”时，强制页面刷新以同步最新状态
+  useBFCacheDefense();
 
   const [cartData, setCartData] = useState<CartData>({ items: [], total: 0, total_items: 0 });
   const [loading, setLoading] = useState(true);
@@ -134,10 +143,11 @@ export default function CartPage() {
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [isCalculatingCoupons, setIsCalculatingCoupons] = useState(false);
+  const [pageShowReloadToken, setPageShowReloadToken] = useState(0);
 
-  const fetchCartData = async () => {
+  const fetchCartData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await fetch('/api/cart', {
         credentials: 'include',
         headers: {
@@ -167,13 +177,13 @@ export default function CartPage() {
   };
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    if (status === 'authenticated') {
       fetchCartData();
-    } else if (!authLoading && !isAuthenticated) {
+    } else if (status === 'unauthenticated') {
       setCartData({ items: [], total: 0, total_items: 0 });
       setLoading(false);
     }
-  }, [authLoading, isAuthenticated]);
+  }, [status]);
 
   const fetchAddresses = async () => {
     if (!isAuthenticated) return;
@@ -291,7 +301,7 @@ export default function CartPage() {
         });
 
         if (response.ok) {
-          await fetchCartData();
+          await fetchCartData(true);
           await refreshCart();
         }
       } catch (error) {
@@ -320,7 +330,7 @@ export default function CartPage() {
 
       if (response.ok) {
         setLocalQuantities(prev => ({ ...prev, [itemId]: newQuantity }));
-        await fetchCartData();
+        await fetchCartData(true);
         await refreshCart();
       }
     } catch (error) {
@@ -361,7 +371,7 @@ export default function CartPage() {
           delete next[itemId];
           return next;
         });
-        await fetchCartData();
+        await fetchCartData(true);
         await refreshCart();
       } else {
         const data = await response.json();
@@ -467,32 +477,74 @@ export default function CartPage() {
     return { usd: converted.usd, cny: converted.cny, aed: converted.aed };
   };
 
-  const getSelectedPromotionsDiscount = (): { usd: number; cny: number; aed: number; totalPercent: number } => {
+  const getSelectedAppliedPromotions = () => {
+    const promotionMap = new Map<number, { id: number; name: string; discount: number; percent: number; baseAmount: number }>();
     const selected = cartData.items.filter(item => selectedItems.includes(item.id));
-    let usd = 0;
-    let cny = 0;
-    let aed = 0;
-    let totalPercent = 0;
 
-    for (const item of selected) {
-      if (item.promotion && item.total_discount_percent && item.total_discount_percent > 0) {
-        const originalUsd = (item.original_price ?? item.price_usd ?? item.price) * item.quantity;
-        const discountUsd = originalUsd * (item.total_discount_percent / 100);
-        usd += discountUsd;
-        totalPercent = Math.max(totalPercent, item.total_discount_percent);
+    selected.forEach((item) => {
+      if (!item.promotion || !item.total_discount_percent || item.total_discount_percent <= 0) return;
+      const originalUsd = (item.original_price ?? item.price_usd ?? item.price) * item.quantity;
+      const discountUsd = originalUsd * (item.total_discount_percent / 100);
+      const sourcePromotions = (item.promotions && item.promotions.length > 0 ? getDisplayPromotions(item.promotions, item.promotion) : [{
+        id: item.promotion.promotion_id,
+        name: item.promotion.name,
+        discount_percent: item.total_discount_percent,
+      }]) as Array<{ id: number; name?: string; discount_percent?: number; priority?: number }>;
+      const percentTotal = sourcePromotions.reduce((sum, promotion) => sum + Number(promotion.discount_percent || 0), 0);
 
-        if (item.price_cny) {
-          const originalCny = item.price_cny * item.quantity;
-          cny += originalCny * (item.total_discount_percent / 100);
-        }
-        if (item.price_aed) {
-          const originalAed = item.price_aed * item.quantity;
-          aed += originalAed * (item.total_discount_percent / 100);
-        }
-      }
-    }
+      sourcePromotions.forEach((promotion, index) => {
+        const id = Number(promotion.id || item.promotion?.promotion_id || index);
+        const previous = promotionMap.get(id);
+        const discount = index === sourcePromotions.length - 1
+          ? discountUsd - sourcePromotions.slice(0, -1).reduce((sum, row) => {
+            const weight = percentTotal > 0 ? Number(row.discount_percent || 0) / percentTotal : 1 / sourcePromotions.length;
+            return sum + Math.round(discountUsd * weight * 100) / 100;
+          }, 0)
+          : Math.round(discountUsd * (percentTotal > 0 ? Number(promotion.discount_percent || 0) / percentTotal : 1 / sourcePromotions.length) * 100) / 100;
+        promotionMap.set(id, {
+          id,
+          name: promotion.name || item.promotion?.name || (i18n.language === 'en' ? 'Promotion' : i18n.language === 'ar' ? 'عرض' : '促销活动'),
+          discount: Math.round(((previous?.discount || 0) + discount) * 100) / 100,
+          percent: Number(promotion.discount_percent || item.total_discount_percent || 0),
+          baseAmount: Math.round(((previous?.baseAmount || 0) + originalUsd) * 100) / 100,
+        });
+      });
+    });
 
-    return { usd: Math.round(usd * 100) / 100, cny: Math.round(cny * 100) / 100, aed: Math.round(aed * 100) / 100, totalPercent };
+    return Array.from(promotionMap.values()).filter((promotion) => promotion.discount > 0);
+  };
+
+  const getSelectedBreakdownItems = (): OrderPriceBreakdownItem[] => {
+    const selected = cartData.items.filter(item => selectedItems.includes(item.id));
+    return selected
+      .filter(item => item.total_discount_percent && item.total_discount_percent > 0)
+      .map(item => {
+        const unitPriceUsd = item.original_price ?? item.price_usd ?? item.price;
+        const originalUsd = unitPriceUsd * item.quantity;
+        const discountUsd = Math.round(originalUsd * (item.total_discount_percent! / 100) * 100) / 100;
+        const sourcePromotions = (item.promotions && item.promotions.length > 0
+          ? getDisplayPromotions(item.promotions, item.promotion || undefined)
+          : item.promotion
+            ? [{ id: item.promotion.promotion_id, name: item.promotion.name, discount_percent: item.total_discount_percent }]
+            : []) as Array<{ id: number; name: string; discount_percent: number; name_en?: string; name_ar?: string }>;
+        return {
+          productId: item.product_id,
+          name: item.name,
+          name_en: item.name_en,
+          name_ar: item.name_ar,
+          image: item.image,
+          unitPriceUsd,
+          quantity: item.quantity,
+          promotions: sourcePromotions.map(p => ({
+            id: p.id,
+            name: p.name,
+            percent: p.discount_percent,
+            name_en: (p as any).name_en,
+            name_ar: (p as any).name_ar,
+          })),
+          discountUsd,
+        };
+      });
   };
 
   const getSelectedOriginalTotal = (): { usd: number; cny: number; aed: number } => {
@@ -542,7 +594,7 @@ export default function CartPage() {
       });
 
       if (response.ok) {
-        await fetchCartData();
+        await fetchCartData(true);
         setMyCouponsTab('available');
       }
     } catch (err) {
@@ -656,11 +708,16 @@ export default function CartPage() {
       }
 
       const { order_id, order_number, amount_usd, amount_cny, amount_aed, items } = createData.data;
-      setSelectedItems([]);
-      setSelectedCouponIds([]);
-      fetchCartData();
+
+      // ============================================================
+      // 核心修改：移除前端手动清理购物车状态的代码
+      // ============================================================
+      // 不要在这里执行 setSelectedItems([]) 和 fetchCartData()
+      // 等待支付跳转，或在支付取消返回后再处理
 
       if (selectedPaymentMethod === 'paypal') {
+        // 触发全局加载状态，锁定 UI 准备跳转外域
+        setIsNavigating(true);
         const paypalResp = await fetch('/api/payments/paypal', {
           method: 'POST',
           credentials: 'include',
@@ -691,6 +748,8 @@ export default function CartPage() {
       }
 
       if (selectedPaymentMethod === 'alipay') {
+        // 触发全局加载状态，锁定 UI 准备跳转外域
+        setIsNavigating(true);
         const alipayResp = await fetch('/api/payments/alipay', {
           method: 'POST',
           credentials: 'include',
@@ -715,6 +774,8 @@ export default function CartPage() {
       }
 
       if (selectedPaymentMethod === 'stripe') {
+        // 触发全局加载状态，锁定 UI 准备跳转外域
+        setIsNavigating(true);
         const stripeResp = await fetch('/api/payments/stripe', {
           method: 'POST',
           credentials: 'include',
@@ -750,8 +811,15 @@ export default function CartPage() {
       alert('创建订单失败');
     } finally {
       setIsSubmitting(false);
-      await fetchCartData();
-      refreshCart();
+      // 如果没有成功跳转，确保关闭加载状态
+      setIsNavigating(false);
+      // ============================================================
+      // 核心修改：移除提交后的刷新逻辑
+      // 因为后端已经清除了购物车，这里刷新会导致跳转前显示“购物车已空”
+      // 只有在没有成功跳转的情况下（比如 catch 到错误）才需要刷新
+      // ============================================================
+      // await fetchCartData();
+      // refreshCart();
     }
   };
 
@@ -759,7 +827,15 @@ export default function CartPage() {
     router.push('/products');
   };
 
-  if (!isAuthenticated) {
+  if (status === 'loading' || (status === 'authenticated' && loading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+        <div className="loading-spinner-lg"></div>
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
         <div className="text-center p-8 rounded-lg" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
@@ -780,14 +856,6 @@ export default function CartPage() {
             {i18n.language === 'ar' ? 'تسجيل الدخول' : i18n.language === 'en' ? 'Login' : '登录'}
           </button>
         </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
-        <div className="loading-spinner"></div>
       </div>
     );
   }
@@ -925,7 +993,7 @@ export default function CartPage() {
                           <div className="flex flex-wrap items-center gap-2 mt-2">
                             {item.total_discount_percent && item.total_discount_percent > 0 && (
                               <span className="px-2 py-1 rounded-md shadow-md font-bold text-white text-[10px] sm:text-xs" style={{ background: 'linear-gradient(135deg, #EF4444, rgba(239, 68, 68, 0.6))', boxShadow: 'rgba(0, 0, 0, 0.2) 0px 2px 4px' }}>
-                                最终折扣 {item.total_discount_percent}% OFF SALE
+                                {t('cart.final_discount', '最终折扣')} {item.total_discount_percent}% OFF SALE
                               </span>
                             )}
                             {getDisplayPromotions(item.promotions || [], item.promotion).map((promo: any) => {
@@ -996,7 +1064,7 @@ export default function CartPage() {
                             style={{ color: 'var(--color-red)', background: 'transparent' }}
                           >
                             {removingId === item.id ? (
-                              <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                              <div className="loading-spinner-sm"></div>
                             ) : (
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1126,7 +1194,7 @@ export default function CartPage() {
                   }`}
                   style={{ color: myCouponsTab === 'available' ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  可用 ({availableCoupons.length})
+                  {i18n.language === 'ar' ? `متاح (${availableCoupons.length})` : i18n.language === 'en' ? `Available (${availableCoupons.length})` : `可用 (${availableCoupons.length})`}
                 </button>
                 <button
                   onClick={() => setMyCouponsTab('expired')}
@@ -1135,7 +1203,7 @@ export default function CartPage() {
                   }`}
                   style={{ color: myCouponsTab === 'expired' ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  已过期 ({expiredCoupons.length})
+                  {i18n.language === 'ar' ? `منتهي (${expiredCoupons.length})` : i18n.language === 'en' ? `Expired (${expiredCoupons.length})` : `已过期 (${expiredCoupons.length})`}
                 </button>
                 <button
                   onClick={() => setMyCouponsTab('used')}
@@ -1144,7 +1212,7 @@ export default function CartPage() {
                   }`}
                   style={{ color: myCouponsTab === 'used' ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  已使用 ({usedCoupons.length})
+                  {i18n.language === 'ar' ? `مستخدم (${usedCoupons.length})` : i18n.language === 'en' ? `Used (${usedCoupons.length})` : `已使用 (${usedCoupons.length})`}
                 </button>
                 <button
                   onClick={() => setMyCouponsTab('claimable')}
@@ -1153,7 +1221,7 @@ export default function CartPage() {
                   }`}
                   style={{ color: myCouponsTab === 'claimable' ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  未领取 ({claimableCoupons.length})
+                  {i18n.language === 'ar' ? `غير مستلم (${claimableCoupons.length})` : i18n.language === 'en' ? `Claimable (${claimableCoupons.length})` : `未领取 (${claimableCoupons.length})`}
                 </button>
               </div>
 
@@ -1161,7 +1229,7 @@ export default function CartPage() {
                 {myCouponsTab === 'available' && (
                   availableCoupons.length === 0 ? (
                     <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>暂无可用优惠券</p>
+                      <p style={{ color: 'var(--text-muted)' }}>{i18n.language === 'ar' ? 'لا توجد قسائم متاحة' : i18n.language === 'en' ? 'No coupons available' : '暂无可用优惠券'}</p>
                     </div>
                   ) : (
                     availableCoupons.map((coupon) => {
@@ -1201,9 +1269,14 @@ export default function CartPage() {
                                 ? 'bg-gradient-to-br from-accent to-accent-hover'
                                 : 'bg-gradient-to-br from-accent to-accent'
                             }`}>
-                              <span className="text-white text-[10px] font-bold text-center leading-tight">{coupon.name}</span>
+                              <span className="text-white text-[10px] font-bold text-center leading-tight">
+                                {i18n.language === 'ar' ? 'في انتظار الاستلام' : i18n.language === 'en' ? 'Claimable' : '待领取'}
+                              </span>
+                              <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded text-center">
+                                {i18n.language === 'ar' ? (coupon.name_ar || coupon.name) : i18n.language === 'en' ? (coupon.name_en || coupon.name) : coupon.name}
+                              </span>
                               <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
-                                {coupon.is_stackable === 1 ? '可叠加' : '不可叠加'}
+                                {coupon.is_stackable === 1 ? (i18n.language === 'ar' ? 'قابل للتكديس' : i18n.language === 'en' ? 'Stackable' : '可叠加') : (i18n.language === 'ar' ? 'غير قابل للتكديس' : i18n.language === 'en' ? 'Non-stackable' : '不可叠加')}
                               </span>
                             </div>
                             <div className="flex-1 p-2">
@@ -1218,10 +1291,12 @@ export default function CartPage() {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[10px] mb-1 text-[var(--text)] truncate">{coupon.description}</p>
+                              <p className="text-[10px] mb-1 text-[var(--text)] truncate">
+                                {i18n.language === 'ar' ? (coupon.description_ar || coupon.description) : i18n.language === 'en' ? (coupon.description_en || coupon.description) : coupon.description}
+                              </p>
                               <div className="flex flex-wrap gap-1 text-[10px]">
                                 <span className="bg-gray-100 px-1 py-0.5 rounded text-[var(--text-muted)]">
-                                  剩{daysLeft}天
+                                  {i18n.language === 'ar' ? `${daysLeft} يوم` : i18n.language === 'en' ? `${daysLeft} days left` : `剩${daysLeft}天`}
                                 </span>
                               </div>
                             </div>
@@ -1235,7 +1310,7 @@ export default function CartPage() {
                 {myCouponsTab === 'expired' && (
                   expiredCoupons.length === 0 ? (
                     <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>无已过期优惠券</p>
+                      <p style={{ color: 'var(--text-muted)' }}>{i18n.language === 'ar' ? 'لا توجد قسائم منتهية الصلاحية' : i18n.language === 'en' ? 'No expired coupons' : '无已过期优惠券'}</p>
                     </div>
                   ) : (
                     expiredCoupons.map((coupon) => {
@@ -1250,9 +1325,9 @@ export default function CartPage() {
                         >
                           <div className="flex h-full">
                             <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-gray-400 to-gray-500">
-                              <span className="text-white text-[10px] font-bold text-center leading-tight">已过期</span>
+                              <span className="text-white text-[10px] font-bold text-center leading-tight">{i18n.language === 'ar' ? 'منتهي الصلاحية' : i18n.language === 'en' ? 'Expired' : '已过期'}</span>
                               <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
-                                {coupon.name}
+                                {i18n.language === 'ar' ? (coupon.name_ar || coupon.name) : i18n.language === 'en' ? (coupon.name_en || coupon.name) : coupon.name}
                               </span>
                             </div>
                             <div className="flex-1 p-2">
@@ -1262,7 +1337,9 @@ export default function CartPage() {
                                   <p className="text-[10px] text-[var(--text-muted)]">{coupon.code}</p>
                                 </div>
                               </div>
-                              <p className="text-[10px] mb-1 text-[var(--text)] truncate">{coupon.description}</p>
+                              <p className="text-[10px] mb-1 text-[var(--text)] truncate">
+                                {i18n.language === 'ar' ? (coupon.description_ar || coupon.description) : i18n.language === 'en' ? (coupon.description_en || coupon.description) : coupon.description}
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -1274,7 +1351,7 @@ export default function CartPage() {
                 {myCouponsTab === 'used' && (
                   usedCoupons.length === 0 ? (
                     <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>无已使用优惠券</p>
+                      <p style={{ color: 'var(--text-muted)' }}>{i18n.language === 'ar' ? 'لا توجد قسائم مستخدمة' : i18n.language === 'en' ? 'No used coupons' : '无已使用优惠券'}</p>
                     </div>
                   ) : (
                     usedCoupons.map((coupon) => {
@@ -1289,9 +1366,9 @@ export default function CartPage() {
                         >
                           <div className="flex h-full">
                             <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-gray-400 to-gray-500">
-                              <span className="text-white text-[10px] font-bold text-center leading-tight">已使用</span>
+                              <span className="text-white text-[10px] font-bold text-center leading-tight">{i18n.language === 'ar' ? 'مستخدم' : i18n.language === 'en' ? 'Used' : '已使用'}</span>
                               <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
-                                {coupon.name}
+                                {i18n.language === 'ar' ? (coupon.name_ar || coupon.name) : i18n.language === 'en' ? (coupon.name_en || coupon.name) : coupon.name}
                               </span>
                             </div>
                             <div className="flex-1 p-2">
@@ -1313,7 +1390,7 @@ export default function CartPage() {
                 {myCouponsTab === 'claimable' && (
                   claimableCoupons.length === 0 ? (
                     <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>无可领取优惠券</p>
+                      <p style={{ color: 'var(--text-muted)' }}>{i18n.language === 'ar' ? 'لا توجد قسائم متاحة للاستلام' : i18n.language === 'en' ? 'No claimable coupons' : '无可领取优惠券'}</p>
                     </div>
                   ) : (
                     claimableCoupons.map((coupon) => {
@@ -1328,9 +1405,9 @@ export default function CartPage() {
                         >
                           <div className="flex h-full">
                             <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-green-500 to-green-600">
-                              <span className="text-white text-[10px] font-bold text-center leading-tight">待领取</span>
+                              <span className="text-white text-[10px] font-bold text-center leading-tight">{i18n.language === 'ar' ? 'في انتظار الاستلام' : i18n.language === 'en' ? 'Claimable' : '待领取'}</span>
                               <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
-                                {coupon.name}
+                                {i18n.language === 'ar' ? (coupon.name_ar || coupon.name) : i18n.language === 'en' ? (coupon.name_en || coupon.name) : coupon.name}
                               </span>
                             </div>
                             <div className="flex-1 p-2">
@@ -1345,7 +1422,7 @@ export default function CartPage() {
                                 onClick={() => handleReceiveCoupon(coupon.coupon_id)}
                                 className="px-2 py-1 bg-gradient-to-r from-green-500 to-green-600 text-white rounded text-[10px] font-medium hover:from-green-600 hover:to-green-700 transition-all cursor-pointer"
                               >
-                                领取
+                                {i18n.language === 'ar' ? 'استلام' : i18n.language === 'en' ? 'Claim' : '领取'}
                               </button>
                             </div>
                           </div>
@@ -1358,7 +1435,9 @@ export default function CartPage() {
 
               {unavailableCoupons.length > 0 && myCouponsTab === 'available' && (
                 <div className="space-y-3 mt-4 opacity-60">
-                  <h3 className="text-sm font-medium opacity-70">{t('quick_order.unavailable_coupons', '不可用优惠券')}</h3>
+                  <h3 className="text-sm font-medium opacity-70">
+                    {i18n.language === 'ar' ? 'قسائم غير متاحة' : i18n.language === 'en' ? 'Unavailable Coupons' : '不可用优惠券'}
+                  </h3>
                   {unavailableCoupons.map((coupon) => {
                     const discountText = coupon.discount_type === 'percentage'
                       ? `${coupon.value}%`
@@ -1400,7 +1479,9 @@ export default function CartPage() {
                 <div className="text-sm" style={{ color: 'var(--text-muted)' }}>...</div>
               ) : paymentMethods.length === 0 ? (
                 <div className="rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                  <p style={{ color: 'var(--text-muted)' }}>暂无可用支付方式</p>
+                  <p style={{ color: 'var(--text-muted)' }}>
+                    {i18n.language === 'ar' ? 'لا توجد طرق دفع متاحة' : i18n.language === 'en' ? 'No payment methods available' : '暂无可用支付方式'}
+                  </p>
                 </div>
               ) : (
                 paymentMethods.map((m) => (
@@ -1445,80 +1526,38 @@ export default function CartPage() {
                 {i18n.language === 'ar' ? 'تفاصيل الطلب' : i18n.language === 'en' ? 'Order Summary' : '结算明细'}
               </h2>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6">
               {(() => {
-                const promoDiscount = getSelectedPromotionsDiscount();
                 const originalTotal = getSelectedOriginalTotal();
-                const hasPromotions = promoDiscount.totalPercent > 0;
+                const selected = cartData.items.filter(item => selectedItems.includes(item.id));
+                const selectedCoupon = availableCoupons.find((coupon) => selectedCouponIds.includes(coupon.id));
                 return (
-                  <>
-                    {hasPromotions && (
-                      <div className="flex justify-between">
-                        <span style={{ color: 'var(--text-muted)' }}>
-                          {i18n.language === 'ar' ? 'السعر الأصلي' : i18n.language === 'en' ? 'Original Price' : '原价'}
-                        </span>
-                        <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through' }}>
-                          {formatMultiPriceSync(originalTotal.usd)}
-                        </span>
-                      </div>
-                    )}
-
-                    {hasPromotions && (
-                      <div className="flex justify-between">
-                        <span style={{ color: 'var(--color-green)' }}>
-                          {i18n.language === 'ar' ? 'خصم العرض' : i18n.language === 'en' ? 'Promotion Discount' : '促销活动'}
-                          <span className="text-xs ml-1" style={{ color: 'var(--color-green)' }}>
-                            ({promoDiscount.totalPercent}% OFF)
-                          </span>
-                        </span>
-                        <span style={{ color: 'var(--color-green)' }}>
-                          -{formatMultiPriceSync(promoDiscount.usd)}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between">
-                      <span style={{ color: 'var(--text-muted)' }}>
-                        {i18n.language === 'ar' ? 'المجموع الفرعي' : i18n.language === 'en' ? 'Subtotal' : '小计'}
-                        <span className="text-sm ml-1">({selectedItems.length} {i18n.language === 'ar' ? 'منتج' : i18n.language === 'en' ? 'items' : '件'})</span>
-                      </span>
-                      <span style={{ color: 'var(--text)' }}>{formatMultiPriceSync(getSelectedTotals().usd)}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span style={{ color: 'var(--text-muted)' }}>
-                        {i18n.language === 'ar' ? 'الشحن' : i18n.language === 'en' ? 'Shipping' : '运费'}
-                      </span>
-                      <span style={{ color: 'var(--color-green)' }}>
-                        {i18n.language === 'ar' ? 'مجاني' : i18n.language === 'en' ? 'Free' : '免费'}
-                      </span>
-                    </div>
-
-                    {selectedCouponIds.length > 0 && (
-                      <div className="flex justify-between">
-                        <span style={{ color: 'var(--text-muted)' }}>
-                          {i18n.language === 'ar' ? 'خصم القسيمة' : i18n.language === 'en' ? 'Coupon Discount' : '优惠券优惠'}
-                          <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>
-                            ({selectedCouponIds.length})
-                          </span>
-                        </span>
-                        <span style={{ color: couponDiscountUsd > 0 ? 'var(--color-green)' : 'var(--text)' }}>
-                          {isCalculatingCoupons ? '...' : `-${formatMultiPriceSync(couponDiscountUsd)}`}
-                        </span>
-                      </div>
-                    )}
-                  </>
+                  <OrderPriceBreakdown
+                    productTotalUsd={originalTotal.usd}
+                    unitPriceUsd={selected.length === 1 ? (selected[0].original_price ?? selected[0].price_usd ?? selected[0].price) : undefined}
+                    quantity={selected.length === 1 ? selected[0].quantity : selectedItems.length}
+                    promotions={getSelectedAppliedPromotions()}
+                    promotionSubtotalUsd={getSelectedTotals().usd}
+                    coupon={selectedCoupon ? {
+                      id: selectedCoupon.id,
+                      coupon_id: selectedCoupon.coupon_id,
+                      code: selectedCoupon.code,
+                      name: selectedCoupon.name,
+                      name_en: selectedCoupon.name_en,
+                      name_ar: selectedCoupon.name_ar,
+                      type: selectedCoupon.discount_type || selectedCoupon.type,
+                      value: selectedCoupon.value,
+                      is_stackable: selectedCoupon.is_stackable,
+                    } : null}
+                    couponDiscountUsd={couponDiscountUsd}
+                    couponSubtotalUsd={totalAfterCouponUsd}
+                    shippingUsd={0}
+                    totalUsd={totalAfterCouponUsd}
+                    showProductCalculation={selected.length === 1}
+                    items={getSelectedBreakdownItems()}
+                  />
                 );
               })()}
-
-              <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-                <div className="flex justify-between text-lg font-bold">
-                  <span style={{ color: 'var(--text)' }}>
-                    {i18n.language === 'ar' ? 'المجموع' : i18n.language === 'en' ? 'Total' : '合计'}
-                  </span>
-                  <span style={{ color: 'var(--primary)' }}>{formatMultiPriceSync(totalAfterCouponUsd)}</span>
-                </div>
-              </div>
             </div>
           </div>
 

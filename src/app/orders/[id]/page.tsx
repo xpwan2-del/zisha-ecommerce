@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatMultiPriceSync, getCountdown } from '@/lib/utils/currency';
+import { InlineReviewForm } from '@/components/reviews';
 
 interface OrderDetailItem {
   id: number;
@@ -17,6 +18,9 @@ interface OrderDetailItem {
   original_price: number;
   subtotal?: number;  // 后端返回的小计（折扣前）
   total_promotions_discount_amount: number;
+  can_review?: boolean;
+  has_reviewed?: boolean;
+  order_item_id?: number;
 }
 
 interface PaymentLogEntry {
@@ -92,10 +96,12 @@ const formatPrice = (amount: number) => {
 
 const statusLabels: Record<string, { zh: string; color: string }> = {
   pending: { zh: '待支付', color: 'bg-yellow-100 text-yellow-800' },
-  paid: { zh: '已支付', color: 'bg-green-100 text-green-800' },
+  paid: { zh: '待发货', color: 'bg-green-100 text-green-800' },
   cancelled: { zh: '已取消', color: 'bg-red-100 text-red-800' },
-  shipped: { zh: '已发货', color: 'bg-blue-100 text-blue-800' },
-  delivered: { zh: '已签收', color: 'bg-purple-100 text-purple-800' },
+  shipped: { zh: '待收货', color: 'bg-blue-100 text-blue-800' },
+  delivered: { zh: '待评价', color: 'bg-purple-100 text-purple-800' },
+  completed: { zh: '已完成', color: 'bg-emerald-100 text-emerald-800' },
+  refunding_payment: { zh: '退款待审核', color: 'bg-orange-100 text-orange-800' },
   refunding: { zh: '退款中', color: 'bg-orange-100 text-orange-800' },
   refunded: { zh: '已退款', color: 'bg-gray-100 text-gray-800' },
 };
@@ -103,14 +109,17 @@ const statusLabels: Record<string, { zh: string; color: string }> = {
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
   const orderId = params.id as string;
+  const queryReviewItemId = Number(searchParams.get('review_item')) || null;
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isPaying, setIsPaying] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<'paypal' | 'alipay' | 'stripe'>('paypal');
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
@@ -131,6 +140,8 @@ export default function OrderDetailPage() {
   const [isEstimating, setIsEstimating] = useState(false);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
   const [countdown, setCountdown] = useState<ReturnType<typeof getCountdown> | null>(null);
+  const [activeReviewItemId, setActiveReviewItemId] = useState<number | null>(null);
+  const reviewItemRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const getUserId = () => Number(user?.id) || 0;
 
@@ -317,6 +328,16 @@ export default function OrderDetailPage() {
     }
   }, [order?.id, order?.coupons]);
 
+  useEffect(() => {
+    if (!order || !queryReviewItemId) return;
+    const targetItem = order.items?.find((item) => (item.order_item_id || item.id) === queryReviewItemId);
+    if (!targetItem) return;
+    setActiveReviewItemId(queryReviewItemId);
+    requestAnimationFrame(() => {
+      reviewItemRefs.current[queryReviewItemId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [order, queryReviewItemId]);
+
   const handleAddressChange = (addressId: number) => {
     setSelectedAddressId(addressId);
     fetchCoupons();
@@ -408,6 +429,30 @@ export default function OrderDetailPage() {
       alert('取消请求失败');
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  const handleConfirmReceipt = async () => {
+    if (!order) return;
+    if (!confirm('确认已收到商品吗？确认后订单将进入待评价状态。')) return;
+
+    setIsConfirming(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/confirm`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        fetchOrder();
+      } else {
+        alert(data.error || '确认收货失败');
+      }
+    } catch {
+      alert('确认收货请求失败');
+    } finally {
+      setIsConfirming(false);
     }
   };
 
@@ -518,27 +563,63 @@ export default function OrderDetailPage() {
         <div className="bg-[var(--card)] rounded-xl shadow-sm border border-[var(--border)] p-6">
           <h2 className="text-lg font-semibold text-[var(--text)] mb-4">商品信息</h2>
           <div className="space-y-4">
-            {order.items.map((item) => (
-              <div key={item.id} className="flex gap-4 py-3 border-b border-[var(--border)] last:border-0">
-                <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                  {item.product_image ? (
-                    <Image src={item.product_image} alt={item.product_name} fill className="object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl">🏺</div>
-                  )}
+            {order.items.map((item) => {
+              const reviewItemId = item.order_item_id || item.id;
+              return (
+                <div
+                  key={item.id}
+                  ref={(element) => {
+                    reviewItemRefs.current[reviewItemId] = element;
+                  }}
+                  className="flex gap-4 py-3 border-b border-[var(--border)] last:border-0"
+                >
+                  <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                    {item.product_image ? (
+                      <Image src={item.product_image} alt={item.product_name} fill className="object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl">🏺</div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/products/${item.product_id}`} className="font-medium text-[var(--text)] hover:text-[var(--accent)]">
+                      {item.product_name}
+                    </Link>
+                    {item.product_name_en && <p className="text-xs text-[var(--text-muted)]">{item.product_name_en}</p>}
+                    <p className="text-sm text-[var(--text-muted)] mt-1">x{item.quantity}</p>
+                    {(item.can_review || item.has_reviewed) && (
+                      <div className="mt-3 flex items-center gap-2">
+                        {item.can_review && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveReviewItemId(reviewItemId)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+                          >
+                            去评价
+                          </button>
+                        )}
+                        {item.has_reviewed && (
+                          <span className="text-xs text-green-600">已评价</span>
+                        )}
+                      </div>
+                    )}
+                    {activeReviewItemId === reviewItemId && (
+                      <InlineReviewForm
+                        orderId={order.id}
+                        orderItemId={reviewItemId}
+                        productId={item.product_id}
+                        onSuccess={() => {
+                          fetchOrder();
+                        }}
+                        onCancel={() => setActiveReviewItemId(null)}
+                      />
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium text-[var(--text)]">{formatPrice(item.subtotal ?? (item.original_price * item.quantity))}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <Link href={`/products/${item.product_id}`} className="font-medium text-[var(--text)] hover:text-[var(--accent)]">
-                    {item.product_name}
-                  </Link>
-                  {item.product_name_en && <p className="text-xs text-[var(--text-muted)]">{item.product_name_en}</p>}
-                  <p className="text-sm text-[var(--text-muted)] mt-1">x{item.quantity}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium text-[var(--text)]">{formatPrice(item.subtotal ?? (item.original_price * item.quantity))}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="mt-6 pt-4 border-t border-[var(--border)] space-y-2 text-sm">
@@ -999,6 +1080,21 @@ export default function OrderDetailPage() {
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
             <p className="text-red-600 font-medium mb-2">订单已取消</p>
             <p className="text-sm text-red-500">库存和优惠券已自动归还</p>
+          </div>
+        )}
+
+        {order.order_status === 'shipped' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+            <p className="text-blue-700 font-medium mb-3">商品已发货</p>
+            <p className="text-sm text-blue-600 mb-4">收到商品后请确认收货，订单将进入待评价状态。</p>
+            <button
+              onClick={handleConfirmReceipt}
+              disabled={isConfirming}
+              className="px-6 py-3 rounded-lg text-white font-medium disabled:opacity-50 cursor-pointer"
+              style={{ backgroundColor: 'var(--accent)' }}
+            >
+              {isConfirming ? '确认中...' : '确认收货'}
+            </button>
           </div>
         )}
 

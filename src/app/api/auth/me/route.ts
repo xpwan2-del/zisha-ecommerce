@@ -88,6 +88,19 @@ export async function GET(request: NextRequest) {
     // 1. 权限验证
     const authResult = requireAuth(request);
     if (authResult.response) {
+      const authBody = await authResult.response.clone().json().catch(() => null);
+
+      if (authBody?.error === 'AUTH_TOKEN_MISSING') {
+        logMonitor('AUTH', 'NO_SESSION', {
+          reason: 'No access token'
+        });
+        return NextResponse.json({
+          success: true,
+          authenticated: false,
+          data: { user: null }
+        });
+      }
+
       logMonitor('AUTH', 'AUTH_FAILED', {
         reason: 'Invalid or expired token'
       });

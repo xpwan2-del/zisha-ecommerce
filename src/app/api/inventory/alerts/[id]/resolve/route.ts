@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth } from '@/lib/admin-helpers';
+import { recordAdminAuditLog } from '@/lib/admin-audit';
 
 /**
  * ============================================================
@@ -33,6 +35,9 @@ export async function POST(
     method: 'POST',
     path: '/api/inventory/alerts/[id]/resolve'
   });
+
+  const auth = checkAdminAuth(request);
+  if (auth.response) return auth.response;
 
   try {
     const { id } = await params;
@@ -100,28 +105,27 @@ export async function POST(
            handled_by = ?,
            handled_at = datetime('now')
        WHERE id = ?`,
-      [resolution_note || 'Manually resolved', handled_by, alertId]
-    );
-
-    await query(
-      `INSERT INTO inventory_alerts (
-        product_id, alert_type, current_stock, threshold,
-        status, old_status, new_status, is_resolved,
-        resolution_note, handled_by, handled_at, created_at
-      ) VALUES (?, ?, ?, ?, 'resolved', ?, ?, 1, ?, ?, datetime('now'), datetime('now'))`,
-      [
-        alert.product_id,
-        alert.alert_type,
-        alert.current_stock,
-        alert.threshold,
-        alert.status,
-        'resolved',
-        resolution_note || 'Manually resolved',
-        handled_by
-      ]
+      [resolution_note || 'Manually resolved', auth.user.name || 'Admin', alertId]
     );
 
     await query('COMMIT');
+
+    await recordAdminAuditLog({
+      request,
+      module: 'INVENTORY',
+      action: 'RESOLVE_ALERT',
+      description: '管理员解决库存预警',
+      operator: auth.user.name || 'Admin',
+      status: 'success',
+      resourceId: alertId,
+      resourceType: 'inventory_alert',
+      riskLevel: 'medium',
+      metadata: {
+        productId: alert.product_id,
+        alertType: alert.alert_type,
+        resolutionNote: resolution_note || 'Manually resolved'
+      }
+    });
 
     logMonitor('INVENTORY', 'SUCCESS', {
       action: 'RESOLVE_INVENTORY_ALERT',

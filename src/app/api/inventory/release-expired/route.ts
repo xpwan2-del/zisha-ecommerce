@@ -39,6 +39,20 @@ export async function POST() {
 
     for (const order of expiredOrders) {
       try {
+        const paymentCheck = await query(
+          "SELECT 1 FROM payment_webhook_events WHERE order_number = ? AND event_type = 'payment_success' AND status IN ('processing', 'completed')",
+          [order.order_number]
+        );
+
+        if (paymentCheck.rows.length > 0) {
+          logMonitor('INVENTORY', 'INFO', {
+            action: 'SKIP_TIMEOUT_CANCEL_PAYMENT_PROCESSING',
+            orderNumber: order.order_number,
+            reason: 'Payment is being processed or already completed'
+          });
+          continue;
+        }
+
         const releaseResult = await releaseOrderResources({
           orderId: order.id,
           userId: order.user_id,

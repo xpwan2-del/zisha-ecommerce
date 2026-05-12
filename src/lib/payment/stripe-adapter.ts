@@ -1,21 +1,28 @@
 // src/lib/payment/stripe-adapter.ts
 import Stripe from 'stripe';
 import { OrderPaymentData, PaymentRequest, RedirectPaymentResult, PaymentAdapter } from './types';
+import { PaymentService } from './PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecretKey
-  ? new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' as any })
-  : null;
+function parseStripeConfig() {
+  const config = PaymentService.getConfig('stripe');
+  const json = config?.config_json ? JSON.parse(config.config_json) : {};
+  return {
+    secretKey: json.secret_key || json.secretKey || json.stripe_secret_key || process.env.STRIPE_SECRET_KEY,
+  };
+}
 
 export class StripeAdapter implements PaymentAdapter {
   async createPayment(
     orderData: OrderPaymentData,
     request: PaymentRequest
   ): Promise<RedirectPaymentResult> {
-    if (!stripe) {
+    const { secretKey } = parseStripeConfig();
+    if (!secretKey) {
       throw new Error('Stripe is not configured');
     }
+
+    const stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' as any });
 
     const { order, items, finalAmount, shippingFee, itemTotal, discountAmount } = orderData;
     const { order_number, currency = 'aed', source = 'cart' } = request;

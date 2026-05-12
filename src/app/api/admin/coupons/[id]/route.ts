@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { recordAdminAuditLog } from '@/lib/admin-audit';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -65,6 +66,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await query(`UPDATE coupons SET ${u.join(', ')} WHERE id = ?`, p);
 
     const updated = await query('SELECT * FROM coupons WHERE id = ?', [couponId]);
+
+    await recordAdminAuditLog({
+      request,
+      module: 'ORDERS',
+      action: 'UPDATE_COUPON',
+      description: '管理员更新优惠券',
+      operator: auth.user.name || 'Admin',
+      status: 'success',
+      resourceId: couponId,
+      resourceType: 'coupon',
+      riskLevel: 'critical',
+      metadata: {
+        code: updated.rows[0].code,
+        changes: body,
+      },
+    });
+
     logApiSuccess('ORDERS', 'UPDATE_COUPON', { couponId, code: updated.rows[0].code });
     return createSuccessResponse(updated.rows[0]);
   } catch (error) {
@@ -82,9 +100,28 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const couponId = parseInt(id);
     logApiRequest('ORDERS', 'DELETE', `/api/admin/coupons/${couponId}`);
 
+    const existing = await query('SELECT * FROM coupons WHERE id = ?', [couponId]);
+    if (existing.rows.length === 0) return createErrorResponse('NOT_FOUND', 404);
+
     await query('DELETE FROM order_coupons WHERE coupon_id = ?', [couponId]);
     await query('DELETE FROM user_coupons WHERE coupon_id = ?', [couponId]);
     await query('DELETE FROM coupons WHERE id = ?', [couponId]);
+
+    await recordAdminAuditLog({
+      request,
+      module: 'ORDERS',
+      action: 'DELETE_COUPON',
+      description: '管理员删除优惠券',
+      operator: auth.user.name || 'Admin',
+      status: 'success',
+      resourceId: couponId,
+      resourceType: 'coupon',
+      riskLevel: 'critical',
+      metadata: {
+        code: existing.rows[0].code,
+        name: existing.rows[0].name,
+      },
+    });
 
     logApiSuccess('ORDERS', 'DELETE_COUPON', { couponId });
     return createSuccessResponse({ message: '优惠券已删除' });

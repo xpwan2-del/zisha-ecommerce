@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
       total_aed: pricing.total_aed,
       address: pricing.address,
       coupon_details: pricing.coupon_details,
+      promotions: pricing.promotions,
       coupon: coupon_ids && coupon_ids.length > 0 ? {
         ids: coupon_ids,
         discount: pricing.total_coupon_discount,

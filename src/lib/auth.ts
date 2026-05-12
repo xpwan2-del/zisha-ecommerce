@@ -5,6 +5,12 @@ if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required');
 }
 const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!process.env.REFRESH_TOKEN_SECRET) {
+  throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
+}
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
+
 const JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '48h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
@@ -22,18 +28,26 @@ export interface UserJWTPayload {
 
 // 生成访问Token
 export function generateAccessToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '48h' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'] });
 }
 
 // 生成刷新Token
 export function generateRefreshToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as SignOptions['expiresIn'] });
 }
 
 // 验证Token
 export function verifyToken(token: string): UserJWTPayload | null {
   try {
     return jwt.verify(token, JWT_SECRET) as UserJWTPayload;
+  } catch (error) {
+    return null;
+  }
+}
+
+export function verifyRefreshToken(token: string): UserJWTPayload | null {
+  try {
+    return jwt.verify(token, REFRESH_TOKEN_SECRET) as UserJWTPayload;
   } catch (error) {
     return null;
   }
@@ -74,13 +88,25 @@ export function getCurrentUser(request: NextRequest): UserJWTPayload | null {
 
 // 验证用户是否登录
 export function requireAuth(request: NextRequest): { user: UserJWTPayload; response: null } | { user: null; response: NextResponse } {
-  const user = getCurrentUser(request);
-  
+  const token = extractTokenFromHeader(request) || extractTokenFromCookie(request);
+
+  if (!token) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { success: false, error: 'AUTH_TOKEN_MISSING', message: 'Unauthorized - Please login' },
+        { status: 401 }
+      )
+    };
+  }
+
+  const user = verifyToken(token);
+
   if (!user) {
     return {
       user: null,
       response: NextResponse.json(
-        { success: false, error: 'Unauthorized - Please login' },
+        { success: false, error: 'AUTH_TOKEN_INVALID', message: 'Unauthorized - Token invalid or expired' },
         { status: 401 }
       )
     };

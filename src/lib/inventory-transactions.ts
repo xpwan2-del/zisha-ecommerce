@@ -46,6 +46,34 @@ export interface CreateInventoryTransactionInput {
   operatorName?: string | null;
 }
 
+export function assertInventoryTransactionInput(input: CreateInventoryTransactionInput) {
+  const productId = Number(input.productId);
+  if (!Number.isInteger(productId) || productId <= 0) {
+    throw new Error('库存流水商品 ID 无效');
+  }
+
+  if (!input.transactionTypeCode || typeof input.transactionTypeCode !== 'string') {
+    throw new Error('库存流水类型无效');
+  }
+
+  if (!Number.isFinite(input.quantityChange) || input.quantityChange === 0) {
+    throw new Error('库存流水变更数量无效');
+  }
+
+  if (!Number.isFinite(input.quantityBefore) || !Number.isFinite(input.quantityAfter)) {
+    throw new Error('库存流水前后库存无效');
+  }
+
+  if (!input.reason?.trim()) {
+    throw new Error('库存流水原因不能为空');
+  }
+
+  return {
+    ...input,
+    productId,
+  };
+}
+
 export class InventoryTransactionTypeMissingError extends Error {
   code = 'TRANSACTION_TYPE_NOT_FOUND';
   transactionTypeCode: string;
