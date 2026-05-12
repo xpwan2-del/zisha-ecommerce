@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { applyPromotions } from '@/lib/pricing/cartPricing';
 import { calculateOrderPricing, persistOrderPricing } from '@/lib/order-pricing-service';
 import { getMessageWithParams } from '@/lib/messages';
@@ -12,7 +11,7 @@ import { logMonitor } from '@/lib/utils/logger';
  * @api {POST} /api/cart/create-order 购物车下单
  * @apiName CreateOrderFromCart
  * @apiGroup CART
- * @apiDescription 将购物车中的商品创建为订单。验证库存、计算促销价格、扣减库存。
+ * @apiDescription 将购物车中已预占库存的商品创建为订单，并清空对应购物车项。
  */
 
 function getLangFromRequest(request: NextRequest): string {
@@ -207,64 +206,6 @@ export async function POST(request: NextRequest) {
             discountAmount
           ]
         );
-
-        const beforeStockResult = await query(
-          'SELECT quantity FROM inventory WHERE product_id = ?',
-          [item.product_id]
-        );
-        const beforeStock = beforeStockResult.rows[0]?.quantity || 0;
-
-        if (beforeStock < item.quantity) {
-          await query('ROLLBACK');
-          return NextResponse.json(
-            {
-              success: false,
-              error_code: 'INSUFFICIENT_STOCK',
-              message: getMessageWithParams('INSUFFICIENT_STOCK', lang, { requested: item.quantity, available: beforeStock }),
-              message_en: getMessageWithParams('INSUFFICIENT_STOCK', 'en', { requested: item.quantity, available: beforeStock }),
-              message_ar: getMessageWithParams('INSUFFICIENT_STOCK', 'ar', { requested: item.quantity, available: beforeStock }),
-              failed_items: [{ product_id: item.product_id, requested: item.quantity, available: beforeStock }]
-            },
-            { status: 400 }
-          );
-        }
-
-        const updateResult = await query(
-          'UPDATE inventory SET quantity = quantity - ? WHERE product_id = ? AND quantity >= ?',
-          [item.quantity, item.product_id, item.quantity]
-        );
-
-        if (!updateResult.changes || updateResult.changes === 0) {
-          await query('ROLLBACK');
-          return NextResponse.json(
-            {
-              success: false,
-              error_code: 'INSUFFICIENT_STOCK',
-              message: getMessageWithParams('INSUFFICIENT_STOCK', lang, { requested: item.quantity, available: beforeStock }),
-              message_en: getMessageWithParams('INSUFFICIENT_STOCK', 'en', { requested: item.quantity, available: beforeStock }),
-              message_ar: getMessageWithParams('INSUFFICIENT_STOCK', 'ar', { requested: item.quantity, available: beforeStock }),
-              failed_items: [{ product_id: item.product_id, requested: item.quantity, available: beforeStock }]
-            },
-            { status: 400 }
-          );
-        }
-
-        const productInfo = await query('SELECT name FROM products WHERE id = ?', [item.product_id]);
-        const productName = productInfo.rows[0]?.name || 'Product';
-
-        await createInventoryTransaction({
-          productId: item.product_id,
-          productName: productName,
-          transactionTypeCode: InventoryTransactionCode.ORDER_CREATE,
-          quantityChange: -item.quantity,
-          quantityBefore: beforeStock,
-          quantityAfter: beforeStock - item.quantity,
-          reason: `Order ${orderNumber}`,
-          referenceType: 'order',
-          referenceId: orderId,
-          operatorId: userId,
-          operatorName: authResult.user?.name,
-        });
       }
 
       const pricing = await calculateOrderPricing({
