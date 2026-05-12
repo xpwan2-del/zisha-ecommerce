@@ -64,6 +64,7 @@ tmp-*
 *-guard.test.mjs
 tests/
 e2e-*.mjs
+*e2e*.mjs
 page-level-e2e*.mjs
 *e2e-report.md
 *test-report.md
