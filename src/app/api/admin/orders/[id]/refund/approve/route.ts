@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
-import { recordAdminAuditLog } from '@/lib/admin-audit';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
 import { OrderEvent, OrderStatusService } from '@/lib/order-status-service';
 
@@ -38,24 +37,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!approveChange.success) {
       return createErrorResponse('INVALID_ORDER_STATUS', 400);
     }
-
-    await recordAdminAuditLog({
-      request,
-      module: 'ORDERS',
-      action: 'APPROVE_REFUND',
-      description: '管理员同意退款审批',
-      operator: operatorName,
-      status: 'success',
-      resourceId: orderId,
-      resourceType: 'order',
-      riskLevel: 'critical',
-      metadata: {
-        orderNumber: cur.order_number,
-        fromStatus: approveChange.fromStatus,
-        toStatus: approveChange.toStatus,
-        paymentMethod: cur.payment_method || null,
-      },
-    });
 
     logApiSuccess('ORDERS', 'APPROVE_REFUND', {
       orderId,

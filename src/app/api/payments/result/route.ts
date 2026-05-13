@@ -1,17 +1,9 @@
-import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
 import { buildPaymentSuccessPersistence } from '@/lib/payment/payment-success-persistence';
 import { AlipayAdapter } from '@/lib/payment/alipay-adapter';
 import { OrderEvent, OrderStatusService } from '@/lib/order-status-service';
-import {
-  markPaymentWebhookEventCompleted,
-  normalizeAlipayPaymentWebhook,
-  normalizePayPalPaymentWebhook,
-  normalizeStripePaymentWebhook,
-  registerPaymentWebhookEvent,
-} from '@/lib/payment/refund-webhook-service';
 
 const alipayAdapter = new AlipayAdapter();
 
@@ -53,12 +45,6 @@ function getLangFromRequest(request: NextRequest): string {
 
 const PAYPAL_API_BASE_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_BASE_LIVE = 'https://api-m.paypal.com';
-
-function parseStripeConfig() {
-  return {
-    secretKey: process.env.STRIPE_SECRET_KEY || '',
-  };
-}
 /**
  * recordPaymentLog - 记录支付日志到 payment_logs 表
  */
@@ -120,17 +106,6 @@ export async function GET(request: NextRequest) {
 
     const order = orderResult.rows[0];
     const orderId = order.id;
-
-    if (order.payment_status === 'paid') {
-      const redirectUrl = new URL('/payment-result', request.url);
-      redirectUrl.searchParams.set('status', 'success');
-      redirectUrl.searchParams.set('order_number', orderNumber);
-      redirectUrl.searchParams.set('source', source);
-      redirectUrl.searchParams.set('platform', platform || order.payment_method || 'unknown');
-      redirectUrl.searchParams.set('order_id', String(orderId));
-      redirectUrl.searchParams.set('already_processed', 'true');
-      return NextResponse.redirect(redirectUrl);
-    }
 
     // === 处理取消 ===
     if (isCancel) {
@@ -199,9 +174,10 @@ export async function GET(request: NextRequest) {
       transactionId = captureResult?.purchase_units?.[0]?.payments?.captures?.[0]?.id || paypalToken;
     } else if (detectedPlatform === 'stripe' && sessionId) {
       platformOrderId = sessionId;
-      const { secretKey: stripeSecretKey } = parseStripeConfig();
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
       if (!stripeSecretKey) throw new Error('Stripe not configured');
-      const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' as any });
+      const StripeLib = require('stripe');
+      const stripe = new StripeLib(stripeSecretKey, { apiVersion: '2024-06-20' });
       captureResult = await stripe.checkout.sessions.retrieve(sessionId);
       if (captureResult.payment_status !== 'paid') {
         throw new Error(`Stripe payment status: ${captureResult.payment_status}`);
@@ -273,30 +249,6 @@ export async function GET(request: NextRequest) {
       redirectUrl.searchParams.set('order_id', String(orderId));
       return NextResponse.redirect(redirectUrl);
     }
-
-    const normalizedPaymentEvent = detectedPlatform === 'paypal'
-      ? normalizePayPalPaymentWebhook({ ...captureResult, token: paypalToken, order_number: orderNumber })
-      : detectedPlatform === 'stripe'
-        ? normalizeStripePaymentWebhook({ ...captureResult, order_number: orderNumber })
-        : normalizeAlipayPaymentWebhook({ trade_no: transactionId || tradeNo || '', out_trade_no: orderNumber, trade_status: captureResult?.status || 'TRADE_SUCCESS' });
-
-    const paymentEvent = await registerPaymentWebhookEvent(
-      detectedPlatform,
-      normalizedPaymentEvent,
-      { orderNumber, detectedPlatform, transactionId, platformOrderId, source }
-    );
-
-    if (paymentEvent.duplicate) {
-      const redirectUrl = new URL('/payment-result', request.url);
-      redirectUrl.searchParams.set('status', 'success');
-      redirectUrl.searchParams.set('order_number', orderNumber);
-      redirectUrl.searchParams.set('source', source);
-      redirectUrl.searchParams.set('platform', detectedPlatform);
-      redirectUrl.searchParams.set('order_id', String(orderId));
-      redirectUrl.searchParams.set('already_processed', 'true');
-      return NextResponse.redirect(redirectUrl);
-    }
-
     const persistence = buildPaymentSuccessPersistence({
       orderId,
       orderNumber,
@@ -306,6 +258,7 @@ export async function GET(request: NextRequest) {
       amount: Number(order.final_amount || 0),
     });
 
+    // 记录支付成功日志
     await recordPaymentLog(
       orderId, orderNumber, detectedPlatform,
       'completed', null, null,
@@ -357,13 +310,12 @@ export async function GET(request: NextRequest) {
       ]
     );
 
-    await markPaymentWebhookEventCompleted(detectedPlatform, paymentEvent.eventId);
-
     logMonitor('PAYMENTS', 'SUCCESS', {
       action: 'PAYMENT_SUCCESS',
       orderId, orderNumber, platform: detectedPlatform, transactionId, source
     });
 
+    // 重定向到前端展示页
     const redirectUrl = new URL('/payment-result', request.url);
     redirectUrl.searchParams.set('status', 'success');
     redirectUrl.searchParams.set('order_number', orderNumber);
@@ -371,6 +323,7 @@ export async function GET(request: NextRequest) {
     redirectUrl.searchParams.set('platform', detectedPlatform);
     redirectUrl.searchParams.set('order_id', String(orderId));
     return NextResponse.redirect(redirectUrl);
+
   } catch (error: any) {
     logMonitor('PAYMENTS', 'ERROR', {
       action: 'PAYMENT_RESULT_ERROR',
