@@ -707,34 +707,15 @@ export default function CartPage() {
         return;
       }
 
-      const { order_id, order_number, amount_usd, amount_cny, amount_aed, items } = createData.data;
-
-      // ============================================================
-      // 核心修改：移除前端手动清理购物车状态的代码
-      // ============================================================
-      // 不要在这里执行 setSelectedItems([]) 和 fetchCartData()
-      // 等待支付跳转，或在支付取消返回后再处理
+      const { order_number } = createData.data;
 
       if (selectedPaymentMethod === 'paypal') {
-        // 触发全局加载状态，锁定 UI 准备跳转外域
         setIsNavigating(true);
         const paypalResp = await fetch('/api/payments/paypal', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', 'x-lang': i18n.language },
-          body: JSON.stringify({
-            order_number,
-            amount: Number(amount_usd || 0).toFixed(2),
-            currency: 'USD',
-            source: 'cart',
-            items: (items || []).map((it: any) => ({
-              product_id: it.product_id,
-              name: it.name,
-              image: it.image,
-              price: it.price_usd ?? it.price,
-              quantity: it.quantity
-            }))
-          })
+          body: JSON.stringify({ order_number })
         });
 
         const paypalData = await paypalResp.json();
@@ -754,13 +735,7 @@ export default function CartPage() {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            order_id,
-            order_number,
-            amount: Number(amount_cny || 0).toFixed(2),
-            currency: 'CNY',
-            source: 'cart'
-          })
+          body: JSON.stringify({ order_number })
         });
 
         const alipayData = await alipayResp.json();
@@ -780,19 +755,7 @@ export default function CartPage() {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            order_number,
-            amount: Number(amount_aed || 0).toFixed(2),
-            currency: 'aed',
-            source: 'cart',
-            items: (items || []).map((it: any) => ({
-              product_id: it.product_id,
-              name: it.name,
-              image: it.image,
-              price: it.price_aed ?? it.price,
-              quantity: it.quantity
-            }))
-          })
+          body: JSON.stringify({ order_number })
         });
 
         const stripeData = await stripeResp.json();

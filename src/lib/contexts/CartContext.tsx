@@ -8,6 +8,9 @@ interface CartItem {
   id: number;
   name: string;
   price: number;
+  price_usd?: number;
+  price_cny?: number;
+  price_aed?: number;
   quantity: number;
   image: string;
   currency?: string;
