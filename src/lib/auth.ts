@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt, { SignOptions } from 'jsonwebtoken';
 
-if (!process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
-}
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!process.env.REFRESH_TOKEN_SECRET) {
-  throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
-}
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
-
 const JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '48h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return secret;
+}
+
+function getRefreshTokenSecret(): string {
+  const secret = process.env.REFRESH_TOKEN_SECRET;
+  if (!secret) {
+    throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
+  }
+  return secret;
+}
 
 // 用户JWT Payload类型
 export interface UserJWTPayload {
