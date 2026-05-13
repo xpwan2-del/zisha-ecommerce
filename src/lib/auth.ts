@@ -34,18 +34,18 @@ export interface UserJWTPayload {
 
 // 生成访问Token
 export function generateAccessToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'] });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'] });
 }
 
 // 生成刷新Token
 export function generateRefreshToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as SignOptions['expiresIn'] });
+  return jwt.sign(payload, getRefreshTokenSecret(), { expiresIn: JWT_REFRESH_EXPIRES_IN as SignOptions['expiresIn'] });
 }
 
 // 验证Token
 export function verifyToken(token: string): UserJWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as UserJWTPayload;
+    return jwt.verify(token, getJwtSecret()) as UserJWTPayload;
   } catch (error) {
     return null;
   }
@@ -53,7 +53,7 @@ export function verifyToken(token: string): UserJWTPayload | null {
 
 export function verifyRefreshToken(token: string): UserJWTPayload | null {
   try {
-    return jwt.verify(token, REFRESH_TOKEN_SECRET) as UserJWTPayload;
+    return jwt.verify(token, getRefreshTokenSecret()) as UserJWTPayload;
   } catch (error) {
     return null;
   }
