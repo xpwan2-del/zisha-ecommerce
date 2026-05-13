@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt, { SignOptions } from 'jsonwebtoken';
 
-if (!process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
-}
-const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '48h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return secret;
+}
 
 // 用户JWT Payload类型
 export interface UserJWTPayload {
@@ -22,18 +26,18 @@ export interface UserJWTPayload {
 
 // 生成访问Token
 export function generateAccessToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '48h' });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '48h' });
 }
 
 // 生成刷新Token
 export function generateRefreshToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
 }
 
 // 验证Token
 export function verifyToken(token: string): UserJWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as UserJWTPayload;
+    return jwt.verify(token, getJwtSecret()) as UserJWTPayload;
   } catch (error) {
     return null;
   }
