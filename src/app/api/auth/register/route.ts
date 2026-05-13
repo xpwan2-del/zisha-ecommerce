@@ -25,15 +25,21 @@ function cookieOptions(maxAge: number) {
   } as const;
 }
 
-if (!process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return secret;
 }
-const JWT_SECRET = process.env.JWT_SECRET;
 
-if (!process.env.REFRESH_TOKEN_SECRET) {
-  throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
+function getRefreshTokenSecret(): string {
+  const secret = process.env.REFRESH_TOKEN_SECRET;
+  if (!secret) {
+    throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
+  }
+  return secret;
 }
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,7 +97,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         role: user.role
       },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '2h' }
     );
 
@@ -101,7 +107,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         email: user.email
       },
-      REFRESH_TOKEN_SECRET,
+      getRefreshTokenSecret(),
       { expiresIn: '30d' }
     );
     
