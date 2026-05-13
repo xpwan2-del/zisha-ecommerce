@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { round2 } from '@/lib/pricing/orderAmountMath';
 import { requireAdmin } from '@/lib/auth';
 
 /**
@@ -110,8 +111,8 @@ export async function GET(request: NextRequest) {
           );
 
           const products = (productsResult.rows || []).map((prod: any) => {
-            const originalPriceUSD = parseFloat(prod.original_price_usd);
-            const promoPriceUSD = originalPriceUSD * (1 - prod.discount_percent / 100);
+            const originalPriceUSD = round2(parseFloat(prod.original_price_usd) || 0);
+            const promoPriceUSD = round2(originalPriceUSD * (1 - prod.discount_percent / 100));
             return {
               product_promotion_id: prod.product_promotion_id,
               product_id: prod.product_id,
@@ -130,17 +131,17 @@ export async function GET(request: NextRequest) {
               } : null,
               original_price_usd: originalPriceUSD,
               promotion_price_usd: promoPriceUSD,
-              discount_amount_usd: originalPriceUSD - promoPriceUSD
+              discount_amount_usd: round2(originalPriceUSD - promoPriceUSD)
             };
           });
 
           // 计算统计信息
           const stats = {
             total_products: products.length,
-            total_original_price_usd: products.reduce((sum: number, p: any) => sum + p.original_price_usd, 0),
-            total_promotion_price_usd: products.reduce((sum: number, p: any) => sum + p.promotion_price_usd, 0),
-            total_discount_usd: products.reduce((sum: number, p: any) => sum + p.discount_amount_usd, 0),
-            avg_discount_percent: promotion.discount_percent
+            total_original_price_usd: round2(products.reduce((sum: number, p: any) => sum + p.original_price_usd, 0)),
+            total_promotion_price_usd: round2(products.reduce((sum: number, p: any) => sum + p.promotion_price_usd, 0)),
+            total_discount_usd: round2(products.reduce((sum: number, p: any) => sum + p.discount_amount_usd, 0)),
+            avg_discount_percent: round2(parseFloat(promotion.discount_percent) || 0)
           };
 
           return {

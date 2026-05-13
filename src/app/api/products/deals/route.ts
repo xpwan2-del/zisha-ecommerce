@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { applyPromotions } from '@/lib/pricing/cartPricing';
+import { round2 } from '@/lib/pricing/orderAmountMath';
 /**
  * @api {GET} /api/products/deals 获取促销商品列表
  * @apiName GetDealsProducts
@@ -152,17 +154,8 @@ export async function GET(request: NextRequest) {
       const promotions = promotionsResult.rows || [];
 
       const calculateFinalPrice = (originalPrice: number, promos: any[]) => {
-        if (promos.length === 0) return originalPrice;
-        const exclusive = promos.find(p => p.can_stack === 1);
-        if (exclusive) {
-          return originalPrice * (1 - exclusive.discount_percent / 100);
-        }
-        const sortedPromos = [...promos].sort((a, b) => a.priority - b.priority);
-        let multiplier = 1;
-        sortedPromos.forEach(p => {
-          multiplier *= (1 - p.discount_percent / 100);
-        });
-        return originalPrice * multiplier;
+        if (promos.length === 0) return round2(originalPrice);
+        return round2(applyPromotions(round2(originalPrice), promos).finalPrice);
       };
 
       const calculateDiscount = (promos: any[]) => {
@@ -170,7 +163,7 @@ export async function GET(request: NextRequest) {
         const exclusive = promos.find(p => p.can_stack === 1);
         if (exclusive) {
           return {
-            discount: exclusive.discount_percent,
+            discount: round2(parseFloat(exclusive.discount_percent) || 0),
             formula: `${exclusive.discount_percent}% (独占)`,
             multiplier: 1 - exclusive.discount_percent / 100
           };
@@ -181,7 +174,7 @@ export async function GET(request: NextRequest) {
           parts.push(`(1-${p.discount_percent}%)`);
         });
         const multiplier = sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1);
-        const totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
+        const totalDiscount = round2(Math.round((1 - multiplier) * 10000) / 100);
         return {
           discount: totalDiscount,
           formula: parts.join(' × ') + ` = ${totalDiscount}%`,
@@ -191,7 +184,8 @@ export async function GET(request: NextRequest) {
 
       const discountInfo = calculateDiscount(promotions);
       const mainPromo = promotions.length > 0 ? [...promotions].sort((a, b) => a.priority - b.priority)[0] : null;
-      const finalPrice = mainPromo ? calculateFinalPrice(parseFloat(row.price), promotions) : parseFloat(row.price);
+      const originalPrice = round2(parseFloat(row.price) || 0);
+      const finalPrice = mainPromo ? calculateFinalPrice(originalPrice, promotions) : originalPrice;
 
       const promotion = mainPromo ? {
         id: mainPromo.promotion_id,
@@ -206,7 +200,7 @@ export async function GET(request: NextRequest) {
         priority: mainPromo.priority,
         can_stack: mainPromo.can_stack,
         promotion_price: finalPrice,
-        original_price: mainPromo.original_price || row.price
+        original_price: originalPrice
       } : null;
 
       const allPromotions = (() => {
@@ -317,8 +311,8 @@ export async function GET(request: NextRequest) {
           color: promotion.color,
           priority: promotion.priority,
           can_stack: promotion.can_stack,
-          original_price: parseFloat(row.price),
-          promotion_price: parseFloat(row.price) * (1 - promotion.discount_percent / 100)
+          original_price: originalPrice,
+          promotion_price: finalPrice
         } : null,
         promotions: allPromotions.map((promo: any) => ({
           id: promo.id,

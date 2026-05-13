@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { applyPromotions } from '@/lib/pricing/cartPricing';
+import { round2 } from '@/lib/pricing/orderAmountMath';
 
 /**
  * ============================================================
@@ -174,12 +176,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // 计算总折扣和公式
     const calculateDiscount = (promos: any[]) => {
-      if (promos.length === 0) return { discount: 0, formula: '' };
+      if (promos.length === 0) return { discount: 0, formula: '', multiplier: 1 };
 
       const exclusive = promos.find(p => p.can_stack === 1);
       if (exclusive) {
         return {
-          discount: exclusive.discount_percent,
+          discount: round2(parseFloat(exclusive.discount_percent) || 0),
           formula: `${exclusive.discount_percent}% (独占)`,
           multiplier: 1 - exclusive.discount_percent / 100
         };
@@ -191,7 +193,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         parts.push(`(1-${p.discount_percent}%)`);
       });
       const multiplier = sortedPromos.reduce((acc, p) => acc * (1 - p.discount_percent / 100), 1);
-      const totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
+      const totalDiscount = round2(Math.round((1 - multiplier) * 10000) / 100);
       return {
         discount: totalDiscount,
         multiplier: multiplier,
@@ -200,17 +202,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     };
 
     const discountInfo = calculateDiscount(allPromotions);
+    const originalPrice = round2(parseFloat(row.price_usd) || 0);
+    const promotionPrice = allPromotions.length > 0
+      ? round2(applyPromotions(originalPrice, allPromotions).finalPrice)
+      : originalPrice;
 
     // 查询评价统计
     const reviewResult = await query(
-      `SELECT COUNT(*) as count, AVG(rating) as avg_rating
-       FROM reviews
-       WHERE product_id = ?`,
+      `SELECT
+         COALESCE(prs.review_count, 0) as count,
+         COALESCE(prs.average_rating, 0) as avg_rating
+       FROM products p
+       LEFT JOIN product_review_stats prs ON p.id = prs.product_id
+       WHERE p.id = ?`,
       [productId]
     );
     const reviewCount = parseInt(String(reviewResult.rows?.[0]?.count || 0));
     const avgRating = reviewResult.rows?.[0]?.avg_rating;
-    const rating = avgRating ? parseFloat(String(avgRating)).toFixed(1) : '5.0';
+    const rating = reviewCount > 0 ? parseFloat(String(avgRating || 0)).toFixed(1) : '5.0';
 
     // 查询产品规格
     const featuresResult = await query(
@@ -290,7 +299,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       name: p.name,
       name_en: p.name_en,
       name_ar: p.name_ar,
-      price_usd: parseFloat(p.price_usd) || 0,
+      price_usd: round2(parseFloat(p.price_usd) || 0),
       image: p.image,
       category: { name: p.category_name }
     }));
@@ -304,8 +313,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       description: row.description,
       description_en: row.description_en,
       description_ar: row.description_ar,
-      price_usd: parseFloat(row.price_usd) || 0,
-      original_price_usd: parseFloat(row.price_usd) || 0,
+      price_usd: originalPrice,
+      original_price_usd: originalPrice,
       stock: parseInt(row.stock) || 0,
       stock_status_id: row.stock_status_id || 1,
       stock_status_info: row.status_id ? {
@@ -352,8 +361,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         color: promotion.promotion_color,
         priority: promotion.priority,
         can_stack: promotion.can_stack,
-        original_price_usd: parseFloat(row.price_usd),
-        promotion_price_usd: parseFloat(row.price_usd) * discountInfo.multiplier,
+        original_price_usd: originalPrice,
+        promotion_price_usd: promotionPrice,
         start_time: promotion.start_time,
         end_time: promotion.end_time
       } : null,

@@ -5,6 +5,9 @@ node_modules/
 .next/
 out/
 
+# Runtime uploads
+public/uploads/
+
 # Environment variables
 .env
 .env.local
@@ -33,6 +36,15 @@ lerna-debug.log*
 
 # Testing
 coverage/
+tests/
+*.test.mjs
+*.guard.mjs
+*-guard.test.mjs
+e2e-*.mjs
+*e2e*.mjs
+page-level-e2e*.mjs
+*e2e-report.md
+*test-report.md
 
 # Temporary files
 *.tmp
@@ -40,12 +52,23 @@ coverage/
 *.tsbuildinfo
 node_modules
 .worktrees/
+tmp/
+.tmp-*
+tmp-*
 
 # Local plans
 .trae/plans/
 
 # Local databases and backups
+*.db
+*.db-*
 *.sqlite
 *.sqlite.*
-zishang.db
+*.sqlite-*
 !src/lib/db/database.sqlite
+zishang.db
+backups/
+src/lib/db/database-backup-*.sqlite
+src/lib/db/*.sqlite-*
+src/lib/db/*.db
+src/lib/db/*.db-*

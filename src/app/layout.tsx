@@ -7,23 +7,28 @@ import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { CurrencyProvider } from "@/lib/contexts/CurrencyContext";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { getThemeBootstrapData } from "@/lib/theme-bootstrap";
+import GlobalLoadingOverlay from "@/components/common/GlobalLoadingOverlay";
 
 export const metadata: Metadata = {
   title: "Zisha Pottery | Premium Teaware",
   description: "Authentic Chinese Zisha pottery for tea enthusiasts in the Middle East",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const themeBootstrap = await getThemeBootstrapData();
+
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" data-theme={themeBootstrap.theme} style={themeBootstrap.cssVariables}>
       <body className="antialiased">
-        <ThemeProvider>
+        <ThemeProvider initialTheme={themeBootstrap.theme} initialThemeColors={themeBootstrap.themeColors}>
           <LanguageProvider>
             <AuthProvider>
+              <GlobalLoadingOverlay />
               <CartProvider>
                 <CurrencyProvider>
                   <Navbar />

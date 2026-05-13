@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { query } from '@/lib/db';
 import { requireAuth, requireAdmin } from '@/lib/auth';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { getMessage, getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
+import { applyPromotions } from '@/lib/pricing/cartPricing';
+import { round2 } from '@/lib/pricing/orderAmountMath';
+import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
 
 /**
  * @api {GET} /api/orders 获取订单列表
@@ -157,7 +162,6 @@ export async function POST(request: NextRequest) {
     // Calculate order total
     let total_amount = 0;
 
-    // 存储每个商品的促销信息
     const itemPromoInfo: Map<number, { originalPrice: number, promotionPrice: number, promotionIds: number[], discountAmount: number }> = new Map();
 
     // 检查商品活动是否过期，并计算促销价格
@@ -178,23 +182,12 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // 计算促销价格
         const promos = promoCheck.rows;
-        const originalPrice = parseFloat(promos[0].original_price);
-
-        // 按新逻辑计算：独占优先 or 叠加计算
-        const exclusive = promos.find((p: any) => p.can_stack === 1);
-        let multiplier = 1;
-        if (exclusive) {
-          multiplier = 1 - exclusive.discount_percent / 100;
-        } else {
-          promos.forEach((p: any) => {
-            multiplier *= (1 - p.discount_percent / 100);
-          });
-        }
-        const promotionPrice = originalPrice * multiplier;
+        const originalPrice = round2(parseFloat(promos[0].original_price) || 0);
+        const promotionResult = applyPromotions(originalPrice, promos);
+        const promotionPrice = round2(promotionResult.finalPrice);
         const promotionIds = promos.map((p: any) => p.id);
-        const discountAmount = originalPrice - promotionPrice;
+        const discountAmount = round2(Math.max(0, originalPrice - promotionPrice));
 
         itemPromoInfo.set(item.product_id, {
           originalPrice,
@@ -203,25 +196,23 @@ export async function POST(request: NextRequest) {
           discountAmount
         });
 
-        total_amount += promotionPrice * item.quantity;
+        total_amount = round2(total_amount + round2(promotionPrice * item.quantity));
       } else {
-        // 没有促销，使用产品原价
         const productResult = await query('SELECT pp.price FROM product_prices pp WHERE pp.product_id = ? AND pp.currency = ?', [item.product_id, 'USD']);
         if (productResult.rows.length === 0) {
           return createErrorResponse('PRODUCT_NOT_FOUND', lang, 404);
         }
-        const productPrice = parseFloat(productResult.rows[0].price);
+        const productPrice = round2(parseFloat(productResult.rows[0].price) || 0);
         itemPromoInfo.set(item.product_id, {
           originalPrice: productPrice,
           promotionPrice: productPrice,
           promotionIds: [],
           discountAmount: 0
         });
-        total_amount += productPrice * item.quantity;
+        total_amount = round2(total_amount + round2(productPrice * item.quantity));
       }
     }
 
-    // Handle coupon
     let order_final_discount_amount = 0;
     if (coupon_code) {
       const couponResult = await query(
@@ -231,19 +222,19 @@ export async function POST(request: NextRequest) {
       if (couponResult.rows.length > 0) {
         const coupon = couponResult.rows[0];
         if (coupon.discount_type === 'percentage') {
-          order_final_discount_amount = total_amount * (coupon.discount_value / 100);
+          order_final_discount_amount = round2(total_amount * (coupon.discount_value / 100));
         } else {
-          order_final_discount_amount = coupon.discount_value;
+          order_final_discount_amount = round2(coupon.discount_value);
         }
-        order_final_discount_amount = Math.min(order_final_discount_amount, total_amount);
+        order_final_discount_amount = round2(Math.min(order_final_discount_amount, total_amount));
       }
     }
 
-    const shipping_fee = 0; // Free shipping for now
-    const final_amount = total_amount - order_final_discount_amount + shipping_fee;
+    const shipping_fee = 0;
+    const final_amount = round2(total_amount - order_final_discount_amount + shipping_fee);
 
-    // Generate order number
-    const order_number = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    // Generate unique order number using UUID
+    const order_number = `ORD-${randomUUID()}`;
 
     // Start transaction
     await query('BEGIN TRANSACTION');
@@ -273,10 +264,11 @@ export async function POST(request: NextRequest) {
       // Create order items
       for (const item of items) {
         const promoInfo = itemPromoInfo.get(item.product_id);
-        const unit_price = promoInfo ? promoInfo.promotionPrice : parseFloat((await query('SELECT pp.price FROM product_prices pp WHERE pp.product_id = ? AND pp.currency = ?', [item.product_id, 'USD'])).rows[0].price);
+        const unit_price = promoInfo ? promoInfo.promotionPrice : round2(parseFloat((await query('SELECT pp.price FROM product_prices pp WHERE pp.product_id = ? AND pp.currency = ?', [item.product_id, 'USD'])).rows[0].price) || 0);
+        const itemPromotionDiscount = promoInfo ? round2(promoInfo.discountAmount * item.quantity) : 0;
 
         await query(
-          `INSERT INTO order_items (order_id, product_id, quantity, specifications, original_price, promotion_ids, discount_amount)
+          `INSERT INTO order_items (order_id, product_id, quantity, specifications, original_price, promotion_ids, total_promotions_discount_amount)
            VALUES (?, ?, ?, '{}', ?, ?, ?)`,
           [
             order_id,
@@ -284,7 +276,7 @@ export async function POST(request: NextRequest) {
             item.quantity,
             promoInfo ? promoInfo.originalPrice : unit_price,
             promoInfo && promoInfo.promotionIds.length > 0 ? JSON.stringify(promoInfo.promotionIds) : null,
-            promoInfo ? promoInfo.discountAmount * item.quantity : 0
+            itemPromotionDiscount
           ]
         );
 
@@ -348,29 +340,19 @@ export async function POST(request: NextRequest) {
         const productInfo = await query('SELECT name FROM products WHERE id = ?', [item.product_id]);
         const product_name = productInfo.rows[0]?.name || 'Product';
 
-        // Record inventory transaction - 使用子查询获取实时值
-        await query(
-          `INSERT INTO inventory_transactions (
-            product_id, product_name, transaction_type, quantity_change,
-            quantity_before, quantity_after, reason,
-            reference_type, reference_id, operator_id, operator_name
-          ) VALUES (?, ?, ?, ?, ?,
-            (SELECT quantity FROM inventory WHERE product_id = ?),
-            ?, ?, ?, ?, ?)`,
-          [
-            item.product_id,
-            product_name,
-            'sale',
-            -item.quantity,
-            before_stock,
-            item.product_id,
-            `Order ${order_number}`,
-            'order',
-            order_id,
-            authResult.user?.userId,
-            authResult.user?.name
-          ]
-        );
+        await createInventoryTransaction({
+          productId: item.product_id,
+          productName: product_name,
+          transactionTypeCode: InventoryTransactionCode.ORDER_CREATE,
+          quantityChange: -item.quantity,
+          quantityBefore: before_stock,
+          quantityAfter: before_stock - item.quantity,
+          reason: `Order ${order_number}`,
+          referenceType: 'order',
+          referenceId: order_id,
+          operatorId: authResult.user?.userId,
+          operatorName: authResult.user?.name || authResult.user?.email,
+        });
       }
 
       await query('COMMIT');
@@ -411,6 +393,7 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT /api/orders - Update order status (admin only)
+// 所有状态变更必须通过 OrderStatusService 进行校验
 export async function PUT(request: NextRequest) {
   const lang = getLangFromRequest(request);
   try {
@@ -425,26 +408,45 @@ export async function PUT(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('id');
     const body = await request.json();
-    const { status } = body;
+    const { event } = body;
 
-    if (!orderId || !status) {
+    if (!orderId || !event) {
       return createErrorResponse('MISSING_PARAMS', lang, 400);
     }
 
-    await query(
-      'UPDATE orders SET order_status = ?, updated_at = ? WHERE id = ?',
-      [status, new Date().toISOString(), orderId]
+    // 通过 OrderStatusService 进行状态变更（校验状态转换是否合法）
+    const result = await OrderStatusService.changeStatus(
+      Number(orderId),
+      event,
+      { type: OperatorType.ADMIN, id: adminResult.user?.userId || 0, name: adminResult.user?.name || 'Admin' },
+      { reason: 'admin_action' }
     );
+
+    if (!result.success) {
+      logMonitor('ORDERS', 'ERROR', { 
+        action: 'UPDATE_ORDER_STATUS_FAILED', 
+        orderId,
+        event,
+        error: result.error 
+      });
+      return createErrorResponse(result.error || 'STATUS_CHANGE_FAILED', lang, 400);
+    }
 
     logMonitor('ORDERS', 'SUCCESS', { 
       action: 'UPDATE_ORDER_STATUS', 
       orderId,
-      status 
+      event,
+      fromStatus: result.fromStatus,
+      toStatus: result.toStatus
     });
 
     return NextResponse.json({
       success: true,
-      data: { id: orderId, order_number: null, status }
+      data: { 
+        id: orderId, 
+        from_status: result.fromStatus,
+        to_status: result.toStatus
+      }
     });
   } catch (error: any) {
     logMonitor('ORDERS', 'ERROR', { action: 'UPDATE_ORDER_STATUS', error: error?.message || String(error) });

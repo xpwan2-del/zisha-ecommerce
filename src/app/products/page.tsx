@@ -8,7 +8,7 @@ import { FeaturedProducts } from '@/components/FeaturedProducts';
 
 export default function ProductsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-xl">Loading...</div></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--background)]"><div className="text-center"><div className="loading-spinner-lg mx-auto mb-4" role="status" aria-label="loading"></div><div className="text-sm text-[var(--text-muted)]">Loading...</div></div></div>}>
       <ProductsContent />
     </Suspense>
   );
@@ -19,13 +19,7 @@ function ProductsContent() {
   const searchParams = useSearchParams();
   const { t, i18n } = useTranslation();
   const [categories, setCategories] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
-
-  // Sync selectedCategory with URL when URL changes
-  useEffect(() => {
-    const categoryFromUrl = searchParams.get('category') || 'all';
-    setSelectedCategory(categoryFromUrl);
-  }, [searchParams]);
+  const selectedCategory = searchParams.get('category') || 'all';
 
   // 加载分类
   useEffect(() => {

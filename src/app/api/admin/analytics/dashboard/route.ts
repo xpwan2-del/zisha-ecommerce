@@ -10,11 +10,17 @@ export async function GET(request: NextRequest) {
   try {
     const queries = await Promise.all([
       query(`SELECT DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(final_amount), 0) as revenue
-             FROM orders WHERE created_at >= DATE('now', '-7 days') GROUP BY DATE(created_at) ORDER BY date`),
+             FROM orders WHERE created_at >= DATE('now', '-7 days') AND order_status NOT IN ('cancelled', 'refunded') GROUP BY DATE(created_at) ORDER BY date`),
       query(`SELECT DATE(created_at) as date, COUNT(*) as count
              FROM users WHERE created_at >= DATE('now', '-7 days') GROUP BY DATE(created_at) ORDER BY date`),
-      query(`SELECT p.name, COUNT(o.id) as count, COALESCE(SUM(o.final_amount), 0) as total
-             FROM orders o JOIN products p ON 1=1 WHERE o.id > 0 LIMIT 20`),
+      query(`SELECT p.name, SUM(oi.quantity) as count, COALESCE(SUM(oi.quantity * oi.original_price), 0) as total
+             FROM order_items oi
+             JOIN products p ON p.id = oi.product_id
+             JOIN orders o ON o.id = oi.order_id
+             WHERE o.payment_status = 'paid' OR o.order_status IN ('paid', 'shipped', 'delivered', 'completed')
+             GROUP BY p.id, p.name
+             ORDER BY count DESC
+             LIMIT 20`),
       query(`SELECT payment_method, COUNT(*) as count FROM orders WHERE payment_method IS NOT NULL GROUP BY payment_method`),
     ]);
 

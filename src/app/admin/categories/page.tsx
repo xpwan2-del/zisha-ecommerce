@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from "react";
+import Image from "next/image";
+import { PlusIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AdminCard } from "@/components/admin/AdminCard";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminTable } from "@/components/admin/ui/admin-table";
+import { EmptyState } from "@/components/admin/ui/empty-state";
 
 interface Category {
   id: string;
@@ -17,81 +23,81 @@ interface CategoryFormData {
   priority: number;
 }
 
+const defaultFormData: CategoryFormData = {
+  name: "",
+  description: "",
+  image: "",
+  priority: 0,
+};
+
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState<CategoryFormData>({
-    name: '',
-    description: '',
-    image: '',
-    priority: 0,
-  });
+  const [formData, setFormData] = useState<CategoryFormData>(defaultFormData);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
     try {
-      const response = await fetch('/api/categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
+      const response = await fetch("/api/admin/categories");
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setCategories(result.data.map((category: any) => ({
+          id: String(category.id),
+          name: category.name || "",
+          description: category.description || "",
+          image: category.image || "",
+          priority: Number(category.priority || 0),
+        })));
       } else {
-        setCategories([
-          {
-            id: '1',
-            name: "Teapots",
-            description: "Zisha teapots of various sizes and designs",
-            image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20teapots%20collection&image_size=square",
-            priority: 0,
-          },
-          {
-            id: '2',
-            name: "Cups",
-            description: "Zisha tea cups and sets",
-            image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20cups&image_size=square",
-            priority: 1,
-          },
-          {
-            id: '3',
-            name: "Accessories",
-            description: "Tea accessories and tools",
-            image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tea%20accessories&image_size=square",
-            priority: 2,
-          },
-          {
-            id: '4',
-            name: "Sets",
-            description: "Complete tea sets with teapot and cups",
-            image: "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=zisha%20tea%20set&image_size=square",
-            priority: 3,
-          },
-        ]);
+        setCategories([]);
+        setError(result.error || "分类数据加载失败，请稍后重试");
       }
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
+    } catch (err) {
+      setCategories([]);
+      setError("分类数据加载失败，请检查网络或接口状态");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleAdd = () => {
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.priority - b.priority),
+    [categories]
+  );
+
+  const metrics = useMemo(() => {
+    const withImage = categories.filter((category) => Boolean(category.image)).length;
+    const withoutDescription = categories.filter((category) => !category.description).length;
+    const highestPriority = sortedCategories[0]?.priority ?? 0;
+
+    return {
+      total: categories.length,
+      withImage,
+      withoutDescription,
+      highestPriority,
+    };
+  }, [categories, sortedCategories]);
+
+  const openCreateModal = () => {
     setIsEditing(false);
     setEditingCategory(null);
-    setFormData({
-      name: '',
-      description: '',
-      image: '',
-      priority: 0,
-    });
+    setFormData(defaultFormData);
+    setMessage("");
+    setError("");
     setShowModal(true);
   };
 
-  const handleEdit = (category: Category) => {
+  const openEditModal = (category: Category) => {
     setIsEditing(true);
     setEditingCategory(category);
     setFormData({
@@ -100,179 +106,307 @@ export default function CategoriesPage() {
       image: category.image,
       priority: category.priority,
     });
+    setMessage("");
+    setError("");
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this category?')) {
-      setCategories(categories.filter(category => category.id !== id));
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingCategory(null);
+    setIsEditing(false);
+    setFormData(defaultFormData);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("确定删除这个分类吗？删除后商品分类展示可能受到影响。")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/categories/${id}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "分类删除失败");
+      }
+      setMessage("分类已删除");
+      fetchCategories();
+    } catch (err: any) {
+      setError(err.message || "分类删除失败");
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (isEditing && editingCategory) {
-      setCategories(categories.map(cat => 
-        cat.id === editingCategory.id 
-          ? { ...cat, ...formData }
-          : cat
-      ));
-    } else {
-      const newCategory: Category = {
-        id: Date.now().toString(),
+
+    try {
+      const payload = {
         ...formData,
+        slug: formData.name.trim().toLowerCase().replace(/\s+/g, "-"),
       };
-      setCategories([...categories, newCategory]);
+      const response = await fetch(
+        isEditing && editingCategory ? `/api/admin/categories/${editingCategory.id}` : "/api/admin/categories",
+        {
+          method: isEditing && editingCategory ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "分类保存失败");
+      }
+      setMessage(isEditing ? "分类已更新" : "分类已添加");
+      closeModal();
+      fetchCategories();
+    } catch (err: any) {
+      setError(err.message || "分类保存失败");
     }
-    
-    setShowModal(false);
-    setFormData({
-      name: '',
-      description: '',
-      image: '',
-      priority: 0,
-    });
   };
 
-  const sortedCategories = [...categories].sort((a, b) => a.priority - b.priority);
+  const columns = [
+    {
+      key: "priority",
+      title: "优先级",
+      width: "90px",
+      render: (category: Category) => (
+        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+          #{category.priority}
+        </span>
+      ),
+    },
+    {
+      key: "image",
+      title: "分类图",
+      width: "90px",
+      render: (category: Category) => (
+        <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
+          {category.image ? (
+            <Image
+              src={category.image}
+              alt={category.name}
+              fill
+              sizes="48px"
+              className="object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">无图</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "name",
+      title: "分类信息",
+      render: (category: Category) => (
+        <div className="min-w-0">
+          <div className="font-semibold text-slate-950">{category.name}</div>
+          <div className="mt-1 max-w-xl truncate text-xs text-slate-500">
+            {category.description || "暂无分类描述"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      title: "资料完整度",
+      width: "130px",
+      render: (category: Category) => {
+        const complete = Boolean(category.image && category.description);
+        return (
+          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${complete ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-amber-50 text-amber-700 ring-amber-100"}`}>
+            {complete ? "完整" : "待补充"}
+          </span>
+        );
+      },
+    },
+    {
+      key: "actions",
+      title: "操作",
+      width: "150px",
+      align: "right" as const,
+      render: (category: Category) => (
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => openEditModal(category)}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+          >
+            <PencilSquareIcon className="h-4 w-4" />
+            编辑
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDelete(category.id)}
+            className="inline-flex items-center gap-1 rounded-lg border border-red-100 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+          >
+            <TrashIcon className="h-4 w-4" />
+            删除
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Categories</h1>
-        <button 
-          onClick={handleAdd}
-          className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300"
-        >
-          Add Category
-        </button>
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="Product Center"
+        title="分类管理"
+        description="统一维护商品分类、展示优先级和分类图片，保证商品中心的基础资料清晰可控。"
+        breadcrumbs={[
+          { label: "后台管理", href: "/admin/dashboard" },
+          { label: "商品中心" },
+          { label: "分类管理" },
+        ]}
+        action={
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-800"
+          >
+            <PlusIcon className="h-5 w-5" />
+            新增分类
+          </button>
+        }
+      />
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <AdminCard className="bg-gradient-to-br from-blue-50 to-white">
+          <div className="text-sm font-medium text-slate-500">分类总数</div>
+          <div className="mt-3 text-3xl font-semibold text-slate-950">{metrics.total}</div>
+        </AdminCard>
+        <AdminCard>
+          <div className="text-sm font-medium text-slate-500">有展示图</div>
+          <div className="mt-3 text-3xl font-semibold text-emerald-700">{metrics.withImage}</div>
+        </AdminCard>
+        <AdminCard>
+          <div className="text-sm font-medium text-slate-500">描述待补充</div>
+          <div className="mt-3 text-3xl font-semibold text-amber-600">{metrics.withoutDescription}</div>
+        </AdminCard>
+        <AdminCard>
+          <div className="text-sm font-medium text-slate-500">最高优先级</div>
+          <div className="mt-3 text-3xl font-semibold text-slate-950">#{metrics.highestPriority}</div>
+        </AdminCard>
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold mb-6">
-              {isEditing ? 'Edit Category' : 'Add Category'}
-            </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Name</label>
+      {message ? (
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+          {message}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <AdminCard
+        title="分类列表"
+        description="按优先级升序展示，数字越小越靠前。建议补齐图片和描述，提升前台导航与商品筛选体验。"
+      >
+        {isLoading || sortedCategories.length ? (
+          <AdminTable
+            columns={columns}
+            data={sortedCategories}
+            rowKey={(category) => category.id}
+            loading={isLoading}
+            emptyTitle="暂无分类"
+            emptyDescription="请新增商品分类后再维护商品资料。"
+          />
+        ) : (
+          <EmptyState
+            title="暂无分类"
+            description="分类是商品管理的基础资料，建议先建立核心商品分类。"
+            action={
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+              >
+                新增分类
+              </button>
+            }
+          />
+        )}
+      </AdminCard>
+
+      {showModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">{isEditing ? "编辑分类" : "新增分类"}</h2>
+                <p className="mt-1 text-sm text-slate-500">维护分类名称、图片和前台展示顺序。</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">分类名称</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   required
                 />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Description</label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">分类描述</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   rows={3}
                 />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Image URL</label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">图片 URL</label>
                 <input
                   type="text"
                   value={formData.image}
                   onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 />
               </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">Priority (0 = highest)</label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">展示优先级</label>
                 <input
                   type="number"
                   value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value, 10) || 0 })}
                   min="0"
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   required
                 />
-                <p className="text-sm text-gray-500 mt-1">Lower numbers appear first (0 = highest priority)</p>
+                <p className="mt-2 text-xs text-slate-500">数字越小越靠前，建议核心分类设置为 0、1、2。</p>
               </div>
-              <div className="flex justify-end space-x-4">
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-6 py-2 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300"
+                  onClick={closeModal}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                 >
-                  Cancel
+                  取消
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300"
+                  className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800"
                 >
-                  {isEditing ? 'Update' : 'Add'}
+                  {isEditing ? "保存修改" : "添加分类"}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="bg-gray-100 dark:bg-gray-700">
-                  <th className="text-left py-3 px-4">Priority</th>
-                  <th className="text-left py-3 px-4">Image</th>
-                  <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-left py-3 px-4">Description</th>
-                  <th className="text-left py-3 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedCategories.map((category) => (
-                  <tr key={category.id} className="border-b">
-                    <td className="py-3 px-4">
-                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm font-medium">
-                        {category.priority}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <img 
-                        src={category.image} 
-                        alt={category.name} 
-                        className="w-12 h-12 object-cover rounded"
-                      />
-                    </td>
-                    <td className="py-3 px-4">{category.name}</td>
-                    <td className="py-3 px-4">{category.description}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex space-x-2">
-                        <button 
-                          onClick={() => handleEdit(category)}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm transition-all duration-300"
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(category.id)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm transition-all duration-300"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -4,8 +4,10 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useBFCacheDefense } from '@/lib/hooks/useBFCacheDefense';
 import { useTheme } from '@/components/ThemeProvider';
-import { formatMultiCurrency, formatMultiPriceSync } from '@/lib/utils/currency';
+import { formatMultiPriceSync } from '@/lib/utils/currency';
+import OrderPriceBreakdown, { type OrderPriceBreakdownItem } from '@/components/order/OrderPriceBreakdown';
 import Image from 'next/image';
 
 interface ProductInfo {
@@ -39,21 +41,26 @@ interface Coupon {
   coupon_id: number;
   code: string;
   name: string;
+  name_en?: string;
+  name_ar?: string;
   type: string;
   discount_type: string;
   value: number;
   description: string;
+  description_en?: string;
+  description_ar?: string;
   expires_at: string;
   is_stackable: number;
 }
 
 interface PriceData {
-  subtotal: number;
-  original_subtotal: number;
-  original_price: number;
-  product_discount: number;
-  coupon_discount: number;
+  total_original_price: number;
+  total_promotions_discount_amount: number;
+  total_after_promotions_amount: number;
+  total_coupon_discount: number;
+  order_final_discount_amount: number;
   shipping_fee: number;
+  final_amount: number;
   total_aed: number;
   total_usd: number;
   total_cny: number;
@@ -81,11 +88,32 @@ interface PriceData {
 }
 
 function QuickOrderContent() {
+  const mapPriceData = (d: any): PriceData => ({
+    total_original_price: d.total_original_price ?? d.original_subtotal_usd ?? d.original_subtotal ?? d.original_price ?? 0,
+    total_promotions_discount_amount: d.total_promotions_discount_amount ?? d.discount_amount ?? d.product_discount ?? 0,
+    total_after_promotions_amount: d.total_after_promotions_amount ?? d.subtotal_usd ?? d.subtotal ?? 0,
+    total_coupon_discount: d.total_coupon_discount ?? d.coupon_discount_usd ?? d.coupon_discount ?? 0,
+    order_final_discount_amount: d.order_final_discount_amount ?? ((d.total_promotions_discount_amount ?? d.product_discount ?? 0) + (d.total_coupon_discount ?? d.coupon_discount ?? 0)),
+    shipping_fee: d.shipping_fee ?? d.shipping_fee_usd ?? 0,
+    final_amount: d.final_amount ?? d.total_usd ?? d.subtotal_usd ?? 0,
+    total_usd: d.total_usd ?? d.final_amount ?? d.subtotal_usd ?? 0,
+    total_cny: d.total_cny ?? d.price_cny ?? 0,
+    total_aed: d.total_aed ?? d.price_aed ?? 0,
+    display_currency: d.display_currency,
+    display_total: d.display_total,
+    address: d.address,
+    coupon: d.coupon,
+    promotions: d.promotions || d.product_promotions || [],
+    payment_method: d.payment_method,
+  });
+
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useTranslation();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { t, i18n } = useTranslation();
+  const { user, isLoading: isAuthLoading, setIsNavigating } = useAuth();
   const { themeColors } = useTheme();
+
+  useBFCacheDefense();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -113,7 +141,7 @@ function QuickOrderContent() {
   useEffect(() => {
     if (!isAuthLoading && !user) {
       const productId = searchParams.get('product_id');
-      router.push(`/login?redirect=/quick-order?product_id=${productId || ''}`);
+      router.push(`/login?from=${encodeURIComponent(`/quick-order?product_id=${productId || ''}`)}`);
       return;
     }
   }, [isAuthLoading, user, router, searchParams]);
@@ -133,17 +161,6 @@ function QuickOrderContent() {
 
       try {
         let url = '/api/quick-order?';
-        const orderId = searchParams.get('order_id');
-        const orderNumber = searchParams.get('order_number');
-        const productId = searchParams.get('product_id');
-        const qty = parseInt(searchParams.get('quantity') || '1', 10);
-
-        if (!orderId && !orderNumber && !productId) {
-          setError('Order ID or Product ID is required');
-          setIsLoading(false);
-          return;
-        }
-
         if (orderId || orderNumber) {
           const orderNumberValue = orderNumber || orderId;
           setCurrentOrderId(orderNumberValue);
@@ -170,6 +187,7 @@ function QuickOrderContent() {
           setUsedCoupons(data.data.coupons?.used || []);
           setExpiredCoupons(data.data.coupons?.expired || []);
           setClaimableCoupons(data.data.coupons?.claimable || []);
+          setSelectedCouponIds(data.data.selected_coupon_ids || []);
           setOrderStatus(data.data.order_status || 'pending');
 
           const defaultAddress = data.data.addresses.find((a: Address) => a.is_default === 1);
@@ -179,21 +197,9 @@ function QuickOrderContent() {
             setSelectedAddressId(data.data.addresses[0].id);
           }
 
-          if (data.data.subtotal !== undefined) {
+          if (data.data.total_original_price !== undefined || data.data.subtotal !== undefined) {
             const d = data.data;
-            setPriceData({
-              original_subtotal: d.original_subtotal_usd ?? d.original_subtotal ?? d.original_price ?? 84.47,
-              subtotal: d.subtotal_usd ?? d.subtotal ?? 59.13,
-              original_price: d.original_price ?? 84.47,
-              product_discount: d.discount_amount ?? d.product_discount ?? 25.34,
-              coupon_discount: 0,
-              shipping_fee: 0,
-              total_usd: d.total_usd ?? d.subtotal_usd ?? 59.13,
-              total_cny: d.price_cny ?? 652.1,
-              total_aed: d.price_aed ?? 310,
-              coupon: undefined,
-              promotions: d.product_promotions || []
-            });
+            setPriceData(mapPriceData(d));
           }
         } else {
           setError(data.error || 'Failed to load quick order data');
@@ -222,6 +228,7 @@ function QuickOrderContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             product_id: product.id,
+            order_id: currentOrderDbId,
             quantity,
             address_id: selectedAddressId,
             coupon_ids: selectedCouponIds.length > 0 ? selectedCouponIds : undefined,
@@ -232,19 +239,7 @@ function QuickOrderContent() {
         const data = await response.json();
         if (response.ok && data.success) {
           const d = data.data;
-          setPriceData({
-            original_subtotal: d.original_subtotal_usd ?? d.original_subtotal ?? d.original_price ?? 84.47,
-            subtotal: d.subtotal_usd ?? d.subtotal ?? 59.13,
-            original_price: d.original_price ?? 84.47,
-            product_discount: d.product_discount_usd ?? d.product_discount ?? 25.34,
-            coupon_discount: d.coupon_discount_usd ?? d.coupon_discount ?? 0,
-            shipping_fee: d.shipping_fee_usd ?? d.shipping_fee ?? 0,
-            total_usd: d.total_usd ?? d.subtotal_usd ?? 59.13,
-            total_cny: d.total_cny ?? d.price_cny ?? 652.1,
-            total_aed: d.total_aed ?? d.price_aed ?? 310,
-            coupon: d.coupon,
-            promotions: d.product_promotions || []
-          });
+          setPriceData(mapPriceData(d));
         }
       } catch (err) {
         console.error('Price calculation error:', err);
@@ -258,7 +253,7 @@ function QuickOrderContent() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [product, quantity, selectedAddressId, selectedCouponIds]);
+  }, [product, quantity, selectedAddressId, selectedCouponIds, currentOrderDbId, paymentMethod]);
 
   const handleIncrementStock = async () => {
     if (!product) return;
@@ -272,6 +267,7 @@ function QuickOrderContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           product_id: product.id,
+          order_id: currentOrderDbId,
           action: 'increment',
           quantity: 1
         })
@@ -297,6 +293,7 @@ function QuickOrderContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           product_id: product.id,
+          order_id: currentOrderDbId,
           action: 'decrement',
           quantity: 1
         })
@@ -320,24 +317,20 @@ function QuickOrderContent() {
       return;
     }
 
-    // Check if any non-stackable coupon is already selected
     const hasNonStackableSelected = selectedCouponIds.some(id => {
       const existingCoupon = availableCoupons.find(c => c.id === id);
       return existingCoupon && existingCoupon.is_stackable === 0;
     });
 
-    // If a non-stackable coupon exists, don't allow adding stackable coupons
     if (hasNonStackableSelected) {
       return;
     }
 
-    // If this coupon is non-stackable, replace all selections with it
     if (coupon.is_stackable === 0) {
       setSelectedCouponIds([coupon.id]);
       return;
     }
 
-    // Add stackable coupon
     setSelectedCouponIds(prev => [...prev, coupon.id]);
   };
 
@@ -356,11 +349,14 @@ function QuickOrderContent() {
 
       if (response.ok) {
         const orderId = searchParams.get('order_id');
+        const orderNumber = searchParams.get('order_number');
         const productId = searchParams.get('product_id');
         const qty = parseInt(searchParams.get('quantity') || '1', 10);
         let url = '/api/quick-order?';
         if (orderId) {
           url += `order_id=${orderId}`;
+        } else if (orderNumber) {
+          url += `order_number=${orderNumber}`;
         } else {
           url += `product_id=${productId}&quantity=${qty}`;
         }
@@ -377,16 +373,27 @@ function QuickOrderContent() {
     }
   };
 
-  const handleCreateOrder = async () => {
-    console.log('=== handleCreateOrder called ===');
-    console.log('product:', product?.id);
-    console.log('selectedAddressId:', selectedAddressId);
-    console.log('currentOrderId:', currentOrderId);
-    console.log('currentOrderDbId:', currentOrderDbId);
-    console.log('paymentMethod:', paymentMethod);
+  const getQuickOrderBreakdownItems = (): OrderPriceBreakdownItem[] | undefined => {
+    if (!product || !priceData || !priceData.promotions || priceData.promotions.length === 0) return undefined;
+    return [{
+      productId: product.id,
+      name: product.name,
+      name_en: product.name_en,
+      image: product.image,
+      unitPriceUsd: product.price_usd,
+      quantity,
+      promotions: priceData.promotions.map(p => ({
+        id: p.id,
+        name: p.name,
+        percent: p.percent,
+      })),
+      discountUsd: priceData.total_promotions_discount_amount ?? 0,
+    }];
+  };
 
+  const handleCreateOrder = async () => {
     if (!product || !selectedAddressId) {
-      setError('请选择收货地址');
+      setError(i18n.language === 'ar' ? 'يرجى اختيار عنوان الشحن' : i18n.language === 'en' ? 'Please select a shipping address' : '请选择收货地址');
       return;
     }
 
@@ -395,7 +402,7 @@ function QuickOrderContent() {
 
     try {
       if (!currentOrderId) {
-        setError('订单信息加载中，请稍后');
+        setError(i18n.language === 'ar' ? 'جاري تحميل معلومات الطلب، يرجى الانتظار' : i18n.language === 'en' ? 'Order information is loading, please wait' : '订单信息加载中，请稍后');
         setIsCreating(false);
         return;
       }
@@ -404,7 +411,7 @@ function QuickOrderContent() {
       const dbOrderId = currentOrderDbId;
 
       if (!dbOrderId) {
-        setError('订单不存在，请从商品详情页重新下单');
+        setError(i18n.language === 'ar' ? 'الطلب غير موجود، يرجى إعادة الطلب من صفحة تفاصيل المنتج' : i18n.language === 'en' ? 'Order does not exist, please re-order from the product detail page' : '订单不存在，请从商品详情页重新下单');
         setIsCreating(false);
         return;
       }
@@ -417,23 +424,19 @@ function QuickOrderContent() {
           order_id: dbOrderId,
           address_id: selectedAddressId,
           payment_method: paymentMethod,
-          coupon_ids: selectedCouponIds.length > 0 ? selectedCouponIds : undefined,
-          order_final_discount_amount: priceData ? (priceData.product_discount + priceData.coupon_discount) : 0
+          coupon_ids: selectedCouponIds.length > 0 ? selectedCouponIds : undefined
         })
       });
 
-      console.log('updateResponse status:', updateResponse.status);
-
       const updateData = await updateResponse.json();
 
-      console.log('updateData:', updateData);
-
       if (!updateResponse.ok || !updateData.success) {
-        setError(updateData.error || '订单更新失败');
+        setError(updateData.error || (i18n.language === 'ar' ? 'فشل تحديث الطلب' : i18n.language === 'en' ? 'Order update failed' : '订单更新失败'));
         setIsCreating(false);
         return;
       }
 
+      // 开始进行支付跳转
       if (paymentMethod === 'paypal') {
         const paypalResponse = await fetch('/api/payments/paypal', {
           method: 'POST',
@@ -441,28 +444,19 @@ function QuickOrderContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             order_number: order_number,
-            amount: (priceData?.total_usd ?? 0).toFixed(2) || '0',
             currency: 'USD',
-            items: [{
-              product_id: product.id,
-              name: product.name,
-              price: priceData ? (priceData.subtotal ?? priceData.total_usd ?? 0) / quantity : 0,
-              quantity: quantity
-            }]
+            source: 'quick-order'
           })
         });
 
-        console.log('paypalResponse status:', paypalResponse.status);
-
         const paypalData = await paypalResponse.json();
 
-        console.log('paypalData:', paypalData);
-
-        // 统一响应格式：success + data.redirect_url
         if (paypalResponse.ok && paypalData.success && paypalData.data?.redirect_url) {
+          setIsNavigating(true);
           window.location.href = paypalData.data.redirect_url;
         } else {
-          setError(paypalData.message || paypalData.error || '支付失败，请稍后重试');
+          setIsNavigating(false);
+          setError(paypalData.message || paypalData.error || (i18n.language === 'ar' ? 'فشل الدفع، يرجى المحاولة لاحقاً' : i18n.language === 'en' ? 'Payment failed, please try again later' : '支付失败，请稍后重试'));
           setIsCreating(false);
         }
       } else {
@@ -473,50 +467,54 @@ function QuickOrderContent() {
           body: JSON.stringify({
             order_number: order_number,
             amount: (priceData?.total_cny ?? 0).toFixed(2) || '0',
-            currency: 'CNY'
+            currency: 'CNY',
+            source: 'quick-order'
           })
         });
 
         const alipayData = await alipayResponse.json();
 
         if (alipayResponse.ok && alipayData.success && alipayData.data.payment_url) {
+          setIsNavigating(true);
           window.location.href = alipayData.data.payment_url;
         } else {
-          setError(alipayData.message || alipayData.error || '支付失败，请稍后重试');
+          setIsNavigating(false);
+          setError(alipayData.message || alipayData.error || (i18n.language === 'ar' ? 'فشل الدفع， يرجى المحاولة لاحقاً' : i18n.language === 'en' ? 'Payment failed, please try again later' : '支付失败，请稍后重试'));
           setIsCreating(false);
         }
       }
     } catch (err) {
       console.error('Payment error:', err);
-      setError('支付失败，请稍后重试');
+      setIsNavigating(false);
+      setError(i18n.language === 'ar' ? 'فشل الدفع، يرجى المحاولة لاحقاً' : i18n.language === 'en' ? 'Payment failed, please try again later' : '支付失败，请稍后重试');
       setIsCreating(false);
     }
   };
 
-  // 取消订单
   const handleCancelOrder = async () => {
-    if (!confirm('确定要取消订单吗？')) return;
+    const confirmMsg = i18n.language === 'ar' ? 'هل أنت متأكد أنك تريد إلغاء الطلب؟' : i18n.language === 'en' ? 'Are you sure you want to cancel the order?' : '确定要取消订单吗？';
+    if (!confirm(confirmMsg)) return;
     if (!currentOrderDbId) {
-      alert('订单信息加载中，请稍后');
+      alert(i18n.language === 'ar' ? 'جاري تحميل معلومات الطلب، يرجى الانتظار' : i18n.language === 'en' ? 'Order information is loading, please wait' : '订单信息加载中，请稍后');
       return;
     }
 
     try {
       const response = await fetch(`/api/orders/${currentOrderDbId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'cancelled' })
+        body: JSON.stringify({ action: 'cancel' })
       });
 
       if (response.ok) {
         router.push('/');
       } else {
-        alert('取消失败，请重试');
+        alert(i18n.language === 'ar' ? 'فشل الإلغاء، يرجى المحاولة مرة أخرى' : i18n.language === 'en' ? 'Cancellation failed, please try again' : '取消失败，请重试');
       }
     } catch (err) {
       console.error('Cancel order error:', err);
-      alert('取消失败，请重试');
+      alert(i18n.language === 'ar' ? 'فشل الإلغاء، يرجى المحاولة مرة أخرى' : i18n.language === 'en' ? 'Cancellation failed, please try again' : '取消失败，请重试');
     }
   };
 
@@ -529,9 +527,9 @@ function QuickOrderContent() {
 
   if (isAuthLoading || !user) {
     return (
-      <div className="py-12 px-4 bg-[#FDF2F8] min-h-screen">
+      <div className="py-12 px-4 bg-[var(--background)] min-h-screen">
         <div className="max-w-4xl mx-auto flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#831843]"></div>
+          <div className="loading-spinner-lg"></div>
         </div>
       </div>
     );
@@ -539,9 +537,9 @@ function QuickOrderContent() {
 
   if (isLoading) {
     return (
-      <div className="py-12 px-4 bg-[#FDF2F8] min-h-screen">
+      <div className="py-12 px-4 bg-[var(--background)] min-h-screen">
         <div className="max-w-4xl mx-auto flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#831843]"></div>
+          <div className="loading-spinner-lg"></div>
         </div>
       </div>
     );
@@ -739,7 +737,7 @@ function QuickOrderContent() {
                   }`}
                   style={{ color: myCouponsTab === 'available' ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  可用 ({availableCoupons.length})
+                  {i18n.language === 'ar' ? 'متاح' : i18n.language === 'en' ? 'Available' : '可用'} ({availableCoupons.length})
                 </button>
                 <button
                   onClick={() => setMyCouponsTab('expired')}
@@ -748,7 +746,7 @@ function QuickOrderContent() {
                   }`}
                   style={{ color: myCouponsTab === 'expired' ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  已过期 ({expiredCoupons.length})
+                  {i18n.language === 'ar' ? 'منتهي الصلاحية' : i18n.language === 'en' ? 'Expired' : '已过期'} ({expiredCoupons.length})
                 </button>
                 <button
                   onClick={() => setMyCouponsTab('used')}
@@ -757,7 +755,7 @@ function QuickOrderContent() {
                   }`}
                   style={{ color: myCouponsTab === 'used' ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  已使用 ({usedCoupons.length})
+                  {i18n.language === 'ar' ? 'مستخدم' : i18n.language === 'en' ? 'Used' : '已使用'} ({usedCoupons.length})
                 </button>
                 <button
                   onClick={() => setMyCouponsTab('claimable')}
@@ -766,7 +764,7 @@ function QuickOrderContent() {
                   }`}
                   style={{ color: myCouponsTab === 'claimable' ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  未领取 ({claimableCoupons.length})
+                  {i18n.language === 'ar' ? 'غير مستلم' : i18n.language === 'en' ? 'Unclaimed' : '未领取'} ({claimableCoupons.length})
                 </button>
               </div>
 
@@ -774,7 +772,7 @@ function QuickOrderContent() {
                 {myCouponsTab === 'available' && (
                   availableCoupons.length === 0 ? (
                     <div className="col-span-2 rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>暂无可用优惠券</p>
+                      <p style={{ color: 'var(--text-muted)' }}>{i18n.language === 'ar' ? 'لا توجد قسائم متاحة' : i18n.language === 'en' ? 'No coupons available' : '暂无可用优惠券'}</p>
                     </div>
                   ) : (
                     availableCoupons.map((coupon) => {
@@ -814,9 +812,11 @@ function QuickOrderContent() {
                                 ? 'bg-gradient-to-br from-accent to-accent-hover'
                                 : 'bg-gradient-to-br from-accent to-accent'
                             }`}>
-                              <span className="text-white text-[10px] font-bold text-center leading-tight">{coupon.name}</span>
+                              <span className="text-white text-[10px] font-bold text-center leading-tight">
+                                {i18n.language === 'ar' ? (coupon.name_ar || coupon.name) : i18n.language === 'en' ? (coupon.name_en || coupon.name) : coupon.name}
+                              </span>
                               <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
-                                {coupon.is_stackable === 1 ? '可叠加' : '不可叠加'}
+                                {coupon.is_stackable === 1 ? (i18n.language === 'ar' ? 'قابل للتكديس' : i18n.language === 'en' ? 'Stackable' : '可叠加') : (i18n.language === 'ar' ? 'غير قابل للتكديس' : i18n.language === 'en' ? 'Non-stackable' : '不可叠加')}
                               </span>
                             </div>
                             <div className="flex-1 p-2">
@@ -831,10 +831,12 @@ function QuickOrderContent() {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[10px] mb-1 text-[var(--text)] truncate">{coupon.description}</p>
+                              <p className="text-[10px] mb-1 text-[var(--text)] truncate">
+                                {i18n.language === 'ar' ? (coupon.description_ar || coupon.description) : i18n.language === 'en' ? (coupon.description_en || coupon.description) : coupon.description}
+                              </p>
                               <div className="flex flex-wrap gap-1 text-[10px]">
                                 <span className="bg-gray-100 px-1 py-0.5 rounded text-[var(--text-muted)]">
-                                  剩{daysLeft}天
+                                  {i18n.language === 'ar' ? `${daysLeft} يوم` : i18n.language === 'en' ? `${daysLeft} days left` : `剩${daysLeft}天`}
                                 </span>
                               </div>
                             </div>
@@ -848,7 +850,7 @@ function QuickOrderContent() {
                 {myCouponsTab === 'expired' && (
                   expiredCoupons.length === 0 ? (
                     <div className="col-span-2 rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>无已过期优惠券</p>
+                      <p style={{ color: 'var(--text-muted)' }}>{i18n.language === 'ar' ? 'لا توجد قسائم منتهية الصلاحية' : i18n.language === 'en' ? 'No expired coupons' : '无已过期优惠券'}</p>
                     </div>
                   ) : (
                     expiredCoupons.map((coupon) => {
@@ -863,15 +865,15 @@ function QuickOrderContent() {
                         >
                           <div className="flex h-full">
                             <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-gray-400 to-gray-500">
-                              <span className="text-white text-[10px] font-bold text-center leading-tight">已过期</span>
+                              <span className="text-white text-[10px] font-bold text-center leading-tight">{i18n.language === 'ar' ? 'منتهي الصلاحية' : i18n.language === 'en' ? 'Expired' : '已过期'}</span>
                               <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
-                                {coupon.name}
+                                {i18n.language === 'ar' ? (coupon.name_ar || coupon.name) : i18n.language === 'en' ? (coupon.name_en || coupon.name) : coupon.name}
                               </span>
                             </div>
                             <div className="flex-1 p-2">
                               <div className="flex justify-between items-start mb-1">
                                 <div>
-                                  <span className="text-gray-500 font-bold">{discountText}</span>
+                                  <span className="text-gray-400 font-bold">{discountText}</span>
                                   <p className="text-[10px] text-[var(--text-muted)]">{coupon.code}</p>
                                 </div>
                               </div>
@@ -887,7 +889,7 @@ function QuickOrderContent() {
                 {myCouponsTab === 'used' && (
                   usedCoupons.length === 0 ? (
                     <div className="col-span-2 rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>无已使用优惠券</p>
+                      <p style={{ color: 'var(--text-muted)' }}>{i18n.language === 'ar' ? 'لا توجد قسائم مستخدمة' : i18n.language === 'en' ? 'No used coupons' : '无已使用优惠券'}</p>
                     </div>
                   ) : (
                     usedCoupons.map((coupon) => {
@@ -902,15 +904,15 @@ function QuickOrderContent() {
                         >
                           <div className="flex h-full">
                             <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-gray-400 to-gray-500">
-                              <span className="text-white text-[10px] font-bold text-center leading-tight">已使用</span>
+                              <span className="text-white text-[10px] font-bold text-center leading-tight">{i18n.language === 'ar' ? 'مستخدم' : i18n.language === 'en' ? 'Used' : '已使用'}</span>
                               <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
-                                {coupon.name}
+                                {i18n.language === 'ar' ? (coupon.name_ar || coupon.name) : i18n.language === 'en' ? (coupon.name_en || coupon.name) : coupon.name}
                               </span>
                             </div>
                             <div className="flex-1 p-2">
                               <div className="flex justify-between items-start mb-1">
                                 <div>
-                                  <span className="text-gray-500 font-bold">{discountText}</span>
+                                  <span className="text-gray-400 font-bold">{discountText}</span>
                                   <p className="text-[10px] text-[var(--text-muted)]">{coupon.code}</p>
                                 </div>
                               </div>
@@ -926,7 +928,7 @@ function QuickOrderContent() {
                 {myCouponsTab === 'claimable' && (
                   claimableCoupons.length === 0 ? (
                     <div className="col-span-2 rounded-lg border p-4 text-center" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>无可领取优惠券</p>
+                      <p style={{ color: 'var(--text-muted)' }}>{i18n.language === 'ar' ? 'لا توجد قسائم متاحة للاستلام' : i18n.language === 'en' ? 'No claimable coupons' : '无可领取优惠券'}</p>
                     </div>
                   ) : (
                     claimableCoupons.map((coupon) => {
@@ -941,9 +943,9 @@ function QuickOrderContent() {
                         >
                           <div className="flex h-full">
                             <div className="w-[120px] shrink-0 p-2 flex flex-col items-center justify-center bg-gradient-to-br from-green-500 to-green-600">
-                              <span className="text-white text-[10px] font-bold text-center leading-tight">待领取</span>
+                              <span className="text-white text-[10px] font-bold text-center leading-tight">{i18n.language === 'ar' ? 'في انتظار الاستلام' : i18n.language === 'en' ? 'Claimable' : '待领取'}</span>
                               <span className="text-white/80 text-[10px] mt-1 bg-white/20 px-1 py-0.5 rounded">
-                                {coupon.name}
+                                {i18n.language === 'ar' ? (coupon.name_ar || coupon.name) : i18n.language === 'en' ? (coupon.name_en || coupon.name) : coupon.name}
                               </span>
                             </div>
                             <div className="flex-1 p-2">
@@ -953,12 +955,14 @@ function QuickOrderContent() {
                                   <p className="text-[10px] text-[var(--text-muted)]">{coupon.code}</p>
                                 </div>
                               </div>
-                              <p className="text-[10px] mb-1 text-[var(--text)] truncate">{coupon.description}</p>
+                              <p className="text-[10px] mb-1 text-[var(--text)] truncate">
+                                {i18n.language === 'ar' ? (coupon.description_ar || coupon.description) : i18n.language === 'en' ? (coupon.description_en || coupon.description) : coupon.description}
+                              </p>
                               <button
                                 onClick={() => handleReceiveCoupon(coupon.coupon_id)}
                                 className="px-2 py-1 bg-gradient-to-r from-green-500 to-green-600 text-white rounded text-[10px] font-medium hover:from-green-600 hover:to-green-700 transition-all cursor-pointer"
                               >
-                                领取
+                                {i18n.language === 'ar' ? 'استلام' : i18n.language === 'en' ? 'Claim' : '领取'}
                               </button>
                             </div>
                           </div>
@@ -971,7 +975,9 @@ function QuickOrderContent() {
 
               {unavailableCoupons.length > 0 && myCouponsTab === 'available' && (
                 <div className="space-y-3 mt-4 opacity-60">
-                  <h3 className="text-sm font-medium opacity-70">{t('quick_order.unavailable_coupons', '不可用优惠券')}</h3>
+                  <h3 className="text-sm font-medium opacity-70">
+                    {i18n.language === 'ar' ? 'قسائم غير متاحة' : i18n.language === 'en' ? 'Unavailable Coupons' : '不可用优惠券'}
+                  </h3>
                   {unavailableCoupons.map((coupon) => {
                       const discountText = coupon.discount_type === 'percentage'
                         ? `${coupon.value}%`
@@ -1034,7 +1040,9 @@ function QuickOrderContent() {
                   </svg>
                   <div className="flex-1">
                     <span className="font-medium text-[var(--text)]">PayPal</span>
-                    <span className="text-sm opacity-60 ml-2">({t('quick_order.usd_payment', '美元支付')})</span>
+                    <span className="text-sm opacity-60 ml-2">
+                      ({i18n.language === 'ar' ? 'دفع بالدولار' : i18n.language === 'en' ? 'USD Payment' : '美元支付'})
+                    </span>
                   </div>
                   {priceData && (
                     <span className="font-bold text-[var(--accent)]">
@@ -1088,108 +1096,34 @@ function QuickOrderContent() {
                   {t('quick_order.price_details', '价格明细')}
                 </h2>
               </div>
-              <div className="p-6 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="opacity-70">{t('quick_order.original_price', '商品总价')}</span>
-                  <span className="line-through opacity-50">{formatMultiPriceSync(priceData.original_subtotal ?? priceData.original_price ?? 0)}</span>
-                </div>
-                {priceData.product_discount > 0 && (
-                  <>
-                    {priceData.promotions && priceData.promotions.length > 0 ? (
-                      priceData.promotions.map((promo: any, idx: number) => (
-                        <div key={idx}>
-                          <div className="flex justify-between text-sm items-center">
-                            <span className="opacity-70 flex items-center gap-2">
-                              <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">{promo.name}</span>
-                              <span className="text-green-600">-{promo.percent}%</span>
-                            </span>
-                            <span className="text-green-600">-{formatMultiPriceSync(promo.discount)}</span>
-                          </div>
-                          <div className="text-xs text-green-600 pl-4 opacity-70">
-                              = {formatMultiPriceSync(priceData.original_subtotal ?? 0)} × {promo.percent}%
-                            </div>
-                        </div>
-                      ))
-                    ) : (
-                      <>
-                        <div className="flex justify-between text-sm">
-                          <span className="opacity-70">{t('quick_order.promotion_discount', '促销优惠')}</span>
-                          <span className="text-green-600">-{formatMultiPriceSync(priceData.product_discount ?? 0)}</span>
-                        </div>
-                        <div className="text-xs text-green-600 pl-4 opacity-70">
-                          = {formatMultiPriceSync(priceData.original_subtotal ?? 0)} - {formatMultiPriceSync(priceData.product_discount ?? 0)}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-                <div className="flex justify-between text-sm">
-                  <span className="opacity-70">{t('quick_order.after_promotion', '促销后小计')}</span>
-                  <span>{formatMultiPriceSync(priceData.subtotal ?? priceData.total_usd ?? 0)}</span>
-                </div>
-                {priceData.coupon_discount > 0 && (
-                  <>
-                    <div className="pt-2 border-t border-dashed border-[var(--border)]"></div>
-                    {(() => {
-                      let remaining = priceData.subtotal ?? priceData.total_usd ?? 0;
-                      const details = priceData.coupon?.details || [];
-                      return details.map((detail: any, idx: number) => {
-                        const prevRemaining = remaining;
-                        remaining = remaining - (detail.discount ?? 0);
-                        
-                        let formula = '';
-                        if (detail.type === 'percentage') {
-                          formula = `= ${formatMultiPriceSync(prevRemaining)} × ${detail.value}%`;
-                        } else {
-                          formula = `= ${formatMultiPriceSync(prevRemaining)} - ${formatMultiPriceSync(detail.discount ?? 0)}`;
-                        }
-                        
-                        return (
-                          <div key={idx}>
-                            <div className="flex justify-between text-sm text-green-600">
-                              <span>
-                                {detail.code || `券${detail.id}`}
-                                {detail.type === 'percentage' ? ` (${detail.value}%)` : ` (固定${detail.value})`}
-                              </span>
-                              <span>-{formatMultiPriceSync(detail.discount ?? 0)}</span>
-                            </div>
-                            <div className="text-xs text-green-600 pl-4 opacity-70">
-                              {formula}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                    <div className="pt-2 border-t border-dashed border-[var(--border)]"></div>
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span>{t('quick_order.coupon_discount', '优惠券优惠')}</span>
-                      <span>-{formatMultiPriceSync(priceData.coupon_discount ?? 0)}</span>
-                    </div>
-                    <div className="text-xs text-green-600 pl-4 opacity-70">
-                      = {formatMultiPriceSync(priceData.subtotal ?? 0)} - {formatMultiPriceSync(priceData.coupon_discount ?? 0)}
-                    </div>
-                  </>
-                )}
-                <div className="flex justify-between text-sm">
-                  <span className="opacity-70">{t('quick_order.after_coupon', '券后小计')}</span>
-                  <span>{formatMultiPriceSync((priceData.subtotal ?? 0) - (priceData.coupon_discount ?? 0))}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="opacity-70">{t('quick_order.shipping_fee', '运费')}</span>
-                  <span>
-                    {(priceData.shipping_fee ?? 0) > 0 ? formatMultiPriceSync(priceData.shipping_fee) : t('quick_order.free', '免费')}
-                  </span>
-                </div>
-                <div className="pt-3 border-t border-[var(--border)]">
-                  <div className="flex justify-between">
-                    <span className="font-medium">{t('quick_order.total', '合计')}</span>
-                    <div className="text-right">
-                      <span className="text-2xl font-bold text-[var(--accent)]">
-                        {formatMultiPriceSync(priceData.total_usd ?? 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+              <div className="p-6">
+                <OrderPriceBreakdown
+                  productTotalUsd={priceData.total_original_price ?? 0}
+                  unitPriceUsd={product?.price_usd ?? ((priceData.total_original_price ?? 0) / Math.max(quantity, 1))}
+                  quantity={quantity}
+                  promotions={priceData.promotions || []}
+                  promotionSubtotalUsd={priceData.total_after_promotions_amount ?? priceData.total_usd ?? 0}
+                  coupon={(() => {
+                    const detail = priceData.coupon?.details?.[0];
+                    const selected = availableCoupons.find((coupon) => selectedCouponIds.includes(coupon.id));
+                    return detail ? {
+                      id: detail.id,
+                      coupon_id: detail.id,
+                      code: detail.code,
+                      name: selected?.name || detail.code,
+                      name_en: selected?.name_en,
+                      name_ar: selected?.name_ar,
+                      type: detail.type,
+                      value: detail.value,
+                      is_stackable: selected?.is_stackable,
+                    } : selected || null;
+                  })()}
+                  couponDiscountUsd={priceData.total_coupon_discount ?? 0}
+                  couponSubtotalUsd={(priceData.total_after_promotions_amount ?? 0) - (priceData.total_coupon_discount ?? 0)}
+                  shippingUsd={priceData.shipping_fee ?? 0}
+                  totalUsd={priceData.final_amount ?? priceData.total_usd ?? 0}
+                  items={getQuickOrderBreakdownItems()}
+                />
               </div>
             </div>
           )}
@@ -1206,7 +1140,7 @@ function QuickOrderContent() {
           >
             {isCreating ? (
               <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                <div className="loading-spinner-sm border-white mr-2"></div>
                 {t('quick_order.creating', '正在创建订单...')}
               </div>
             ) : (
@@ -1228,12 +1162,15 @@ function QuickOrderContent() {
 }
 
 export default function QuickOrderPage() {
+  const { i18n } = useTranslation();
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">加载中...</p>
+          <div className="loading-spinner-lg mb-4"></div>
+          <p className="text-gray-600">
+            {i18n.language === 'ar' ? 'جاري التحميل...' : i18n.language === 'en' ? 'Loading...' : '加载中...'}
+          </p>
         </div>
       </div>
     }>

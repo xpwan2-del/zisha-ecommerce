@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { recordAdminAuditLog } from '@/lib/admin-audit';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +33,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        WHERE uc.user_id = ? ORDER BY uc.created_at DESC LIMIT 10`,
       [userId]
     );
+
+    await recordAdminAuditLog({
+      request,
+      module: 'AUTH',
+      action: 'GET_USER_DETAIL',
+      description: '管理员查看用户详情',
+      operator: auth.user.name || 'Admin',
+      status: 'success',
+      resourceId: userId,
+      resourceType: 'user',
+      riskLevel: 'high',
+      metadata: {
+        email: userResult.rows[0]?.email || null,
+        role: userResult.rows[0]?.role || null,
+      },
+    });
 
     logApiSuccess('AUTH', 'GET_USER_DETAIL', { userId });
     return createSuccessResponse({
@@ -84,6 +101,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, paramsArr);
 
     const updated = await query('SELECT id, name, email, phone, role, level, points, total_spent FROM users WHERE id = ?', [userId]);
+
+    await recordAdminAuditLog({
+      request,
+      module: 'AUTH',
+      action: 'UPDATE_USER',
+      description: '管理员更新用户资料',
+      operator: auth.user.name || 'Admin',
+      status: 'success',
+      resourceId: userId,
+      resourceType: 'user',
+      riskLevel: 'critical',
+      metadata: body,
+    });
+
     logApiSuccess('AUTH', 'UPDATE_USER', { userId });
     return createSuccessResponse(updated.rows[0]);
   } catch (error) {

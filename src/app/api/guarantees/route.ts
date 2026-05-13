@@ -1,104 +1,74 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
-/**
- * @api {GET} /api/guarantees 获取保障条款
- * @apiName GetGuarantees
- * @apiGroup GUARANTEES
- * @apiDescription 获取商城的保障条款列表。
- */
 
-
-interface Guarantee {
-  id: number;
-  text: string;
-  text_en: string;
-  text_ar: string;
-  color: string;
-  icon: string;
-  is_active: boolean;
-  order: number;
+export async function ensureGuaranteesTable() {
+  await query(`CREATE TABLE IF NOT EXISTS guarantees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    text_en TEXT,
+    text_ar TEXT,
+    color TEXT DEFAULT '#CA8A04',
+    icon TEXT DEFAULT 'check-circle',
+    is_active INTEGER DEFAULT 1,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
 }
 
-let guarantees: Guarantee[] = [
-  {
-    id: 1,
-    text: 'Free shipping on orders over $50',
-    text_en: 'Free shipping on orders over $50',
-    text_ar: 'شحن مجاني على الطلبات فوق 50 دولار',
-    color: '#CA8A04',
-    icon: 'check-circle',
-    is_active: true,
-    order: 0
-  },
-  {
-    id: 2,
-    text: '30-day returns',
-    text_en: '30-day returns',
-    text_ar: 'إرجاع في غضون 30 يومًا',
-    color: '#CA8A04',
-    icon: 'check-circle',
-    is_active: true,
-    order: 1
-  },
-  {
-    id: 3,
-    text: 'Authentic guarantee',
-    text_en: 'Authentic guarantee',
-    text_ar: 'ضمان أصالة',
-    color: '#CA8A04',
-    icon: 'check-circle',
-    is_active: true,
-    order: 2
-  },
-  {
-    id: 4,
-    text: 'Green product',
-    text_en: 'Green product',
-    text_ar: 'منتج أخضر',
-    color: '#CA8A04',
-    icon: 'check-circle',
-    is_active: true,
-    order: 3
-  }
-];
+function normalizeGuarantee(row: any) {
+  return {
+    id: row.id,
+    text: row.text || '',
+    text_en: row.text_en || '',
+    text_ar: row.text_ar || '',
+    color: row.color || '#CA8A04',
+    icon: row.icon || 'check-circle',
+    is_active: Boolean(row.is_active),
+    order: Number(row.sort_order || 0),
+    sort_order: Number(row.sort_order || 0),
+  };
+}
 
 export async function GET() {
   try {
     logMonitor('GUARANTEES', 'REQUEST', { method: 'GET', action: 'GET_GUARANTEES' });
-
-    const sortedGuarantees = guarantees.sort((a, b) => a.order - b.order);
-    logMonitor('GUARANTEES', 'SUCCESS', { action: 'GET_GUARANTEES', count: sortedGuarantees.length });
-    return NextResponse.json(sortedGuarantees);
+    await ensureGuaranteesTable();
+    const result = await query('SELECT * FROM guarantees ORDER BY sort_order ASC, id ASC');
+    const rows = result.rows.map(normalizeGuarantee);
+    logMonitor('GUARANTEES', 'SUCCESS', { action: 'GET_GUARANTEES', count: rows.length });
+    return NextResponse.json(rows);
   } catch (error: any) {
     logMonitor('GUARANTEES', 'ERROR', { action: 'GET_GUARANTEES', error: error?.message || String(error) });
-    console.error('Error fetching guarantees:', error);
     return NextResponse.json({ error: 'Failed to fetch guarantees' }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     logMonitor('GUARANTEES', 'REQUEST', { method: 'POST', action: 'CREATE_GUARANTEE' });
-
+    await ensureGuaranteesTable();
     const body = await request.json();
-    
-    const newGuarantee: Guarantee = {
-      id: Math.max(...guarantees.map(g => g.id), 0) + 1,
-      text: body.text,
-      text_en: body.text_en,
-      text_ar: body.text_ar,
-      color: body.color || '#CA8A04',
-      icon: body.icon || 'check-circle',
-      is_active: body.is_active !== false,
-      order: body.order || guarantees.length
-    };
-    
-    guarantees.push(newGuarantee);
-    logMonitor('GUARANTEES', 'SUCCESS', { action: 'CREATE_GUARANTEE', id: newGuarantee.id });
-    return NextResponse.json(newGuarantee, { status: 201 });
+    const result = await query(
+      `INSERT INTO guarantees (text, text_en, text_ar, color, icon, is_active, sort_order, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [
+        body.text,
+        body.text_en || '',
+        body.text_ar || '',
+        body.color || '#CA8A04',
+        body.icon || 'check-circle',
+        body.is_active === false ? 0 : 1,
+        Number(body.order ?? body.sort_order ?? 0),
+      ]
+    );
+    const created = await query('SELECT * FROM guarantees WHERE id = ?', [result.lastInsertRowid]);
+    const data = normalizeGuarantee(created.rows[0]);
+    logMonitor('GUARANTEES', 'SUCCESS', { action: 'CREATE_GUARANTEE', id: data.id });
+    return NextResponse.json(data, { status: 201 });
   } catch (error: any) {
     logMonitor('GUARANTEES', 'ERROR', { action: 'CREATE_GUARANTEE', error: error?.message || String(error) });
-    console.error('Error adding guarantee:', error);
     return NextResponse.json({ error: 'Failed to add guarantee' }, { status: 500 });
   }
 }

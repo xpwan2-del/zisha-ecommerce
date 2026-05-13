@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 /**
  * @api {GET} /api/products/init 初始化产品表结构
  * @apiName InitProductsTable
@@ -10,6 +11,9 @@ import { logMonitor } from '@/lib/utils/logger';
 
 
 export async function POST(request: NextRequest) {
+  const authResult = checkAdminAuth(request);
+  if (authResult.response) return authResult.response;
+
   try {
     logMonitor('PRODUCTS', 'REQUEST', { method: 'POST', action: 'INIT_PRODUCTS' });
 

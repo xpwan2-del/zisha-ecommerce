@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import CountrySelect from './CountrySelect';
 import RegionSelect from './RegionSelect';
 
@@ -35,43 +35,47 @@ const LABEL_OPTIONS = [
   { value: '其他', label: '其他' }
 ];
 
+function createFormData(address?: Address | null): Address {
+  if (!address) {
+    return {
+      contact_name: '',
+      phone: '',
+      country_code: '',
+      country_name: '',
+      state_code: null,
+      state_name: null,
+      city: '',
+      street_address: '',
+      street_address_2: '',
+      postal_code: '',
+      label: '',
+      is_default: false
+    };
+  }
+
+  return {
+    id: address.id,
+    contact_name: address.contact_name || '',
+    phone: address.phone || '',
+    country_code: address.country_code || '',
+    country_name: address.country_name || '',
+    state_code: address.state_code || null,
+    state_name: address.state_name || null,
+    city: address.city || '',
+    street_address: address.street_address || '',
+    street_address_2: address.street_address_2 || '',
+    postal_code: address.postal_code || '',
+    label: address.label || '',
+    is_default: address.is_default || false
+  };
+}
+
 export default function AddressForm({ address, onSubmit, onCancel, isLoading = false }: AddressFormProps) {
-  const [formData, setFormData] = useState<Address>({
-    contact_name: '',
-    phone: '',
-    country_code: '',
-    country_name: '',
-    state_code: null,
-    state_name: null,
-    city: '',
-    street_address: '',
-    street_address_2: '',
-    postal_code: '',
-    label: '',
-    is_default: false
-  });
+  const [formData, setFormData] = useState<Address>(() => createFormData(address));
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (address) {
-      setFormData({
-        id: address.id,
-        contact_name: address.contact_name || '',
-        phone: address.phone || '',
-        country_code: address.country_code || '',
-        country_name: address.country_name || '',
-        state_code: address.state_code || null,
-        state_name: address.state_name || null,
-        city: address.city || '',
-        street_address: address.street_address || '',
-        street_address_2: address.street_address_2 || '',
-        postal_code: address.postal_code || '',
-        label: address.label || '',
-        is_default: address.is_default || false
-      });
-    }
-  }, [address]);
+
 
   const validate = () => {
     const newErrors: Record<string, string> = {};

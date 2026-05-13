@@ -252,7 +252,7 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
           multiplier *= (1 - p.discount_percent / 100);
           parts.push(`(1-${p.discount_percent}%)`);
         });
-        totalDiscount = Math.round((1 - multiplier) * 10000) / 100;
+        totalDiscount = Number(((1 - multiplier) * 100).toFixed(2));
         formula = parts.join(' × ') + ` = ${totalDiscount}%`;
       }
 
@@ -460,18 +460,11 @@ export function FeaturedProducts({ category = "all", data, pageType = "products"
     <section className="py-8 px-4">
       <div className="max-w-7xl mx-auto">
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 12 }).map((_, index) => (
-              <div key={index} className="bg-white rounded-md shadow-sm overflow-hidden animate-pulse">
-                <div className="aspect-square bg-gray-200"></div>
-                <div className="p-4">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/3 mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                </div>
-              </div>
-            ))}
+          <div className="min-h-[320px] flex items-center justify-center">
+            <div className="text-center">
+              <div className="loading-spinner-lg mx-auto mb-4" role="status" aria-label="loading"></div>
+              <p className="text-sm text-[var(--text-muted)]">Loading...</p>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">

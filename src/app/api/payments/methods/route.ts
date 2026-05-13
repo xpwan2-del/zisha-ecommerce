@@ -10,6 +10,11 @@ import { logMonitor } from '@/lib/utils/logger';
 
 
 export async function GET(request: Request) {
+  logMonitor('PAYMENTS', 'REQUEST', {
+    method: 'GET',
+    path: '/api/payments/methods'
+  });
+
   try {
     await PaymentService.initialize();
 
@@ -22,14 +27,20 @@ export async function GET(request: Request) {
       isEnabled: method.is_enabled
     }));
 
-    logMonitor('PAYMENT', 'GET_METHODS', { count: formattedMethods.length });
+    logMonitor('PAYMENTS', 'SUCCESS', {
+      action: 'GET_METHODS',
+      count: formattedMethods.length
+    });
 
     return NextResponse.json({
       success: true,
       data: formattedMethods
     });
   } catch (error: any) {
-    console.error('[Payment Methods] Error:', error);
+    logMonitor('PAYMENTS', 'ERROR', {
+      action: 'GET_METHODS',
+      error: String(error)
+    });
     return NextResponse.json({
       success: false,
       error: error.message || 'Failed to get payment methods'

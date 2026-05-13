@@ -5,22 +5,17 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n/i18n";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [isReady, setIsReady] = useState(false);
-  
-  useEffect(() => {
-    // Wait for i18n to be initialized
-    if (i18n.isInitialized) {
-      setIsReady(true);
-    } else {
-      const handleInit = () => setIsReady(true);
-      i18n.on('initialized', handleInit);
-      return () => i18n.off('initialized', handleInit);
-    }
-  }, []);
+  const [isReady, setIsReady] = useState(i18n.isInitialized);
 
-  if (!isReady) {
-    return null;
-  }
+  useEffect(() => {
+    if (isReady) {
+      return;
+    }
+
+    const handleInit = () => setIsReady(true);
+    i18n.on("initialized", handleInit);
+    return () => i18n.off("initialized", handleInit);
+  }, [isReady]);
 
   return <I18nextProvider i18n={i18n}>{children}</I18nextProvider>;
 }

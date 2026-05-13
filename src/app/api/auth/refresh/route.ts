@@ -4,6 +4,18 @@ import jwt from 'jsonwebtoken';
 import { getMessage } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+function cookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge,
+    path: '/',
+  } as const;
+}
+
 /**
  * @api {POST} /api/auth/refresh 刷新访问令牌
  * @apiName RefreshToken
@@ -75,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     let decoded: any;
     try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET!);
+      decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!);
     } catch (error) {
       logMonitor('AUTH', 'VALIDATION_FAILED', {
         reason: 'INVALID_REFRESH_TOKEN'
@@ -104,13 +116,7 @@ export async function POST(request: NextRequest) {
       message: lang === 'zh' ? '令牌刷新成功' : lang === 'ar' ? 'تم تجديد الرمز المميز' : 'Token refreshed successfully'
     });
 
-    response.cookies.set('access_token', accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 60 * 60 * 2,
-      path: '/'
-    });
+    response.cookies.set('access_token', accessToken, cookieOptions(60 * 60 * 2));
 
     logMonitor('AUTH', 'SUCCESS', {
       action: 'REFRESH_SUCCESS',

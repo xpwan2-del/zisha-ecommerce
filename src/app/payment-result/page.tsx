@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { EnhancedPaymentResultCard } from '@/components/payment';
+import { derivePaymentResultState } from '@/lib/payment-result-state';
 
 function PaymentResultContent() {
   const router = useRouter();
@@ -61,30 +62,16 @@ function PaymentResultContent() {
           setPaymentMethod(platformMap[platform]);
         }
 
-        if (status === 'success') {
-          setPaymentStatus('success');
-        } else if (status === 'cancel') {
-          setPaymentStatus('fail');
-          setErrorInfo({
-            errorCode: 'USER_CANCEL',
-            errorMessage: {
-              zh: '您取消了支付，订单仍待支付。您可以重新支付或取消订单。',
-              en: 'Payment was cancelled. Your order is still pending. You can retry payment or cancel the order.',
-              ar: 'تم إلغاء الدفع. طلبك لا يزال معلقاً. يمكنك إعادة الدفع أو إلغاء الطلب.',
-            },
-          });
-        } else {
-          setPaymentStatus('fail');
-          const reason = status || 'fail';
-          setErrorInfo({
-            errorCode: reason.toUpperCase(),
-            errorMessage: {
-              zh: decodeURIComponent(errorMsg || '') || '支付失败，请重试',
-              en: 'Payment failed, please retry',
-              ar: 'فشل الدفع، يرجى المحاولة مرة أخرى',
-            },
-          });
-        }
+        const resultState = derivePaymentResultState({
+          status,
+          order: fetchedOrder,
+          errorMsg: errorMsg ? decodeURIComponent(errorMsg) : null,
+        });
+        setPaymentStatus(resultState.paymentStatus);
+        setErrorInfo(resultState.errorCode ? {
+          errorCode: resultState.errorCode,
+          errorMessage: resultState.errorMessage,
+        } : null);
       } catch (error) {
         console.error('Error fetching order:', error);
         setPaymentStatus('fail');
@@ -127,7 +114,7 @@ function PaymentResultContent() {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="loading-spinner-lg mb-4"></div>
           <p className="text-[var(--text-muted)]">正在加载订单信息...</p>
         </div>
       </div>
@@ -158,7 +145,7 @@ export default function PaymentResultPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <div className="loading-spinner-lg"></div>
       </div>
     }>
       <PaymentResultContent />

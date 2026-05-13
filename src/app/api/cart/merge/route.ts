@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { getMessage, getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 
 /**
  * @api {POST} /api/cart/merge 合并购物车
@@ -112,29 +113,19 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['cat_increase']);
-          const transactionTypeId = typeResult.rows[0]?.id || 8;
-
-          await query(
-            `INSERT INTO inventory_transactions (
-              product_id, product_name, transaction_type_id, quantity_change,
-              quantity_before, quantity_after, reason, reference_type, reference_id,
-              operator_id, operator_name, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-            [
-              product_id,
-              product.name || `Product #${product_id}`,
-              transactionTypeId,
-              -additionalQty,
-              availableStock,
-              availableStock - additionalQty,
-              `Merged from guest cart`,
-              'cart_merge',
-              existingItem.rows[0].id,
-              user_id,
-              authResult.user?.name || 'User'
-            ]
-          );
+          await createInventoryTransaction({
+            productId: product_id,
+            productName: product.name || `Product #${product_id}`,
+            transactionTypeCode: InventoryTransactionCode.CART_INCREASE,
+            quantityChange: -additionalQty,
+            quantityBefore: availableStock,
+            quantityAfter: availableStock - additionalQty,
+            reason: `Merged from guest cart`,
+            referenceType: 'cart_merge',
+            referenceId: existingItem.rows[0].id,
+            operatorId: user_id,
+            operatorName: authResult.user?.name,
+          });
         }
 
         await query(
@@ -170,29 +161,19 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['cat_increase']);
-        const transactionTypeId = typeResult.rows[0]?.id || 8;
-
-        await query(
-          `INSERT INTO inventory_transactions (
-            product_id, product_name, transaction_type_id, quantity_change,
-            quantity_before, quantity_after, reason, reference_type, reference_id,
-            operator_id, operator_name, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-          [
-            product_id,
-            product.name || `Product #${product_id}`,
-            transactionTypeId,
-            -quantity,
-            availableStock,
-            availableStock - quantity,
-            `Added from guest cart merge`,
-            'cart_merge',
-            product_id,
-            user_id,
-            authResult.user?.name || 'User'
-          ]
-        );
+        await createInventoryTransaction({
+          productId: product_id,
+          productName: product.name || `Product #${product_id}`,
+          transactionTypeCode: InventoryTransactionCode.CART_INCREASE,
+          quantityChange: -quantity,
+          quantityBefore: availableStock,
+          quantityAfter: availableStock - quantity,
+          reason: `Added from guest cart merge`,
+          referenceType: 'cart_merge',
+          referenceId: product_id,
+          operatorId: user_id,
+          operatorName: authResult.user?.name,
+        });
 
         await query(
           'INSERT INTO cart_items (user_id, product_id, quantity) VALUES (?, ?, ?)',

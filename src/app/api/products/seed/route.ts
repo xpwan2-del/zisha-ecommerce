@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 /**
  * @api {GET} /api/products/seed 种子产品数据
  * @apiName SeedProducts
@@ -9,12 +11,15 @@ import { query } from '@/lib/db';
 
 
 export async function POST(request: NextRequest) {
+  const authResult = checkAdminAuth(request);
+  if (authResult.response) return authResult.response;
+
   try {
     // Start transaction
     await query('BEGIN');
 
-    // Clear existing products
-    await query('DELETE FROM products');
+    // Preserve existing products while adding missing seed data
+      await query('CREATE UNIQUE INDEX IF NOT EXISTS idx_products_seed_id ON products(id)');
 
     // Seed data
     const products = [
@@ -185,7 +190,7 @@ export async function POST(request: NextRequest) {
     // Insert products
     for (const product of products) {
       await query(
-        `INSERT INTO products (id, name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount)
+        `INSERT OR IGNORE INTO products (id, name, name_en, name_ar, price, original_price, stock, category_id, image, images, description, features, is_limited, discount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           product.id,
@@ -219,15 +224,19 @@ export async function POST(request: NextRequest) {
         [product.id, product.name, product.stock || 0, seedStatusId]
       );
 
-      // 写入 inventory_transactions 表
-      const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['self_estock']);
-      const transactionTypeId = typeResult.rows[0]?.id || 14;
-
-      await query(
-        `INSERT INTO inventory_transactions (product_id, product_name, transaction_type_id, quantity_change, quantity_before, quantity_after, reason, operator_name, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [product.id, product.name, transactionTypeId, product.stock || 0, 0, product.stock || 0, 'Seed data initialization', 'system']
-      );
+      await createInventoryTransaction({
+        productId: product.id,
+        productName: product.name,
+        transactionTypeCode: InventoryTransactionCode.SELF_RESTOCK,
+        quantityChange: product.stock || 0,
+        quantityBefore: 0,
+        quantityAfter: product.stock || 0,
+        reason: 'Seed data initialization',
+        referenceType: 'seed',
+        referenceId: product.id,
+        operatorId: null,
+        operatorName: 'SYSTEM'
+      });
     }
 
     // Commit transaction

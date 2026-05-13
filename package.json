@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint ."
+    "start": "next start -p 3001",
+    "lint": "eslint .",
+    "test:refund-duplicate-callback": "node refund-duplicate-callback.test.mjs",
+    "test:refund-end-to-end": "node tests/e2e/refund-end-to-end.test.mjs"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

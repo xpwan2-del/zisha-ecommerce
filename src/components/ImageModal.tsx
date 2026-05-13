@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Image from 'next/image';
 
 interface ImageModalProps {
   images: string[];
@@ -32,11 +33,16 @@ export default function ImageModal({ images, currentIndex, onClose, onPrev, onNe
       </button>
       
       <div className="max-w-4xl max-h-[90vh] relative">
-        <img
-          src={images[currentIndex]}
-          alt={`Image ${currentIndex + 1}`}
-          className="w-full h-auto max-h-[90vh] object-contain"
-        />
+        <div className="relative h-[70vh] w-[80vw] max-w-4xl">
+          <Image
+            src={images[currentIndex]}
+            alt={`Image ${currentIndex + 1}`}
+            fill
+            sizes="80vw"
+            className="object-contain"
+            unoptimized={images[currentIndex]?.startsWith('data:')}
+          />
+        </div>
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full">
           {currentIndex + 1} / {images.length}
         </div>

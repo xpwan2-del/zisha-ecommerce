@@ -12,6 +12,14 @@ function getJwtSecret(): string {
   return secret;
 }
 
+function getRefreshTokenSecret(): string {
+  const secret = process.env.REFRESH_TOKEN_SECRET;
+  if (!secret) {
+    throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
+  }
+  return secret;
+}
+
 // 用户JWT Payload类型
 export interface UserJWTPayload {
   userId: number;
@@ -26,18 +34,26 @@ export interface UserJWTPayload {
 
 // 生成访问Token
 export function generateAccessToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: '48h' });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'] });
 }
 
 // 生成刷新Token
 export function generateRefreshToken(payload: Omit<UserJWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
+  return jwt.sign(payload, getRefreshTokenSecret(), { expiresIn: JWT_REFRESH_EXPIRES_IN as SignOptions['expiresIn'] });
 }
 
 // 验证Token
 export function verifyToken(token: string): UserJWTPayload | null {
   try {
     return jwt.verify(token, getJwtSecret()) as UserJWTPayload;
+  } catch (error) {
+    return null;
+  }
+}
+
+export function verifyRefreshToken(token: string): UserJWTPayload | null {
+  try {
+    return jwt.verify(token, getRefreshTokenSecret()) as UserJWTPayload;
   } catch (error) {
     return null;
   }
@@ -78,13 +94,25 @@ export function getCurrentUser(request: NextRequest): UserJWTPayload | null {
 
 // 验证用户是否登录
 export function requireAuth(request: NextRequest): { user: UserJWTPayload; response: null } | { user: null; response: NextResponse } {
-  const user = getCurrentUser(request);
-  
+  const token = extractTokenFromHeader(request) || extractTokenFromCookie(request);
+
+  if (!token) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { success: false, error: 'AUTH_TOKEN_MISSING', message: 'Unauthorized - Please login' },
+        { status: 401 }
+      )
+    };
+  }
+
+  const user = verifyToken(token);
+
   if (!user) {
     return {
       user: null,
       response: NextResponse.json(
-        { success: false, error: 'Unauthorized - Please login' },
+        { success: false, error: 'AUTH_TOKEN_INVALID', message: 'Unauthorized - Token invalid or expired' },
         { status: 401 }
       )
     };

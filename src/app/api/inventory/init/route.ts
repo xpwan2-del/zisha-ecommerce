@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { createInventoryTransaction, InventoryTransactionCode } from '@/lib/inventory-transactions';
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 
 /**
  * ============================================================
@@ -35,6 +37,9 @@ function calculateStatusId(quantity: number): number {
 }
 
 export async function POST(request: NextRequest) {
+  const authResult = checkAdminAuth(request);
+  if (authResult.response) return authResult.response;
+
   logMonitor('INVENTORY', 'REQUEST', {
     method: 'POST',
     path: '/api/inventory/init'
@@ -98,17 +103,19 @@ export async function POST(request: NextRequest) {
         [productId, productName, stock, statusId]
       );
 
-      const typeResult = await query('SELECT id FROM transaction_type WHERE code = ?', ['self_estock']);
-      const transactionTypeId = typeResult.rows[0]?.id || 14;
-
-      await query(
-        `INSERT INTO inventory_transactions (
-          product_id, product_name, transaction_type_id, quantity_change,
-          quantity_before, quantity_after, reason, reference_type,
-          operator_name, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [productId, productName, transactionTypeId, stock, 0, stock, '库存初始化', 'init', operator_name]
-      );
+      await createInventoryTransaction({
+        productId,
+        productName,
+        transactionTypeCode: InventoryTransactionCode.SELF_RESTOCK,
+        quantityChange: stock,
+        quantityBefore: 0,
+        quantityAfter: stock,
+        reason: '库存初始化',
+        referenceType: 'init',
+        referenceId: productId,
+        operatorId: null,
+        operatorName: operator_name,
+      });
 
       results.push({
         product_id: productId,

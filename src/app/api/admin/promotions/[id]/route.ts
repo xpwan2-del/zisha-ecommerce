@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { recordAdminAuditLog } from '@/lib/admin-audit';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -72,6 +73,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await query(`UPDATE promotions SET ${updates.join(', ')} WHERE id = ?`, paramsArr);
 
     const updated = await query('SELECT * FROM promotions WHERE id = ?', [promoId]);
+
+    await recordAdminAuditLog({
+      request,
+      module: 'PRODUCTS',
+      action: 'UPDATE_PROMOTION',
+      description: '管理员更新促销活动',
+      operator: auth.user.name || 'Admin',
+      status: 'success',
+      resourceId: promoId,
+      resourceType: 'promotion',
+      riskLevel: 'critical',
+      metadata: {
+        name: updated.rows[0].name,
+        changes: body,
+      },
+    });
+
     logApiSuccess('PRODUCTS', 'UPDATE_PROMOTION', { promoId, name: updated.rows[0].name });
     return createSuccessResponse(updated.rows[0]);
   } catch (error) {
@@ -89,9 +107,29 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const promoId = parseInt(id);
     logApiRequest('PRODUCTS', 'DELETE', `/api/admin/promotions/${promoId}`);
 
+    const existing = await query('SELECT * FROM promotions WHERE id = ?', [promoId]);
+    if (existing.rows.length === 0) return createErrorResponse('NOT_FOUND', 404);
+
     await query('DELETE FROM product_promotions WHERE promotion_id = ?', [promoId]);
     await query('DELETE FROM promotion_stats WHERE promotion_id = ?', [promoId]);
     await query('DELETE FROM promotions WHERE id = ?', [promoId]);
+
+    await recordAdminAuditLog({
+      request,
+      module: 'PRODUCTS',
+      action: 'DELETE_PROMOTION',
+      description: '管理员删除促销活动',
+      operator: auth.user.name || 'Admin',
+      status: 'success',
+      resourceId: promoId,
+      resourceType: 'promotion',
+      riskLevel: 'critical',
+      metadata: {
+        name: existing.rows[0].name,
+        status: existing.rows[0].status,
+        type: existing.rows[0].type,
+      },
+    });
 
     logApiSuccess('PRODUCTS', 'DELETE_PROMOTION', { promoId });
     return createSuccessResponse({ message: '促销活动已删除' });

@@ -1,5 +1,7 @@
 "use client";
 
+import Image from 'next/image';
+import Link from 'next/link';
 import { useTranslation } from "react-i18next";
 
 export function Hero() {
@@ -24,18 +26,18 @@ export function Hero() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <a 
+              <Link 
                 href="/products" 
                 className="btn-primary"
               >
                 {t('hero.cta')}
-              </a>
-              <a 
+              </Link>
+              <Link 
                 href="/customize" 
                 className="border border-border hover:border-accent text-dark dark:text-white dark:border-gray-600 dark:hover:border-gray-400 py-3 px-6 rounded-md font-medium transition-colors duration-200 flex items-center justify-center"
               >
                 {t('hero.explore')}
-              </a>
+              </Link>
             </div>
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-sm text-gray-500 dark:text-gray-400">
@@ -62,9 +64,11 @@ export function Hero() {
           
           <div className="relative">
             <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden shadow-xl">
-              <img 
-                src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot%20collection%20on%20wooden%20table%20with%20traditional%20chinese%20tea%20set%20elegant%20professional%20photography&image_size=landscape_16_9" 
-                alt="Zisha Pottery Collection" 
+              <Image
+                src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20zisha%20teapot%20collection%20on%20wooden%20table%20with%20traditional%20chinese%20tea%20set%20elegant%20professional%20photography&image_size=landscape_16_9"
+                alt="Zisha Pottery Collection"
+                width={1280}
+                height={720}
                 className="object-cover w-full h-full"
               />
             </div>

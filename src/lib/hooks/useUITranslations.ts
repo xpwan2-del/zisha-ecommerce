@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { getTranslationResources, type TranslationResources } from "@/i18n/i18n";
 
 interface TranslationCache {
   [key: string]: {
@@ -12,6 +13,35 @@ interface TranslationCache {
 }
 
 const cache: TranslationCache = {};
+
+function normalizeTranslationMap(data: TranslationResources): TranslationCache {
+  const dbTranslations: TranslationCache = {};
+
+  const languages: Array<keyof TranslationCache[string]> = ["zh", "en", "ar"];
+
+  languages.forEach((lang) => {
+    const languagePack = data[lang];
+    if (!languagePack) {
+      return;
+    }
+
+    Object.entries(languagePack).forEach(([namespace, values]) => {
+      if (!values || typeof values !== "object") {
+        return;
+      }
+
+      Object.entries(values).forEach(([key, value]) => {
+        const fullKey = `${namespace}.${key}`;
+        if (!dbTranslations[fullKey]) {
+          dbTranslations[fullKey] = { zh: "", en: "", ar: "" };
+        }
+        dbTranslations[fullKey][lang] = typeof value === "string" ? value : "";
+      });
+    });
+  });
+
+  return dbTranslations;
+}
 
 export function useUITranslations() {
   const { i18n } = useTranslation();
@@ -29,57 +59,14 @@ export function useUITranslations() {
 
       setIsLoading(true);
       try {
-        const response = await fetch("/api/translations");
-        if (response.ok) {
-          const data = await response.json();
-
-          const dbTranslations: TranslationCache = {};
-
-          if (data.zh) {
-            Object.entries(data.zh).forEach(([namespace, values]: [string, any]) => {
-              if (typeof values === "object") {
-                Object.entries(values).forEach(([key, value]: [string, any]) => {
-                  const fullKey = `${namespace}.${key}`;
-                  if (!dbTranslations[fullKey]) {
-                    dbTranslations[fullKey] = { zh: "", en: "", ar: "" };
-                  }
-                  dbTranslations[fullKey].zh = value;
-                });
-              }
-            });
-          }
-
-          if (data.en) {
-            Object.entries(data.en).forEach(([namespace, values]: [string, any]) => {
-              if (typeof values === "object") {
-                Object.entries(values).forEach(([key, value]: [string, any]) => {
-                  const fullKey = `${namespace}.${key}`;
-                  if (!dbTranslations[fullKey]) {
-                    dbTranslations[fullKey] = { zh: "", en: "", ar: "" };
-                  }
-                  dbTranslations[fullKey].en = value;
-                });
-              }
-            });
-          }
-
-          if (data.ar) {
-            Object.entries(data.ar).forEach(([namespace, values]: [string, any]) => {
-              if (typeof values === "object") {
-                Object.entries(values).forEach(([key, value]: [string, any]) => {
-                  const fullKey = `${namespace}.${key}`;
-                  if (!dbTranslations[fullKey]) {
-                    dbTranslations[fullKey] = { zh: "", en: "", ar: "" };
-                  }
-                  dbTranslations[fullKey].ar = value;
-                });
-              }
-            });
-          }
-
-          Object.assign(cache, dbTranslations);
-          setTranslations(dbTranslations);
+        const data = await getTranslationResources();
+        if (!data) {
+          return;
         }
+
+        const dbTranslations = normalizeTranslationMap(data);
+        Object.assign(cache, dbTranslations);
+        setTranslations(dbTranslations);
       } catch (error) {
         console.error("Failed to load UI translations:", error);
       } finally {
@@ -90,15 +77,18 @@ export function useUITranslations() {
     loadTranslations();
   }, []);
 
-  const t = useCallback((key: string, fallback?: string): string => {
-    const cached = cache[key];
-    if (cached) {
-      if (currentLang === "zh") return cached.zh || fallback || key;
-      if (currentLang === "ar") return cached.ar || cached.en || fallback || key;
-      return cached.en || fallback || key;
-    }
-    return fallback || key;
-  }, [currentLang]);
+  const t = useCallback(
+    (key: string, fallback?: string): string => {
+      const cached = cache[key];
+      if (cached) {
+        if (currentLang === "zh") return cached.zh || fallback || key;
+        if (currentLang === "ar") return cached.ar || cached.en || fallback || key;
+        return cached.en || fallback || key;
+      }
+      return fallback || key;
+    },
+    [currentLang]
+  );
 
   return { t, translations, isLoading };
 }

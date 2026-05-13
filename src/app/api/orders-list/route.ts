@@ -106,8 +106,8 @@ export async function GET(request: NextRequest) {
 
     if (order_status) {
       if (order_status === 'refund') {
-        ordersSql += ' AND o.order_status IN (?, ?)';
-        params.push('refunding', 'refunded');
+        ordersSql += ' AND o.order_status IN (?, ?, ?)';
+        params.push('refunding_payment', 'refunding', 'refunded');
       } else {
         ordersSql += ' AND o.order_status = ?';
         params.push(order_status);
@@ -189,8 +189,8 @@ export async function GET(request: NextRequest) {
 
     if (order_status) {
       if (order_status === 'refund') {
-        countSql += ' AND order_status IN (?, ?)';
-        countParams.push('refunding', 'refunded');
+        countSql += ' AND order_status IN (?, ?, ?)';
+        countParams.push('refunding_payment', 'refunding', 'refunded');
       } else {
         countSql += ' AND order_status = ?';
         countParams.push(order_status);

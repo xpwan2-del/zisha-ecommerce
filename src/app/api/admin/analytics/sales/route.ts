@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
               COUNT(*) as order_count,
               COALESCE(SUM(final_amount), 0) as total_revenue,
               COALESCE(AVG(final_amount), 0) as avg_order_value
-       FROM orders GROUP BY period ORDER BY period DESC LIMIT 24`
+       FROM orders
+       WHERE order_status NOT IN ('cancelled', 'refunded')
+       GROUP BY period ORDER BY period DESC LIMIT 24`
     );
 
     logApiSuccess('API', 'GET_SALES_ANALYTICS');

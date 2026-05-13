@@ -9,9 +9,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const queries = await Promise.all([
-      query(`SELECT COUNT(*) as count, COALESCE(SUM(final_amount), 0) as amount FROM orders WHERE DATE(created_at) = DATE('now')`),
-      query(`SELECT COUNT(*) as count, COALESCE(SUM(final_amount), 0) as amount FROM orders WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')`),
-      query(`SELECT COUNT(*) as count FROM orders WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now', '-1 month')`),
+      query(`SELECT COUNT(*) as count, COALESCE(SUM(final_amount), 0) as amount FROM orders WHERE DATE(created_at) = DATE('now') AND order_status NOT IN ('cancelled', 'refunded')`),
+      query(`SELECT COUNT(*) as count, COALESCE(SUM(final_amount), 0) as amount FROM orders WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now') AND order_status NOT IN ('cancelled', 'refunded')`),
+      query(`SELECT COUNT(*) as count FROM orders WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now', '-1 month') AND order_status NOT IN ('cancelled', 'refunded')`),
       query(`SELECT COUNT(*) as count FROM users`),
       query(`SELECT COUNT(*) as count FROM products`),
       query(`SELECT COUNT(*) as count FROM inventory WHERE quantity <= 5 AND quantity > 0`),

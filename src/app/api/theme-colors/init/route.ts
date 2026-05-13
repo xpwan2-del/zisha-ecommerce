@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 /**
  * @api {GET} /api/theme-colors/init 初始化主题颜色表
  * @apiName InitThemeColorsTable
@@ -10,6 +11,9 @@ import { logMonitor } from '@/lib/utils/logger';
 
 
 export async function POST(request: NextRequest) {
+  const authResult = checkAdminAuth(request);
+  if (authResult.response) return authResult.response;
+
   try {
     logMonitor('THEME_COLORS', 'REQUEST', { method: 'POST', action: 'INIT_THEME_COLORS' });
     const tableExistsResult = await query("SELECT name FROM sqlite_master WHERE type='table' AND name='theme_color_configs'");
@@ -53,7 +57,17 @@ export async function POST(request: NextRequest) {
       { theme: "chinese", key: "inventoryStatus_inStock", value: "#16A34A" },
       { theme: "chinese", key: "inventoryStatus_limited", value: "#F97316" },
       { theme: "chinese", key: "inventoryStatus_lowStock", value: "#DC2626" },
-      { theme: "chinese", key: "inventoryStatus_outOfStock", value: "#DC2626" },
+      { theme: "chinese", key: "reviewFeedbackSuccessBg", value: "#ECFDF5" },
+      { theme: "chinese", key: "reviewFeedbackSuccessBorder", value: "#86EFAC" },
+      { theme: "chinese", key: "reviewFeedbackSuccessText", value: "#14532D" },
+      { theme: "chinese", key: "reviewFeedbackIconBg", value: "#16A34A" },
+      { theme: "chinese", key: "reviewFeedbackIconText", value: "#FFFFFF" },
+      { theme: "chinese", key: "reviewFeedbackBadgeBg", value: "#16A34A" },
+      { theme: "chinese", key: "reviewFeedbackBadgeText", value: "#FFFFFF" },
+      { theme: "chinese", key: "reviewFeedbackErrorBg", value: "#FEF2F2" },
+      { theme: "chinese", key: "reviewFeedbackErrorBorder", value: "#FCA5A5" },
+      { theme: "chinese", key: "reviewFeedbackErrorText", value: "#991B1B" },
+      { theme: "chinese", key: "reviewStarActive", value: "#F59E0B" },
 
       { theme: "middleEastern", key: "primary", value: "#5D3B6D" },
       { theme: "middleEastern", key: "secondary", value: "#D4AF37" },
@@ -126,6 +140,17 @@ export async function POST(request: NextRequest) {
       { theme: "middleEasternLuxury", key: "inventoryStatus_limited", value: "#F97316" },
       { theme: "middleEasternLuxury", key: "inventoryStatus_lowStock", value: "#DC2626" },
       { theme: "middleEasternLuxury", key: "inventoryStatus_outOfStock", value: "#DC2626" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackSuccessBg", value: "#FFF7ED" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackSuccessBorder", value: "#D4AF37" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackSuccessText", value: "#422006" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackIconBg", value: "#8B4513" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackIconText", value: "#FFFFFF" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackBadgeBg", value: "#D4AF37" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackBadgeText", value: "#1F2937" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackErrorBg", value: "#FEF2F2" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackErrorBorder", value: "#FCA5A5" },
+      { theme: "middleEasternLuxury", key: "reviewFeedbackErrorText", value: "#991B1B" },
+      { theme: "middleEasternLuxury", key: "reviewStarActive", value: "#D4AF37" },
     ];
 
     for (const config of defaultConfigs) {

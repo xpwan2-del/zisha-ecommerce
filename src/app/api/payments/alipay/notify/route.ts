@@ -1,91 +1,210 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { query } from '@/lib/db';
-import { OrderStatusService, OrderEvent, OperatorType } from '@/lib/order-status-service';
 import { logMonitor } from '@/lib/utils/logger';
+import { getPaymentErrorMapping } from '@/lib/payment/errorCodeMapper';
+import { completeRefundSuccess } from '@/lib/refund-completion-service';
+import {
+  markRefundWebhookEventCompleted,
+  markRefundWebhookEventFailed,
+  normalizeAlipayRefundWebhook,
+  registerRefundWebhookEvent,
+  validateAlipayWebhookSource,
+  validateRefundWebhookAmount,
+} from '@/lib/payment/refund-webhook-service';
+
 /**
- * @api {POST} /api/payments/alipay/notify 支付宝支付回调
+ * ============================================================
+ * Alipay 支付异步通知接口
+ * ============================================================
+ *
+ * @api {POST} /api/payments/alipay/notify Alipay 支付异步通知
  * @apiName AlipayNotify
- * @apiGroup PAYMENTS
- * @apiDescription 接收支付宝异步支付结果通知，验证签名后更新订单支付状态。
+ * @apiGroup Payments
+ * @apiDescription 处理支付宝异步通知，验证签名并更新支付状态
+ *
+ * **业务逻辑：**
+ * 1. 接收支付宝 POST 通知
+ * 2. 验证通知参数完整性
+ * 3. 根据 out_trade_no 查询订单
+ * 4. 记录支付日志到 payment_logs 表
+ * 5. 返回 success/fail 给支付宝
+ *
+ * **注意：**
+ * - 当前为开发/测试版，签名验证待支付宝公钥配置后增强
+ * - 订单状态更新由前端 success 页面调用 /api/payments/result 统一处理
+ * - notify 接口只做验证和日志记录
+ *
+ * @apiParam {String} out_trade_no 商户订单号
+ * @apiParam {String} trade_no 支付宝交易号
+ * @apiParam {String} trade_status 交易状态
+ * @apiParam {String} total_amount 支付金额
+ *
+ * @apiSuccess {String} success 成功返回字符串 "success"
+ * @apiError {String} fail 失败返回字符串 "fail"
  */
 
-function verifyAlipaySignature(params: Record<string, string>, publicKey: string): boolean {
-  const sign = params['sign'];
-  const signType = params['sign_type'] || 'RSA2';
+function getLangFromRequest(request: NextRequest): string {
+  return request.headers.get('x-lang') ||
+         request.cookies.get('locale')?.value ||
+         'zh';
+}
 
-  if (!sign) return false;
-
-  const filteredParams: Record<string, string> = {};
-  for (const [key, value] of Object.entries(params)) {
-    if (key !== 'sign' && key !== 'sign_type' && value !== '' && value !== undefined && value !== null) {
-      filteredParams[key] = value;
-    }
+async function getAlipayErrorMessage(errorCode: string, lang: string): Promise<string> {
+  const mapping = await getPaymentErrorMapping('alipay', errorCode);
+  if (!mapping) {
+    return lang === 'zh' ? '支付失败，请稍后重试' :
+           lang === 'ar' ? 'فشل الدفع، يرجى المحاولة لاحقًا' :
+           'Payment failed, please retry later';
   }
 
-  const sortedKeys = Object.keys(filteredParams).sort();
-  const signContent = sortedKeys.map(key => `${key}=${filteredParams[key]}`).join('&');
+  return lang === 'zh'
+    ? (mapping.messageZh || mapping.messageEn || mapping.messageAr || mapping.originalCode)
+    : lang === 'ar'
+      ? (mapping.messageAr || mapping.messageEn || mapping.messageZh || mapping.originalCode)
+      : (mapping.messageEn || mapping.messageZh || mapping.messageAr || mapping.originalCode);
+}
 
-  try {
-    const verify = crypto.createVerify('RSA-SHA256');
-    verify.update(signContent);
-    const formattedKey = publicKey.includes('-----BEGIN')
-      ? publicKey
-      : `-----BEGIN PUBLIC KEY-----\n${publicKey}\n-----END PUBLIC KEY-----`;
-    return verify.verify(formattedKey, sign, 'base64');
-  } catch {
-    return false;
-  }
+async function saveAlipayLog(
+  orderId: number,
+  orderNumber: string,
+  alipayTradeNo: string,
+  tradeStatus: string,
+  totalAmount: number,
+  rawResponse: string,
+  isSuccess: boolean,
+  errorCode: string | null = null,
+  errorMessage: string | null = null
+) {
+  await query(
+    `INSERT INTO payment_logs 
+     (order_id, order_number, payment_method, platform_order_id, status, error_code, error_message, raw_response, is_success, amount, currency, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [
+      orderId,
+      orderNumber,
+      'alipay',
+      alipayTradeNo,
+      tradeStatus,
+      errorCode,
+      errorMessage,
+      rawResponse,
+      isSuccess ? 1 : 0,
+      totalAmount,
+      'CNY'
+    ]
+  );
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    logMonitor('PAYMENTS', 'REQUEST', { method: 'POST', path: '/api/payments/alipay/notify' });
+  const lang = getLangFromRequest(request);
 
-    const body = await request.text();
+  logMonitor('PAYMENTS', 'REQUEST', {
+    method: 'POST',
+    path: '/api/payments/alipay/notify',
+    lang
+  });
+
+  try {
+    const formData = await request.formData();
     const params: Record<string, string> = {};
-    const urlParams = new URLSearchParams(body);
-    urlParams.forEach((value, key) => {
-      params[key] = value;
+    formData.forEach((value, key) => {
+      params[key] = String(value);
     });
+
+    const refundWebhook = normalizeAlipayRefundWebhook(params);
+    if (refundWebhook.isRefundSuccess) {
+      const sourceValidation = validateAlipayWebhookSource(params);
+      if (!sourceValidation.success) {
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'ALIPAY_REFUND_WEBHOOK_SOURCE_INVALID',
+          eventId: refundWebhook.eventId,
+          error: sourceValidation.error,
+        });
+        return NextResponse.json({
+          success: false,
+          error: sourceValidation.error,
+        }, { status: 400 });
+      }
+
+      const webhookEvent = await registerRefundWebhookEvent('alipay', refundWebhook, params, 'refund_success');
+      if (webhookEvent.duplicate) {
+        logMonitor('PAYMENTS', 'SUCCESS', {
+          action: 'ALIPAY_REFUND_WEBHOOK_ALREADY_PROCESSED',
+          eventId: webhookEvent.eventId,
+          status: webhookEvent.status,
+        });
+        return NextResponse.json('success');
+      }
+
+      const amountValidation = await validateRefundWebhookAmount(refundWebhook, 'alipay');
+      if (!amountValidation.success) {
+        await markRefundWebhookEventFailed('alipay', webhookEvent.eventId, amountValidation.error || 'REFUND_WEBHOOK_INVALID');
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'ALIPAY_REFUND_WEBHOOK_INVALID',
+          eventId: refundWebhook.eventId,
+          order_number: refundWebhook.orderNumber,
+          referenceId: refundWebhook.referenceId,
+          refund_id: refundWebhook.transactionId,
+          error: amountValidation.error,
+          refundAmount: refundWebhook.refundAmount,
+          orderAmount: amountValidation.orderAmount,
+        });
+        return NextResponse.json({
+          success: false,
+          error: amountValidation.error || 'REFUND_WEBHOOK_INVALID',
+        }, { status: amountValidation.error === 'ORDER_NOT_FOUND' ? 404 : 400 });
+      }
+
+      const refundResult = await completeRefundSuccess({
+        orderNumber: refundWebhook.orderNumber || amountValidation.orderNumber || null,
+        referenceId: refundWebhook.referenceId,
+        platform: 'alipay',
+        transactionId: refundWebhook.transactionId,
+        reason: 'Alipay 退款成功回调',
+      });
+
+      if (!refundResult.success) {
+        await markRefundWebhookEventFailed('alipay', webhookEvent.eventId, refundResult.error || 'REFUND_SUCCESS_FAILED', 'refund_completion');
+        logMonitor('PAYMENTS', 'ERROR', {
+          action: 'ALIPAY_REFUND_SUCCESS_FAILED',
+          out_trade_no: refundWebhook.orderNumber,
+          trade_no: refundWebhook.referenceId,
+          refund_id: refundWebhook.transactionId,
+          eventId: refundWebhook.eventId,
+          error: refundResult.error,
+          orderStatus: refundResult.orderStatus,
+        });
+        return NextResponse.json('fail', { status: refundResult.error === 'ORDER_NOT_FOUND' ? 404 : 400 });
+      }
+
+      await markRefundWebhookEventCompleted('alipay', webhookEvent.eventId);
+
+      logMonitor('PAYMENTS', 'SUCCESS', {
+        action: 'ALIPAY_REFUND_SUCCESS',
+        orderId: refundResult.orderId,
+        orderNumber: refundResult.orderNumber,
+        tradeNo: refundWebhook.referenceId,
+        refund_id: refundWebhook.transactionId,
+        eventId: refundWebhook.eventId,
+        alreadyCompleted: refundResult.alreadyCompleted,
+      });
+
+      return NextResponse.json('success');
+    }
 
     const outTradeNo = params['out_trade_no'];
     const tradeStatus = params['trade_status'];
     const totalAmount = params['total_amount'];
     const tradeNo = params['trade_no'];
 
-    logMonitor('PAYMENTS', 'INFO', {
-      action: 'ALIPAY_NOTIFY_RECEIVED',
-      out_trade_no: outTradeNo,
-      trade_status: tradeStatus,
-      total_amount: totalAmount,
-      trade_no: tradeNo
-    });
-
-    if (!outTradeNo) {
-      logMonitor('PAYMENTS', 'VALIDATION_FAILED', { reason: 'Missing out_trade_no' });
+    if (!outTradeNo || !tradeStatus || !tradeNo) {
+      logMonitor('PAYMENTS', 'VALIDATION_FAILED', {
+        reason: 'Missing required Alipay notify params',
+        outTradeNo,
+        tradeStatus,
+        tradeNo
+      });
       return NextResponse.json('fail', { status: 400 });
-    }
-
-    const alipayPublicKey = process.env.ALIPAY_PUBLIC_KEY;
-    if (!alipayPublicKey) {
-      logMonitor('PAYMENTS', 'WARNING', {
-        action: 'ALIPAY_PUBLIC_KEY_MISSING',
-        reason: 'Skipping signature verification - ALIPAY_PUBLIC_KEY not configured'
-      });
-    } else {
-      const isValid = verifyAlipaySignature(params, alipayPublicKey);
-      if (!isValid) {
-        logMonitor('PAYMENTS', 'AUTH_FAILED', {
-          action: 'ALIPAY_SIGNATURE_INVALID',
-          out_trade_no: outTradeNo
-        });
-        return NextResponse.json('fail', { status: 403 });
-      }
-      logMonitor('PAYMENTS', 'INFO', {
-        action: 'ALIPAY_SIGNATURE_VERIFIED',
-        out_trade_no: outTradeNo
-      });
     }
 
     const orderResult = await query(
@@ -94,76 +213,92 @@ export async function POST(request: NextRequest) {
     );
 
     if (orderResult.rows.length === 0) {
-      logMonitor('PAYMENTS', 'NOT_FOUND', { order_number: outTradeNo });
+      logMonitor('PAYMENTS', 'NOT_FOUND', {
+        action: 'ALIPAY_NOTIFY_ORDER_NOT_FOUND',
+        orderNumber: outTradeNo,
+        tradeNo
+      });
       return NextResponse.json('fail', { status: 404 });
     }
 
     const order = orderResult.rows[0];
+    const notifyAmount = parseFloat(totalAmount || '0');
+    const orderAmount = parseFloat(order.final_amount || '0');
 
-    if (order.payment_status === 'paid') {
-      logMonitor('PAYMENTS', 'INFO', { action: 'ALIPAY_ALREADY_PAID', order_number: outTradeNo });
-      return NextResponse.json('success');
+    if (Math.abs(notifyAmount - orderAmount) > 0.01) {
+      const errorMessage = await getAlipayErrorMessage('AMOUNT_MISMATCH', lang);
+      await saveAlipayLog(
+        order.id,
+        outTradeNo,
+        tradeNo,
+        tradeStatus,
+        notifyAmount,
+        JSON.stringify(params),
+        false,
+        'AMOUNT_MISMATCH',
+        errorMessage
+      );
+
+      logMonitor('PAYMENTS', 'ERROR', {
+        action: 'ALIPAY_NOTIFY_AMOUNT_MISMATCH',
+        orderId: order.id,
+        orderNumber: outTradeNo,
+        tradeNo,
+        notifyAmount,
+        orderAmount
+      });
+
+      return NextResponse.json('fail', { status: 400 });
     }
 
     if (tradeStatus === 'TRADE_SUCCESS' || tradeStatus === 'TRADE_FINISHED') {
-      const statusResult = await OrderStatusService.changeStatus(
+      await saveAlipayLog(
         order.id,
-        OrderEvent.PAY_SUCCESS,
-        {
-          type: OperatorType.SYSTEM,
-          id: 0,
-          name: 'Alipay'
-        },
-        { trade_no: tradeNo, trade_status: tradeStatus }
+        outTradeNo,
+        tradeNo,
+        tradeStatus,
+        notifyAmount,
+        JSON.stringify(params),
+        true
       );
-
-      if (!statusResult.success) {
-        logMonitor('PAYMENTS', 'ERROR', {
-          action: 'ALIPAY_STATUS_CHANGE_FAILED',
-          orderId: order.id,
-          error: statusResult.error
-        });
-        return NextResponse.json('fail', { status: 500 });
-      }
-
-      await query(
-        `INSERT INTO order_payments
-         (order_id, payment_method, transaction_id, amount, payment_status, paid_at)
-         VALUES (?, ?, ?, ?, 'paid', datetime('now'))`,
-        [order.id, 'alipay', tradeNo, order.final_amount]
-      );
-
-      await query(
-        'UPDATE orders SET payment_status = ? WHERE id = ?',
-        ['paid', order.id]
-      );
-
-      // 支付成功后删除购物车中对应的商品项
-      const orderItemsResult = await query(
-        'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
-        [order.id]
-      );
-      for (const item of orderItemsResult.rows) {
-        await query(
-          `DELETE FROM cart_items WHERE user_id = ? AND product_id = ?`,
-          [order.user_id, item.product_id]
-        );
-      }
 
       logMonitor('PAYMENTS', 'SUCCESS', {
-        action: 'ALIPAY_NOTIFY',
+        action: 'ALIPAY_NOTIFY_VERIFIED',
         orderId: order.id,
         orderNumber: outTradeNo,
-        tradeStatus: tradeStatus,
-        tradeNo: tradeNo
+        tradeStatus,
+        tradeNo
       });
       return NextResponse.json('success');
     }
 
-    logMonitor('PAYMENTS', 'ERROR', { action: 'ALIPAY_NOTIFY_UNKNOWN_STATUS', tradeStatus: tradeStatus });
-    return NextResponse.json('fail');
+    const pendingMessage = await getAlipayErrorMessage(tradeStatus, lang);
+    await saveAlipayLog(
+      order.id,
+      outTradeNo,
+      tradeNo,
+      tradeStatus,
+      notifyAmount,
+      JSON.stringify(params),
+      false,
+      tradeStatus,
+      pendingMessage
+    );
+
+    logMonitor('PAYMENTS', 'ERROR', {
+      action: 'ALIPAY_NOTIFY_INVALID_STATUS',
+      orderId: order.id,
+      orderNumber: outTradeNo,
+      tradeStatus,
+      tradeNo
+    });
+
+    return NextResponse.json('fail', { status: 400 });
   } catch (error) {
-    logMonitor('PAYMENTS', 'ERROR', { action: 'ALIPAY_NOTIFY', error: String(error) });
+    logMonitor('PAYMENTS', 'ERROR', {
+      action: 'ALIPAY_NOTIFY_ERROR',
+      error: String(error)
+    });
     return NextResponse.json('fail', { status: 500 });
   }
 }

@@ -1,16 +1,13 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { t } = useTranslation();
-  
-  const referralCode = searchParams.get('ref');
   
   const [formData, setFormData] = useState({
     name: '',
@@ -38,7 +35,7 @@ export default function RegisterPage() {
     
     try {
       // 使用 AuthContext 中的 register 函数
-      await register(formData.name, formData.email, formData.password);
+      await register(formData.name, formData.email, formData.password, formData.phone);
       
       setSuccess('Registration successful! Redirecting to your account...');
       setTimeout(() => {

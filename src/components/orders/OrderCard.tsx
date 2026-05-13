@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OrderStatusBadge } from './OrderStatusBadge';
 
@@ -32,12 +33,14 @@ export interface Order {
 interface OrderCardProps {
   order: Order;
   onViewDetails?: (order: Order) => void;
+  onStatusChange?: () => void;
 }
 
-export function OrderCard({ order, onViewDetails }: OrderCardProps) {
+export function OrderCard({ order, onViewDetails, onStatusChange }: OrderCardProps) {
   const router = useRouter();
   const firstItem = order.items?.[0];
   const itemCount = order.items?.length || 0;
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const handleViewDetails = () => {
     if (onViewDetails) {
@@ -49,6 +52,35 @@ export function OrderCard({ order, onViewDetails }: OrderCardProps) {
 
   const handleCardClick = () => {
     handleViewDetails();
+  };
+
+  const handleConfirmReceipt = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (isConfirming) return;
+    if (!confirm('确认已收到商品吗？确认后订单将进入待评价状态。')) return;
+
+    setIsConfirming(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/confirm`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        if (onStatusChange) {
+          onStatusChange();
+        } else {
+          router.refresh();
+        }
+      } else {
+        alert(data.error || '确认收货失败');
+      }
+    } catch {
+      alert('确认收货请求失败');
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -78,7 +110,8 @@ export function OrderCard({ order, onViewDetails }: OrderCardProps) {
           </>
         );
       case 'paid':
-      case 'processing':
+      case 'delivered':
+      case 'completed':
         return (
           <button className="px-4 py-2 border rounded-lg text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50"
             style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
@@ -88,35 +121,19 @@ export function OrderCard({ order, onViewDetails }: OrderCardProps) {
       case 'shipped':
         return (
           <>
-            <button className="px-4 py-2 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors"
-              style={{ backgroundColor: 'var(--accent)' }}>
-              确认收货
+            <button
+              onClick={handleConfirmReceipt}
+              disabled={isConfirming}
+              className="px-4 py-2 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors disabled:opacity-50"
+              style={{ backgroundColor: 'var(--accent)' }}
+            >
+              {isConfirming ? '确认中...' : '确认收货'}
             </button>
             <button className="px-4 py-2 border rounded-lg text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50"
               style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
               再次购买
             </button>
           </>
-        );
-      case 'reviewing':
-        return (
-          <>
-            <button className="px-4 py-2 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors"
-              style={{ backgroundColor: 'var(--accent)' }}>
-              去评价
-            </button>
-            <button className="px-4 py-2 border rounded-lg text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50"
-              style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
-              再次购买
-            </button>
-          </>
-        );
-      case 'completed':
-        return (
-          <button className="px-4 py-2 border rounded-lg text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50"
-            style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
-            再次购买
-          </button>
         );
       default:
         return null;

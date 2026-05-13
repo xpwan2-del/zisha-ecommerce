@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { logMonitor } from '@/lib/utils/logger';
+import { checkAdminAuth } from '@/lib/admin-helpers';
 
 /**
  * ============================================================
@@ -30,6 +31,9 @@ export async function POST(
     method: 'POST',
     path: '/api/inventory/checks/[id]/items'
   });
+
+  const auth = checkAdminAuth(request);
+  if (auth.response) return auth.response;
 
   try {
     const { id } = await params;

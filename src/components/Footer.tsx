@@ -2,6 +2,8 @@
 
 import { useTranslation } from "react-i18next";
 
+import Link from 'next/link';
+
 export function Footer() {
   const { t } = useTranslation();
   const links = t('footer.links', { returnObjects: true }) as { home: string; shop: string; about: string; contact: string };
@@ -33,24 +35,24 @@ export function Footer() {
           </h4>
           <ul className="space-y-4">
             <li>
-              <a href="/" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
+              <Link href="/" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
                 {links.home || '首页'}
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/products" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
+              <Link href="/products" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
                 {links.shop || '所有商品'}
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/about" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
+              <Link href="/about" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
                 {links.about || '关于我们'}
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/contact" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
+              <Link href="/contact" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
                 {links.contact || '联系我们'}
-              </a>
+              </Link>
             </li>
           </ul>
         </div>
@@ -62,24 +64,24 @@ export function Footer() {
           </h4>
           <ul className="space-y-4">
             <li>
-              <a href="/products?category=1" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
+              <Link href="/products?category=1" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
                 茶壶
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/products?category=2" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
+              <Link href="/products?category=2" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
                 茶杯
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/products?category=3" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
+              <Link href="/products?category=3" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
                 配件
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/products?category=4" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
+              <Link href="/products?category=4" className="text-text-muted hover:text-accent transition-colors duration-300 text-sm">
                 套装
-              </a>
+              </Link>
             </li>
           </ul>
         </div>

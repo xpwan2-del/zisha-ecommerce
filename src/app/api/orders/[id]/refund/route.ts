@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { logMonitor } from '@/lib/utils/logger';
+import { OrderEvent, OrderStatusService } from '@/lib/order-status-service';
 
 /**
  * ============================================================
@@ -108,10 +109,28 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('INVALID_STATUS', lang, 400);
     }
 
-    await query(
-      `UPDATE orders SET order_status = 'refunding', updated_at = datetime('now') WHERE id = ?`,
-      [orderId]
+    const statusChange = await OrderStatusService.changeStatus(
+      Number(orderId),
+      OrderEvent.REFUND_REQUEST,
+      {
+        type: 'user',
+        id: userId,
+        name: authResult.user?.name || 'User',
+      },
+      {
+        reason: '用户申请退款',
+        refundFromStatus: order.order_status,
+      }
     );
+
+    if (!statusChange.success) {
+      logMonitor('ORDERS', 'VALIDATION_FAILED', {
+        reason: statusChange.error,
+        orderId,
+        orderStatus: order.order_status
+      });
+      return createErrorResponse('INVALID_STATUS', lang, 400);
+    }
 
     logMonitor('ORDERS', 'SUCCESS', {
       action: 'REQUEST_REFUND',
@@ -123,7 +142,7 @@ export async function POST(request: NextRequest) {
     return createSuccessResponse({
       order_id: String(orderId),
       order_number: order.order_number,
-      status: 'refunding'
+      status: 'refunding_payment'
     });
 
   } catch (error) {
