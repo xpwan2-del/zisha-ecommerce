@@ -48,3 +48,4 @@ node_modules
 *.sqlite
 *.sqlite.*
 zishang.db
+!src/lib/db/database.sqlite
