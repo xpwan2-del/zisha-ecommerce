@@ -167,9 +167,10 @@ export async function POST(request: NextRequest) {
     // 检查商品活动是否过期，并计算促销价格
     for (const item of items) {
       const promoCheck = await query(
-        `SELECT pp.id, pp.promotion_id, pp.original_price, pr.name as promo_name, pr.discount_percent, pp.end_time, pp.can_stack, pp.priority
+        `SELECT pp.id, pp.promotion_id, pr.name as promo_name, pr.discount_percent, pp.end_time, pp.can_stack, pp.priority, ppr.price as original_price
          FROM product_promotions pp
          JOIN promotions pr ON pp.promotion_id = pr.id
+         JOIN product_prices ppr ON ppr.product_id = pp.product_id AND ppr.currency = 'USD'
          WHERE pp.product_id = ? AND pp.end_time > datetime('now') AND datetime(pp.start_time) <= datetime('now')`,
         [item.product_id]
       );

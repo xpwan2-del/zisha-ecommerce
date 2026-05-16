@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
-import { query } from '@/lib/db';
 import { checkAdminAuth, createSuccessResponse, createErrorResponse, logApiRequest, logApiSuccess, logApiError } from '@/lib/admin-helpers';
-import { OrderEvent, OrderStatusService } from '@/lib/order-status-service';
+import { RefundService } from '@/lib/payment/refund-service';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = checkAdminAuth(request);
@@ -15,41 +14,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const operatorId = auth.user.userId;
     const operatorName = auth.user.name || 'Admin';
 
-    const order = await query('SELECT * FROM orders WHERE id = ?', [orderId]);
-    if (order.rows.length === 0) return createErrorResponse('NOT_FOUND', 404);
-    const cur = order.rows[0];
-
-    if (cur.order_status !== 'refunding_payment') return createErrorResponse('INVALID_ORDER_STATUS', 400);
-
-    const approveChange = await OrderStatusService.changeStatus(
+    const refundApproval = await RefundService.approveRefund({
       orderId,
-      OrderEvent.REFUND_APPROVE,
-      {
-        type: 'admin',
-        id: operatorId,
-        name: operatorName,
-      },
-      {
-        reason: '管理员同意退款',
-      }
-    );
+      operatorId,
+      operatorName,
+      reason: '管理员同意退款',
+    });
 
-    if (!approveChange.success) {
-      return createErrorResponse('INVALID_ORDER_STATUS', 400);
+    if (!refundApproval.success) {
+      return createErrorResponse(refundApproval.detail || refundApproval.error || 'REFUND_APPROVAL_FAILED', refundApproval.status || 400);
     }
 
     logApiSuccess('ORDERS', 'APPROVE_REFUND', {
       orderId,
-      orderNumber: cur.order_number,
-      approveFromStatus: approveChange.fromStatus,
-      approveToStatus: approveChange.toStatus,
-      paymentMethod: cur.payment_method || null,
+      orderNumber: refundApproval.orderNumber,
+      approveFromStatus: refundApproval.fromStatus,
+      approveToStatus: refundApproval.toStatus,
+      refundPlatform: refundApproval.refundResult?.platform || null,
+      refundId: refundApproval.refundResult?.refundId || null,
+      refundStatus: refundApproval.refundResult?.status || null,
     });
     return createSuccessResponse({
       message: '退款审批已通过，等待支付通道退款结果',
-      order_status: approveChange.toStatus,
+      order_status: refundApproval.toStatus,
       payment_status: 'refunding',
       after_sale_status: 'approved',
+      refund: refundApproval.refundResult,
     });
   } catch (error) {
     logApiError('ORDERS', 'APPROVE_REFUND', error);

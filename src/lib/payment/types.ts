@@ -35,6 +35,27 @@ export interface PaymentRequest {
   extra?: Record<string, string>;
 }
 
+export interface RefundPaymentRequest {
+  orderId: number;
+  orderNumber: string;
+  paymentMethod: string;
+  paymentId?: string | null;
+  referenceId?: string | null;
+  amount: number;
+  currency?: string;
+  reason?: string;
+  operatorId: number;
+  operatorName: string;
+}
+
+export interface RefundPaymentResult {
+  success: boolean;
+  platform: string;
+  refundId?: string | null;
+  status: 'processing' | 'succeeded' | 'failed';
+  raw?: unknown;
+}
+
 export type PaymentGatewayResult =
   | RedirectPaymentResult
   | SdkParamsPaymentResult;
@@ -73,4 +94,8 @@ export interface PaymentAdapter {
     orderData: OrderPaymentData,
     request: PaymentRequest
   ): Promise<PaymentGatewayResult>;
+
+  refundPayment(
+    request: RefundPaymentRequest
+  ): Promise<RefundPaymentResult>;
 }

@@ -260,6 +260,11 @@ function QuickOrderContent() {
     const maxAllowed = product.stock - reservedStock;
     if (quantity >= maxAllowed) return;
 
+    if (currentOrderId?.startsWith('PRODUCT_') && currentOrderDbId === product.id) {
+      setQuantity(prev => prev + 1);
+      return;
+    }
+
     try {
       const response = await fetch('/api/quick-order/inventory', {
         method: 'POST',
@@ -285,6 +290,11 @@ function QuickOrderContent() {
 
   const handleDecrementStock = async () => {
     if (!product || quantity <= 1) return;
+
+    if (currentOrderId?.startsWith('PRODUCT_') && currentOrderDbId === product.id) {
+      setQuantity(prev => prev - 1);
+      return;
+    }
 
     try {
       const response = await fetch('/api/quick-order/inventory', {
@@ -407,8 +417,33 @@ function QuickOrderContent() {
         return;
       }
 
-      const order_number = currentOrderId;
-      const dbOrderId = currentOrderDbId;
+      let order_number = currentOrderId;
+      let dbOrderId = currentOrderDbId;
+
+      if (currentOrderId.startsWith('PRODUCT_')) {
+        const createResponse = await fetch('/api/orders', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [{ product_id: product.id, quantity }],
+            shipping_address_id: selectedAddressId,
+            payment_method: paymentMethod,
+          })
+        });
+
+        const createData = await createResponse.json();
+        if (!createResponse.ok || !createData.success) {
+          setError(createData.message || createData.error || (i18n.language === 'ar' ? 'فشل إنشاء الطلب' : i18n.language === 'en' ? 'Order creation failed' : '订单创建失败'));
+          setIsCreating(false);
+          return;
+        }
+
+        order_number = createData.data.order_number;
+        dbOrderId = createData.data.order_id;
+        setCurrentOrderId(order_number);
+        setCurrentOrderDbId(dbOrderId);
+      }
 
       if (!dbOrderId) {
         setError(i18n.language === 'ar' ? 'الطلب غير موجود، يرجى إعادة الطلب من صفحة تفاصيل المنتج' : i18n.language === 'en' ? 'Order does not exist, please re-order from the product detail page' : '订单不存在，请从商品详情页重新下单');

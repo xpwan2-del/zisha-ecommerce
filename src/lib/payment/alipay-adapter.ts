@@ -1,6 +1,6 @@
 // src/lib/payment/alipay-adapter.ts
 import crypto from 'crypto';
-import { OrderPaymentData, PaymentRequest, RedirectPaymentResult, PaymentAdapter } from './types';
+import { OrderPaymentData, PaymentRequest, RedirectPaymentResult, PaymentAdapter, RefundPaymentRequest, RefundPaymentResult } from './types';
 import { PaymentService } from './PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
 
@@ -158,6 +158,76 @@ export class AlipayAdapter implements PaymentAdapter {
       total_amount: queryResult.total_amount || '0',
       out_trade_no: queryResult.out_trade_no || '',
       trade_no: queryResult.trade_no || '',
+    };
+  }
+
+  async refundPayment(request: RefundPaymentRequest): Promise<RefundPaymentResult> {
+    const { privateKey: alipayPrivateKey, gatewayUrl: alipayGateway, appId: alipayAppId } = parseAlipayConfig();
+
+    if (!alipayPrivateKey) {
+      throw new Error('Alipay private key not configured, cannot refund payment');
+    }
+
+    const outRequestNo = `refund_${request.orderNumber}_${Date.now()}`;
+    const bizContent = JSON.stringify({
+      out_trade_no: request.orderNumber,
+      trade_no: request.referenceId || undefined,
+      refund_amount: request.amount.toFixed(2),
+      refund_reason: request.reason || '管理员同意退款',
+      out_request_no: outRequestNo,
+    });
+
+    const now = new Date();
+    const params: Record<string, string> = {
+      app_id: alipayAppId,
+      method: 'alipay.trade.refund',
+      charset: 'utf-8',
+      sign_type: 'RSA2',
+      timestamp: now.toISOString().split('T')[0] + ' ' + now.toTimeString().split(' ')[0],
+      version: '1.0',
+      biz_content: bizContent,
+    };
+
+    const queryString = new URLSearchParams(params).toString();
+    const sign = this.generateRSA2Sign(queryString, alipayPrivateKey);
+    params.sign = sign;
+
+    logMonitor('PAYMENTS', 'REQUEST', {
+      action: 'ALIPAY_REFUND_REQUEST',
+      orderNumber: request.orderNumber,
+      amount: request.amount,
+      outRequestNo,
+    });
+
+    const response = await fetch(alipayGateway, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    });
+
+    const raw = await response.text();
+    if (!response.ok) {
+      logMonitor('PAYMENTS', 'ERROR', {
+        action: 'ALIPAY_REFUND_FAILED',
+        orderNumber: request.orderNumber,
+        status: response.status,
+        responseText: raw.substring(0, 200),
+      });
+      throw new Error('Alipay refund request failed');
+    }
+
+    logMonitor('PAYMENTS', 'SUCCESS', {
+      action: 'ALIPAY_REFUND_CREATED',
+      orderNumber: request.orderNumber,
+      refundId: outRequestNo,
+    });
+
+    return {
+      success: true,
+      platform: 'alipay',
+      refundId: outRequestNo,
+      status: 'processing',
+      raw,
     };
   }
 

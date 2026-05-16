@@ -4,6 +4,7 @@ import { logMonitor } from '@/lib/utils/logger';
 import { buildPaymentSuccessPersistence } from '@/lib/payment/payment-success-persistence';
 import { AlipayAdapter } from '@/lib/payment/alipay-adapter';
 import { OrderEvent, OrderStatusService } from '@/lib/order-status-service';
+import { buildPaymentResultRedirectPath } from '@/lib/payment/result-redirect';
 
 const alipayAdapter = new AlipayAdapter();
 
@@ -122,10 +123,14 @@ export async function GET(request: NextRequest) {
         orderId, orderNumber, platform, source
       });
 
-      // ============================================================
-      // 核心修改：取消支付后直接跳转到订单详情页，切断回购物车路径
-      // ============================================================
-      return NextResponse.redirect(new URL(`/orders/${orderId}`, request.url));
+      const redirectPath = buildPaymentResultRedirectPath({
+        status: 'cancel',
+        orderId,
+        orderNumber,
+        source,
+        platform: platform || order.payment_method,
+      });
+      return NextResponse.redirect(new URL(redirectPath, request.url));
     }
 
     // === 处理支付成功 ===
@@ -315,14 +320,14 @@ export async function GET(request: NextRequest) {
       orderId, orderNumber, platform: detectedPlatform, transactionId, source
     });
 
-    // 重定向到前端展示页
-    const redirectUrl = new URL('/payment-result', request.url);
-    redirectUrl.searchParams.set('status', 'success');
-    redirectUrl.searchParams.set('order_number', orderNumber);
-    redirectUrl.searchParams.set('source', source);
-    redirectUrl.searchParams.set('platform', detectedPlatform);
-    redirectUrl.searchParams.set('order_id', String(orderId));
-    return NextResponse.redirect(redirectUrl);
+    const redirectPath = buildPaymentResultRedirectPath({
+      status: 'success',
+      orderId,
+      orderNumber,
+      source,
+      platform: detectedPlatform,
+    });
+    return NextResponse.redirect(new URL(redirectPath, request.url));
 
   } catch (error: any) {
     logMonitor('PAYMENTS', 'ERROR', {

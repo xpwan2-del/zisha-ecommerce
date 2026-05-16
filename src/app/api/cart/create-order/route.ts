@@ -6,6 +6,7 @@ import { applyPromotions } from '@/lib/pricing/cartPricing';
 import { calculateOrderPricing, persistOrderPricing } from '@/lib/order-pricing-service';
 import { getMessageWithParams } from '@/lib/messages';
 import { logMonitor } from '@/lib/utils/logger';
+const { buildDeleteCheckedOutCartItemsSql } = require('@/lib/cart/checkoutCleanup');
 
 /**
  * @api {POST} /api/cart/create-order 购物车下单
@@ -222,6 +223,9 @@ export async function POST(request: NextRequest) {
         couponIds,
         paymentMethod,
       });
+
+      const cleanupSql = buildDeleteCheckedOutCartItemsSql({ userId, cartItemIds });
+      await query(cleanupSql.sql, cleanupSql.params);
 
       await query('COMMIT');
 

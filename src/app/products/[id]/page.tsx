@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useCallback } from "react";
+import { useState, useEffect, use, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -99,40 +99,39 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
   const [isFavorited, setIsFavorited] = useState(false);
   const [activeTab, setActiveTab] = useState<'description' | 'specs'>('description');
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
+  const hasLoadedProductRef = useRef(false);
+  const lastFavoriteProductIdRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    fetchProduct();
-    fetchRelatedProducts();
-    fetchReviews();
-    if (isAuthenticated && user) {
-      checkFavoriteStatus();
+  const fetchProduct = useCallback(async (options?: { showPageLoader?: boolean }) => {
+    const shouldShowPageLoader = options?.showPageLoader ?? !hasLoadedProductRef.current;
+    if (shouldShowPageLoader) {
+      setIsLoading(true);
     }
-  }, [id, i18n.language, isAuthenticated, user]);
 
-  const fetchProduct = async () => {
-    setIsLoading(true);
     try {
       const response = await fetch(`/api/products/${id}`);
       if (!response.ok) {
         setProduct(null);
-        setIsLoading(false);
         return;
       }
       const data = await response.json();
       if (data && !data.error) {
         setProduct(data.data || data);
+        hasLoadedProductRef.current = true;
       } else {
         setProduct(null);
       }
-      setIsLoading(false);
     } catch (error) {
       console.error('Failed to fetch product:', error);
       setProduct(null);
-      setIsLoading(false);
+    } finally {
+      if (shouldShowPageLoader) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [id]);
   
-  const fetchRelatedProducts = async () => {
+  const fetchRelatedProducts = useCallback(async () => {
     try {
       const response = await fetch(`/api/products?category=all&limit=8`);
       if (!response.ok) {
@@ -144,14 +143,16 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
       if (productsData.length > 0) {
         const products = productsData.filter((p: any) => p.id != parseInt(id)).slice(0, 4);
         setRelatedProducts(products);
+        return;
       }
+      setRelatedProducts([]);
     } catch (error) {
       console.error('Failed to fetch related products:', error);
       setRelatedProducts([]);
     }
-  };
+  }, [id]);
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     try {
       const response = await fetch(`/api/reviews?product_id=${id}&lang=${i18n.language}`);
       if (!response.ok) {
@@ -164,7 +165,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
       console.error('Failed to fetch reviews:', error);
       setReviews([]);
     }
-  };
+  }, [i18n.language, id]);
 
   const openModal = (images: string[], index: number) => {
     setCurrentImages(images);
@@ -192,7 +193,6 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
         if (response.ok) {
           setCartMessage({ type: 'success', text: t('cart.added_success', '已添加到购物车') });
           await refreshCart();
-          await fetchProduct();
         }
         else setCartMessage({ type: 'error', text: data.error || t('cart.add_failed', '添加失败') });
       } else {
@@ -248,16 +248,44 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
     }
   };
 
-  const checkFavoriteStatus = async () => {
-    if (!product?.id || !isAuthenticated) return;
+  const checkFavoriteStatus = useCallback(async (productId: number) => {
+    if (!isAuthenticated) return;
+    lastFavoriteProductIdRef.current = productId;
     try {
-      const response = await fetch(`/api/favorites?product_id=${product.id}`, { credentials: 'include' });
+      const response = await fetch(`/api/favorites?product_id=${productId}`, { credentials: 'include' });
       const data = await response.json();
-      if (data.success && data.data?.isFavorited) setIsFavorited(true);
+      setIsFavorited(Boolean(data.success && data.data?.isFavorited));
     } catch (error) {
       console.error('Failed to check favorite status:', error);
     }
-  };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    hasLoadedProductRef.current = false;
+    lastFavoriteProductIdRef.current = null;
+    setProduct(null);
+    setIsFavorited(false);
+    fetchProduct({ showPageLoader: true });
+    fetchRelatedProducts();
+  }, [fetchProduct, fetchRelatedProducts, id]);
+
+  useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user || !product?.id) {
+      setIsFavorited(false);
+      lastFavoriteProductIdRef.current = null;
+      return;
+    }
+
+    if (lastFavoriteProductIdRef.current === product.id) {
+      return;
+    }
+
+    checkFavoriteStatus(product.id);
+  }, [checkFavoriteStatus, isAuthenticated, product?.id, user]);
 
   const toggleFavorite = async () => {
     if (!isAuthenticated || !user || !product?.id) {

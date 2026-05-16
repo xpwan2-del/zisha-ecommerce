@@ -1,7 +1,8 @@
 // src/lib/payment/paypal-adapter.ts
-import { OrderPaymentData, PaymentRequest, RedirectPaymentResult, PaymentAdapter } from './types';
+import { OrderPaymentData, PaymentRequest, RedirectPaymentResult, PaymentAdapter, RefundPaymentRequest, RefundPaymentResult } from './types';
 import { PaymentService } from '@/lib/payment/PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
+import { buildPayPalApplicationContext } from '@/lib/payment/paypal-redirects';
 
 const PAYPAL_API_BASE_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_BASE_LIVE = 'https://api-m.paypal.com';
@@ -110,10 +111,11 @@ export class PayPalAdapter implements PaymentAdapter {
         },
         items: paypalItems,
       }],
-      application_context: {
-        return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cart/success?order_number=${order_number}&status=cancel&platform=paypal`,
-      },
+      application_context: buildPayPalApplicationContext({
+        baseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+        orderNumber: order_number,
+        source: request.source || 'cart',
+      }),
     };
 
     logMonitor('PAYMENTS', 'INFO', {
@@ -168,6 +170,68 @@ export class PayPalAdapter implements PaymentAdapter {
       type: 'redirect',
       paymentId: paypalResponse.id,
       redirectUrl: approvalUrl,
+    };
+  }
+
+  async refundPayment(request: RefundPaymentRequest): Promise<RefundPaymentResult> {
+    await PaymentService.initialize();
+    const config = this.getConfig();
+    const accessToken = await this.getAccessToken();
+    const captureId = request.referenceId || request.paymentId;
+
+    if (!captureId) {
+      throw new Error('PayPal capture id missing');
+    }
+
+    logMonitor('PAYMENTS', 'REQUEST', {
+      action: 'PAYPAL_REFUND_REQUEST',
+      orderNumber: request.orderNumber,
+      amount: request.amount,
+      captureId,
+    });
+
+    const response = await fetch(`${config.apiBase}/v2/payments/captures/${captureId}/refund`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'PayPal-Request-Id': `refund-${request.orderNumber}`,
+      },
+      body: JSON.stringify({
+        amount: {
+          value: request.amount.toFixed(2),
+          currency_code: request.currency || 'USD',
+        },
+        invoice_id: request.orderNumber,
+        note_to_payer: request.reason || 'Order refund',
+      }),
+    });
+
+    const raw = await response.json();
+    if (!response.ok) {
+      logMonitor('PAYMENTS', 'ERROR', {
+        action: 'PAYPAL_REFUND_FAILED',
+        orderNumber: request.orderNumber,
+        status: response.status,
+        errorName: raw?.name,
+        errorMessage: raw?.message,
+      });
+      throw new Error(raw?.message || 'PayPal refund request failed');
+    }
+
+    logMonitor('PAYMENTS', 'SUCCESS', {
+      action: 'PAYPAL_REFUND_CREATED',
+      orderNumber: request.orderNumber,
+      refundId: raw.id,
+      status: raw.status,
+    });
+
+    return {
+      success: true,
+      platform: 'paypal',
+      refundId: raw.id,
+      status: raw.status === 'COMPLETED' ? 'succeeded' : 'processing',
+      raw,
     };
   }
 }

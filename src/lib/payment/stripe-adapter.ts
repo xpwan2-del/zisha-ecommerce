@@ -1,6 +1,6 @@
 // src/lib/payment/stripe-adapter.ts
 import Stripe from 'stripe';
-import { OrderPaymentData, PaymentRequest, RedirectPaymentResult, PaymentAdapter } from './types';
+import { OrderPaymentData, PaymentRequest, RedirectPaymentResult, PaymentAdapter, RefundPaymentRequest, RefundPaymentResult } from './types';
 import { PaymentService } from './PaymentService';
 import { logMonitor } from '@/lib/utils/logger';
 
@@ -95,6 +95,51 @@ export class StripeAdapter implements PaymentAdapter {
       type: 'redirect',
       paymentId: session.id,
       redirectUrl: session.url || '',
+    };
+  }
+
+  async refundPayment(request: RefundPaymentRequest): Promise<RefundPaymentResult> {
+    const { secretKey } = parseStripeConfig();
+    if (!secretKey) {
+      throw new Error('Stripe is not configured');
+    }
+
+    const stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' as any });
+    const paymentIntent = request.referenceId || request.paymentId;
+    if (!paymentIntent) {
+      throw new Error('Stripe refund reference missing');
+    }
+
+    logMonitor('PAYMENTS', 'REQUEST', {
+      action: 'STRIPE_REFUND_CREATE',
+      orderNumber: request.orderNumber,
+      amount: request.amount,
+    });
+
+    const refund = await stripe.refunds.create({
+      payment_intent: paymentIntent,
+      amount: Math.round(request.amount * 100),
+      reason: 'requested_by_customer',
+      metadata: {
+        order_number: request.orderNumber,
+        operator_id: String(request.operatorId),
+        operator_name: request.operatorName,
+      },
+    });
+
+    logMonitor('PAYMENTS', 'SUCCESS', {
+      action: 'STRIPE_REFUND_CREATED',
+      orderNumber: request.orderNumber,
+      refundId: refund.id,
+      status: refund.status,
+    });
+
+    return {
+      success: true,
+      platform: 'stripe',
+      refundId: refund.id,
+      status: refund.status === 'succeeded' ? 'succeeded' : 'processing',
+      raw: refund,
     };
   }
 }
